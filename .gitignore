@@ -1,0 +1,30 @@
+# dependencias
+/node_modules
+/.pnp
+.pnp.*
+
+# build
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# Prisma Client generado
+/lib/db/generated
+
+# entorno
+.env
+.env*.local
+
+# testing y varios
+/coverage
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+*.tsbuildinfo
+
+# Claude
+.claude

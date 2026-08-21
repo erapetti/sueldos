@@ -1,0 +1,432 @@
+'use client'
+
+/**
+ * §7.1 y §7.2 — base compartida de las dos planillas mensuales.
+ *
+ * Encabezado con selector de mes y flechas, calendario de 7 columnas (lunes a domingo),
+ * modo lista rápida, pie fijo con el resumen en vivo, y guardado en lote de todos los
+ * renglones en una sola operación.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
+import {
+  aISO,
+  aPeriodoISO,
+  diasDelPeriodo,
+  diaSemana,
+  formatearPeriodoCapitalizado,
+  hoy,
+  NOMBRES_DIAS_CORTOS,
+  parsePeriodo,
+  sumarMeses,
+} from '@/lib/format/dates'
+
+export type Renglon = {
+  /** Clave local; los ya guardados traen además `id`. */
+  clave: string
+  id?: string
+  fecha: string
+  horas: number
+  nota?: string
+  /** Campos propios de cada planilla (recargo/BPS, o causal/descuenta). */
+  extra: Record<string, unknown>
+}
+
+export type DiaContexto = {
+  fecha: string
+  /** Horas que le corresponden al día según el régimen vigente. */
+  horasRegimen: number
+  feriado: string | null
+  feriadoNoLaborable: boolean
+}
+
+export type PlanillaMensualProps = {
+  empleadoId: string
+  alias: string
+  nombreCompleto: string
+  periodo: string
+  /** Ruta base de la planilla, para navegar entre meses. */
+  ruta: string
+  titulo: string
+  /** Datos por día del período: horas del régimen y feriados. */
+  dias: DiaContexto[]
+  /** Renglones ya guardados. */
+  guardados: Renglon[]
+  /** Estado de la liquidación del período, para el encabezado. */
+  estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
+  /** Información extra del encabezado (valores hora vigentes). */
+  encabezado: React.ReactNode
+  /** Contenido del popover de carga de un día. */
+  renderPopover: (props: {
+    fecha: string
+    contexto: DiaContexto
+    renglones: Renglon[]
+    agregar: (renglon: Omit<Renglon, 'clave' | 'fecha'>) => void
+    quitar: (clave: string) => void
+    cerrar: () => void
+  }) => React.ReactNode
+  /** Etiqueta corta de un renglón dentro de la celda del calendario. */
+  renderEtiqueta: (renglon: Renglon) => React.ReactNode
+  /** Fila del modo lista rápida. */
+  renderFilaLista: (props: {
+    renglon: Renglon
+    contexto: DiaContexto | undefined
+    actualizar: (cambios: Partial<Renglon>) => void
+    quitar: () => void
+  }) => React.ReactNode
+  /** Resumen del pie: se calcula sobre los renglones de la sesión. */
+  renderResumen: (renglones: Renglon[]) => React.ReactNode
+  /**
+   * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
+   * el lote; la planilla se recarga sola cuando cambian los renglones guardados.
+   */
+  onGuardar: (renglones: Renglon[], borrar: string[]) => void
+  enviando: boolean
+  soloLectura?: boolean
+}
+
+const ESTADO_TEXTO = {
+  SIN_LIQUIDAR: 'Sin liquidar',
+  LIQUIDADA: 'Liquidada',
+  LIQUIDADA_Y_PAGADA: 'Liquidada y pagada',
+} as const
+
+let contador = 0
+function nuevaClave(): string {
+  contador += 1
+  return `r${contador}`
+}
+
+export function PlanillaMensual(props: PlanillaMensualProps) {
+  const router = useRouter()
+  const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
+  const hoyISO = useMemo(() => aISO(hoy()), [])
+
+  const [renglones, setRenglones] = useState<Renglon[]>(props.guardados)
+  const [borrar, setBorrar] = useState<string[]>([])
+  const [modoLista, setModoLista] = useState(false)
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
+  const [foco, setFoco] = useState<string | null>(null)
+  const grillaRef = useRef<HTMLDivElement>(null)
+
+  // Al cambiar de mes, o después de guardar, la planilla se recarga con lo guardado. Es
+  // estado derivado de las props: se ajusta durante el render comparando contra el valor
+  // anterior, en vez de con un efecto.
+  const [guardadosPrevios, setGuardadosPrevios] = useState(props.guardados)
+  if (props.guardados !== guardadosPrevios) {
+    setGuardadosPrevios(props.guardados)
+    setRenglones(props.guardados)
+    setBorrar([])
+    setDiaAbierto(null)
+  }
+
+  const hayCambios = useMemo(() => {
+    if (borrar.length > 0) return true
+    if (renglones.length !== props.guardados.length) return true
+    return renglones.some((r) => !r.id)
+  }, [renglones, borrar, props.guardados])
+
+  // §7.1 — cerrar con cambios sin guardar pide confirmación.
+  useEffect(() => {
+    if (!hayCambios) return
+    function alSalir(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', alSalir)
+    return () => window.removeEventListener('beforeunload', alSalir)
+  }, [hayCambios])
+
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, Renglon[]>()
+    for (const r of renglones) {
+      const lista = mapa.get(r.fecha) ?? []
+      lista.push(r)
+      mapa.set(r.fecha, lista)
+    }
+    return mapa
+  }, [renglones])
+
+  const contextoPorDia = useMemo(
+    () => new Map(props.dias.map((d) => [d.fecha, d])),
+    [props.dias],
+  )
+
+  const agregar = useCallback((fecha: string, datos: Omit<Renglon, 'clave' | 'fecha'>) => {
+    setRenglones((previos) => [...previos, { ...datos, clave: nuevaClave(), fecha }])
+  }, [])
+
+  const quitar = useCallback((clave: string) => {
+    setRenglones((previos) => {
+      const objetivo = previos.find((r) => r.clave === clave)
+      // Los renglones ya guardados se marcan para borrar en el mismo lote.
+      if (objetivo?.id) setBorrar((b) => [...b, objetivo.id!])
+      return previos.filter((r) => r.clave !== clave)
+    })
+  }, [])
+
+  const actualizar = useCallback((clave: string, cambios: Partial<Renglon>) => {
+    setRenglones((previos) =>
+      previos.map((r) => (r.clave === clave ? { ...r, ...cambios } : r)),
+    )
+  }, [])
+
+  function irAMes(delta: number) {
+    if (hayCambios && !confirm('Tenés cambios sin guardar. ¿Salir igual?')) return
+    router.push(`${props.ruta}?periodo=${aPeriodoISO(sumarMeses(periodo, delta))}`)
+  }
+
+  function guardar() {
+    props.onGuardar(renglones, borrar)
+  }
+
+  function descartar() {
+    setRenglones(props.guardados)
+    setBorrar([])
+  }
+
+  // §7.1 — las flechas del teclado mueven de día, para cargar todo sin usar el mouse.
+  function alTeclado(e: React.KeyboardEvent, fecha: string) {
+    const deltas: Record<string, number> = {
+      ArrowLeft: -1,
+      ArrowRight: 1,
+      ArrowUp: -7,
+      ArrowDown: 7,
+    }
+    const delta = deltas[e.key]
+    if (delta === undefined) return
+
+    e.preventDefault()
+    const todos = props.dias.map((d) => d.fecha)
+    const indice = todos.indexOf(fecha)
+    const destino = todos[indice + delta]
+    if (!destino) return
+
+    setFoco(destino)
+    grillaRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-fecha="${destino}"]`)
+      ?.focus()
+  }
+
+  const diasDelMes = useMemo(() => diasDelPeriodo(periodo), [periodo])
+  // Celdas vacías para que el 1° caiga en su columna (la semana arranca en lunes).
+  const relleno = diaSemana(diasDelMes[0])
+
+  const noPuedeAvanzar = periodo.getTime() >= parsePeriodo(aPeriodoISO(hoy())).getTime()
+
+  return (
+    <div className="space-y-4 pb-32">
+      {/* Encabezado */}
+      <div className="space-y-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{props.titulo}</h1>
+          <p className="text-sm text-muted-foreground">
+            <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
+              {props.alias}
+            </Link>{' '}
+            — {props.nombreCompleto}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => irAMes(-1)} aria-label="Mes anterior">
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="min-w-40 text-center font-medium">
+              {formatearPeriodoCapitalizado(periodo)}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => irAMes(1)}
+              disabled={noPuedeAvanzar}
+              aria-label="Mes siguiente"
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+
+          <span className="rounded-full border px-3 py-1 text-sm text-muted-foreground">
+            {ESTADO_TEXTO[props.estadoLiquidacion]}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setModoLista((v) => !v)}
+            className="ml-auto"
+          >
+            {modoLista ? (
+              <>
+                <CalendarDays className="size-4" aria-hidden /> Calendario
+              </>
+            ) : (
+              <>
+                <List className="size-4" aria-hidden /> Lista rápida
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className="text-sm text-muted-foreground">{props.encabezado}</div>
+      </div>
+
+      {/* Cuerpo */}
+      {modoLista ? (
+        <div className="space-y-2 rounded-lg border p-3">
+          {renglones.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Todavía no cargaste nada. Agregá el primer renglón.
+            </p>
+          ) : (
+            renglones
+              .slice()
+              .sort((a, b) => a.fecha.localeCompare(b.fecha))
+              .map((renglon) => (
+                <div key={renglon.clave} className="flex items-center gap-2">
+                  {props.renderFilaLista({
+                    renglon,
+                    contexto: contextoPorDia.get(renglon.fecha),
+                    actualizar: (cambios) => actualizar(renglon.clave, cambios),
+                    quitar: () => quitar(renglon.clave),
+                  })}
+                </div>
+              ))
+          )}
+
+          {!props.soloLectura ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                agregar(props.dias[0]?.fecha ?? aISO(diasDelMes[0]), {
+                  horas: 0,
+                  extra: {},
+                })
+              }
+            >
+              Agregar renglón
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div ref={grillaRef} className="rounded-lg border p-2 sm:p-3">
+          <div className="grid grid-cols-7 gap-1 pb-2 text-center text-xs font-medium text-muted-foreground">
+            {NOMBRES_DIAS_CORTOS.map((d) => (
+              <div key={d}>{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: relleno }, (_, i) => (
+              <div key={`hueco-${i}`} />
+            ))}
+
+            {diasDelMes.map((fechaDia) => {
+              const fecha = aISO(fechaDia)
+              const contexto = contextoPorDia.get(fecha)
+              const delDia = porDia.get(fecha) ?? []
+              const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
+              const esHoy = fecha === hoyISO
+
+              return (
+                <Popover
+                  key={fecha}
+                  open={diaAbierto === fecha}
+                  onOpenChange={(v) => setDiaAbierto(v ? fecha : null)}
+                >
+                  <PopoverAnchor asChild>
+                    <button
+                      type="button"
+                      data-fecha={fecha}
+                      onClick={() => !props.soloLectura && setDiaAbierto(fecha)}
+                      onKeyDown={(e) => alTeclado(e, fecha)}
+                      onFocus={() => setFoco(fecha)}
+                      tabIndex={foco === fecha || (!foco && fechaDia.getUTCDate() === 1) ? 0 : -1}
+                      disabled={props.soloLectura}
+                      aria-label={`${fechaDia.getUTCDate()} — ${contexto?.feriado ?? ''} ${
+                        delDia.length > 0 ? `${delDia.length} renglones` : 'sin cargas'
+                      }`}
+                      className={cn(
+                        'flex min-h-20 flex-col items-start gap-1 rounded-md border p-1.5 text-left text-xs transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        noTrabaja && 'bg-muted/50',
+                        esHoy && 'ring-2 ring-primary',
+                        !props.soloLectura && 'hover:bg-accent',
+                      )}
+                    >
+                      <span className="flex w-full items-baseline justify-between">
+                        <span className={cn('font-medium', esHoy && 'text-primary')}>
+                          {fechaDia.getUTCDate()}
+                        </span>
+                        {contexto && contexto.horasRegimen > 0 ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            {contexto.horasRegimen} h
+                          </span>
+                        ) : null}
+                      </span>
+
+                      {contexto?.feriado ? (
+                        <span className="line-clamp-2 text-[10px] text-destructive">
+                          {contexto.feriado}
+                        </span>
+                      ) : null}
+
+                      <span className="flex w-full flex-col gap-0.5">
+                        {delDia.map((r) => (
+                          <span key={r.clave}>{props.renderEtiqueta(r)}</span>
+                        ))}
+                      </span>
+                    </button>
+                  </PopoverAnchor>
+
+                  <PopoverContent align="start" className="w-72">
+                    {props.renderPopover({
+                      fecha,
+                      contexto: contexto ?? {
+                        fecha,
+                        horasRegimen: 0,
+                        feriado: null,
+                        feriadoNoLaborable: false,
+                      },
+                      renglones: delDia,
+                      agregar: (datos) => agregar(fecha, datos),
+                      quitar,
+                      cerrar: () => setDiaAbierto(null),
+                    })}
+                  </PopoverContent>
+                </Popover>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Pie fijo (§7.1) */}
+      {!props.soloLectura ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 backdrop-blur no-print">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 p-3 lg:pl-72">
+            <div className="min-w-0 flex-1 text-sm">{props.renderResumen(renglones)}</div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={descartar} disabled={!hayCambios || props.enviando}>
+                Descartar
+              </Button>
+              <Button onClick={guardar} disabled={!hayCambios || props.enviando}>
+                {props.enviando ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export { nuevaClave, Trash2, Input }

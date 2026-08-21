@@ -1,0 +1,591 @@
+'use client'
+
+/**
+ * §8.4 — ficha del empleado, con sus ocho secciones.
+ */
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+import { FormularioSeries } from './FormularioSeries'
+import { FormularioDatos } from './FormularioDatos'
+import { PanelCompartir } from './PanelCompartir'
+import { formatearDias, formatearImporte } from '@/lib/format/money'
+import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
+
+type Salario = {
+  id: string
+  fechaVigencia: string
+  fechaVigenciaISO: string
+  salario: string
+  horasSemanales: string
+  valorHora: string
+  origen: string
+}
+
+type ValorHoraNegro = {
+  id: string
+  fechaVigencia: string
+  fechaVigenciaISO: string
+  valor: string
+  origen: string
+}
+
+type Regimen = {
+  id: string
+  fechaVigencia: string
+  fechaVigenciaISO: string
+  dias: string[]
+  total: string
+}
+
+export type FichaProps = {
+  empleadoId: string
+  seccionInicial: string
+  soloLectura: boolean
+  esDueno: boolean
+  comoAdministrador: boolean
+  duenoNombre: string
+  empleado: {
+    alias: string
+    nombreCompleto: string
+    banco: string
+    cuenta: string
+    fechaIngreso: string
+    fechaEgreso: string | null
+    cobraBoletos: boolean
+    aportaBps: boolean
+    celular: string | null
+    direccion: string | null
+    cedula: string | null
+    seguroSalud: string | null
+    seguroSaludDescripcion: string | null
+    activo: boolean
+    visible: boolean
+  }
+  salarios: Salario[]
+  valoresHoraNegro: ValorHoraNegro[]
+  regimenes: Regimen[]
+  cuentaCorriente: {
+    id: string
+    fecha: string
+    tipo: string
+    concepto: string
+    debe: string
+    haber: string
+    saldoAcumulado: string
+    esReversa: boolean
+  }[]
+  saldo: string
+  mesesSinLiquidar: string[]
+  cuotas: { id: string; fecha: string; fechaISO: string; monto: string; estado: string }[]
+  licencias: {
+    id: string
+    desde: string
+    hasta: string
+    diasHabiles: string
+    salarioVacacional: string | null
+    liquidacionAnulada: boolean
+    nota: string | null
+  }[]
+  licenciaMovimientos: {
+    id: string
+    fecha: string
+    tipo: string
+    concepto: string
+    debe: string
+    haber: string
+    saldoAcumulado: string
+  }[]
+  saldoDias: string
+  liquidaciones: {
+    id: string
+    periodo: string
+    periodoISO: string
+    tipo: string
+    secuencia: number
+    estado: string
+    totalAPagar: string
+    pagada: boolean
+  }[]
+  totalesPorPeriodo: Record<string, string>
+  permisos: { usuarioId: string; nombre: string; email: string; permiso: string }[]
+}
+
+const ETIQUETA_TIPO: Record<string, string> = {
+  MENSUAL: 'Mensual',
+  AGUINALDO: 'Aguinaldo',
+  SALARIO_VACACIONAL: 'Salario vacacional',
+}
+
+export function FichaEmpleado(props: FichaProps) {
+  const router = useRouter()
+  const [seccion, setSeccion] = useState(props.seccionInicial)
+
+  return (
+    <div className="space-y-5">
+      {props.comoAdministrador ? (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Estás viendo un empleado de {props.duenoNombre} como administrador. Para operarlo tenés
+          que compartírtelo desde «Todos los empleados».
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{props.empleado.alias}</h1>
+          <p className="text-muted-foreground">{props.empleado.nombreCompleto}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!props.empleado.activo ? <Badge variant="secondary">Dado de baja</Badge> : null}
+          {!props.empleado.visible ? <Badge variant="outline">Oculto del listado</Badge> : null}
+          {!props.empleado.aportaBps ? <Badge variant="outline">Sin aportes al BPS</Badge> : null}
+        </div>
+      </div>
+
+      <Tabs value={seccion} onValueChange={setSeccion}>
+        <TabsList className="flex w-full flex-wrap justify-start">
+          <TabsTrigger value="datos">Datos</TabsTrigger>
+          <TabsTrigger value="salario">Salario</TabsTrigger>
+          <TabsTrigger value="regimen">Régimen</TabsTrigger>
+          <TabsTrigger value="novedades">Novedades</TabsTrigger>
+          <TabsTrigger value="cuenta">Cuenta corriente</TabsTrigger>
+          <TabsTrigger value="licencia">Licencia</TabsTrigger>
+          <TabsTrigger value="liquidaciones">Liquidaciones</TabsTrigger>
+          {props.esDueno ? <TabsTrigger value="compartido">Compartido con</TabsTrigger> : null}
+        </TabsList>
+
+        {/* 1 — Datos */}
+        <TabsContent value="datos" className="pt-4">
+          <FormularioDatos
+            empleadoId={props.empleadoId}
+            valores={props.empleado}
+            soloLectura={props.soloLectura}
+            esDueno={props.esDueno}
+          />
+        </TabsContent>
+
+        {/* 2 — Salario */}
+        <TabsContent value="salario" className="space-y-6 pt-4">
+          <section className="space-y-3">
+            <h2 className="font-semibold">Salario y horas semanales</h2>
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vigente desde</TableHead>
+                    <TableHead className="text-right">Salario</TableHead>
+                    <TableHead className="text-right">Horas semanales</TableHead>
+                    <TableHead className="text-right">Valor hora calculado</TableHead>
+                    <TableHead>Origen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {props.salarios.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="tabular">{s.fechaVigencia}</TableCell>
+                      <TableCell className="text-right tabular">
+                        {formatearImporte(s.salario)}
+                      </TableCell>
+                      <TableCell className="text-right tabular">{s.horasSemanales} h</TableCell>
+                      <TableCell className="text-right tabular">
+                        {formatearImporte(s.valorHora)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {!props.soloLectura ? (
+              <FormularioSeries
+                tipo="SALARIO"
+                empleadoId={props.empleadoId}
+                onGuardado={() => router.refresh()}
+              />
+            ) : null}
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="font-semibold">Valor hora «en negro»</h2>
+            <p className="text-sm text-muted-foreground">
+              Con el que se pagan las horas extras sin descuento de BPS (§4.3.1).
+            </p>
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vigente desde</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Valor hora calculado</TableHead>
+                    <TableHead>Origen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {props.valoresHoraNegro.map((v) => {
+                    // El valor hora calculado vigente a esa fecha, como referencia.
+                    const referencia = props.salarios.find(
+                      (s) => s.fechaVigenciaISO <= v.fechaVigenciaISO,
+                    )
+                    return (
+                      <TableRow key={v.id}>
+                        <TableCell className="tabular">{v.fechaVigencia}</TableCell>
+                        <TableCell className="text-right tabular">
+                          {formatearImporte(v.valor)}
+                        </TableCell>
+                        <TableCell className="text-right tabular text-muted-foreground">
+                          {referencia ? formatearImporte(referencia.valorHora) : '—'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {v.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {!props.soloLectura ? (
+              <FormularioSeries
+                tipo="VALOR_HORA_NEGRO"
+                empleadoId={props.empleadoId}
+                onGuardado={() => router.refresh()}
+              />
+            ) : null}
+          </section>
+        </TabsContent>
+
+        {/* 3 — Régimen */}
+        <TabsContent value="regimen" className="space-y-4 pt-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vigente desde</TableHead>
+                  {NOMBRES_DIAS_CORTOS.map((d) => (
+                    <TableHead key={d} className="text-right">
+                      {d}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {props.regimenes.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="tabular">{r.fechaVigencia}</TableCell>
+                    {r.dias.map((horas, i) => (
+                      <TableCell key={i} className="text-right tabular">
+                        {Number(horas) > 0 ? horas : '—'}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-right tabular font-medium">{r.total} h</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {!props.soloLectura ? (
+            <FormularioSeries
+              tipo="REGIMEN"
+              empleadoId={props.empleadoId}
+              onGuardado={() => router.refresh()}
+            />
+          ) : null}
+        </TabsContent>
+
+        {/* 4 — Novedades */}
+        <TabsContent value="novedades" className="space-y-3 pt-4">
+          <p className="text-sm text-muted-foreground">
+            Las horas extras y las inasistencias se cargan en su planilla mensual, que permite
+            cargar un mes entero de una sola vez.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/empleados/${props.empleadoId}/horas-extras`}>Horas extras</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/empleados/${props.empleadoId}/faltas`}>Inasistencias</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/empleados/${props.empleadoId}/liquidacion`}>Cálculo de sueldo</Link>
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* 5 — Cuenta corriente */}
+        <TabsContent value="cuenta" className="space-y-4 pt-4">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className="text-sm text-muted-foreground">Saldo</span>
+            <span
+              className={cn(
+                'text-2xl font-semibold tabular',
+                Number(props.saldo) < 0 && 'text-destructive',
+              )}
+            >
+              {formatearImporte(props.saldo)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {Number(props.saldo) > 0
+                ? 'la empresa le debe al empleado'
+                : Number(props.saldo) < 0
+                  ? 'saldo pendiente de préstamos'
+                  : 'al día'}
+            </span>
+          </div>
+
+          {props.mesesSinLiquidar.length > 0 ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              El saldo puede estar incompleto: faltan confirmar las liquidaciones de{' '}
+              {props.mesesSinLiquidar.slice(0, 8).join(', ')}
+              {props.mesesSinLiquidar.length > 8
+                ? ` y ${props.mesesSinLiquidar.length - 8} meses más`
+                : ''}
+              .
+            </p>
+          ) : null}
+
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Concepto</TableHead>
+                  <TableHead className="text-right">Debe</TableHead>
+                  <TableHead className="text-right">Haber</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {props.cuentaCorriente.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                      Todavía no hay movimientos.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  props.cuentaCorriente.map((m) => (
+                    <TableRow key={m.id} className={cn(m.esReversa && 'text-muted-foreground')}>
+                      <TableCell className="tabular">{m.fecha}</TableCell>
+                      <TableCell>{m.concepto}</TableCell>
+                      <TableCell className="text-right tabular">
+                        {Number(m.debe) > 0 ? formatearImporte(m.debe) : ''}
+                      </TableCell>
+                      <TableCell className="text-right tabular">
+                        {Number(m.haber) > 0 ? formatearImporte(m.haber) : ''}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          'text-right tabular',
+                          Number(m.saldoAcumulado) < 0 && 'text-destructive',
+                        )}
+                      >
+                        {formatearImporte(m.saldoAcumulado)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {props.cuotas.length > 0 ? (
+            <section className="space-y-2">
+              <h2 className="font-semibold">Plan de pagos</h2>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mes</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {props.cuotas.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="tabular">{c.fecha}</TableCell>
+                        <TableCell className="text-right tabular">
+                          {formatearImporte(c.monto)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={c.estado === 'APLICADA' ? 'secondary' : 'outline'}>
+                            {c.estado === 'APLICADA' ? 'Aplicada' : 'Pendiente'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+          ) : null}
+        </TabsContent>
+
+        {/* 6 — Licencia */}
+        <TabsContent value="licencia" className="space-y-4 pt-4">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className="text-sm text-muted-foreground">Saldo de días</span>
+            <span
+              className={cn(
+                'text-2xl font-semibold tabular',
+                Number(props.saldoDias) < 0 && 'text-destructive',
+              )}
+            >
+              {formatearDias(props.saldoDias)}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Concepto</TableHead>
+                  <TableHead className="text-right">Consumidos</TableHead>
+                  <TableHead className="text-right">Generados</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {props.licenciaMovimientos.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                      Todavía no hay movimientos de licencia.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  props.licenciaMovimientos.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="tabular">{m.fecha}</TableCell>
+                      <TableCell>{m.concepto}</TableCell>
+                      <TableCell className="text-right tabular">
+                        {Number(m.debe) > 0 ? m.debe : ''}
+                      </TableCell>
+                      <TableCell className="text-right tabular">
+                        {Number(m.haber) > 0 ? m.haber : ''}
+                      </TableCell>
+                      <TableCell className="text-right tabular">{m.saldoAcumulado}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {props.licencias.length > 0 ? (
+            <section className="space-y-2">
+              <h2 className="font-semibold">Períodos gozados</h2>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Desde</TableHead>
+                      <TableHead>Hasta</TableHead>
+                      <TableHead className="text-right">Días hábiles</TableHead>
+                      <TableHead className="text-right">Salario vacacional</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {props.licencias.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="tabular">{l.desde}</TableCell>
+                        <TableCell className="tabular">{l.hasta}</TableCell>
+                        <TableCell className="text-right tabular">{l.diasHabiles}</TableCell>
+                        <TableCell className="text-right tabular">
+                          {l.salarioVacacional ? formatearImporte(l.salarioVacacional) : '—'}
+                          {l.liquidacionAnulada ? (
+                            <span className="ml-1 text-muted-foreground">(anulada)</span>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+          ) : null}
+        </TabsContent>
+
+        {/* 7 — Liquidaciones */}
+        <TabsContent value="liquidaciones" className="space-y-3 pt-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Secuencia</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Total del período</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {props.liquidaciones.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                      Todavía no hay liquidaciones confirmadas.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  props.liquidaciones.map((l) => (
+                    <TableRow key={l.id} className={cn(l.estado === 'ANULADA' && 'opacity-60')}>
+                      <TableCell className="capitalize">{l.periodo}</TableCell>
+                      <TableCell>{ETIQUETA_TIPO[l.tipo] ?? l.tipo}</TableCell>
+                      <TableCell className="text-right tabular">#{l.secuencia}</TableCell>
+                      <TableCell className="text-right tabular">
+                        {formatearImporte(l.totalAPagar)}
+                      </TableCell>
+                      <TableCell className="text-right tabular text-muted-foreground">
+                        {formatearImporte(
+                          props.totalesPorPeriodo[`${l.periodoISO}|${l.tipo}`] ?? '0',
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {l.estado === 'ANULADA' ? (
+                          <Badge variant="outline">Anulada</Badge>
+                        ) : l.pagada ? (
+                          <Badge variant="secondary">Pagada</Badge>
+                        ) : (
+                          <Badge variant="outline">Sin pagar</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* 8 — Compartido con */}
+        {props.esDueno ? (
+          <TabsContent value="compartido" className="pt-4">
+            <PanelCompartir
+              empleadoId={props.empleadoId}
+              permisos={props.permisos}
+              onCambio={() => router.refresh()}
+            />
+          </TabsContent>
+        ) : null}
+      </Tabs>
+    </div>
+  )
+}
