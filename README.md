@@ -35,9 +35,10 @@ En desarrollo, dejar `PROXY_SHARED_SECRET` **sin definir** en `.env` para poder 
 sin oauth2-proxy delante, y usar `DEV_IMPERSONATE_USER` para simular identidad (§3.2).
 
 ```bash
-npm test          # 216 tests: motor de cálculo, licencia, estado derivado, integración
+npm test          # 217 tests: motor de cálculo, licencia, estado derivado, integración
 npm run lint
 npx tsc --noEmit
+npm audit         # tiene que dar 0 vulnerabilidades
 ```
 
 Los tests de integración **borran todas las tablas** de la base apuntada por `DATABASE_URL`.
@@ -288,6 +289,28 @@ Otros pendientes que no bloquean pantallas:
 - **Descuentos sobre el salario vacacional** (§13.2) — hoy se liquida por el monto bruto.
 - **Otros eventos que generan días de licencia** (§13.5) — el modelo ya contempla el tipo
   `AJUSTE`.
+
+## Overrides de dependencias
+
+`package.json` fuerza `deepmerge-ts` a `^8` con un `overrides`.
+
+El motivo es [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx), un
+agotamiento de pila al mergear grafos recursivos. La dependencia entra por `prisma` —el CLI,
+que está en `devDependencies`— a través de `@prisma/config`, que es lo que lee
+`prisma.config.ts`. Prisma 7.9.1, la última al 18/08/2026, sigue trayendo la 7.1.5.
+
+**El runtime nunca la carga**: `@prisma/client`, que es lo único que va a producción, solo
+depende de `@prisma/client-runtime-utils`. Aun así conviene sacarla del árbol, porque un
+`npm audit` en rojo permanente hace que se dejen de leer los hallazgos nuevos.
+
+Lo que **no** hay que hacer es `npm audit fix --force`: baja a `prisma@6.12.0`, que no
+soporta el generador `prisma-client`, los driver adapters ni `prisma.config.ts`. Rompe todo
+el acceso a datos para arreglar algo que no afecta a producción.
+
+Con el override, `prisma validate`, `generate`, `migrate status`, `migrate diff` y el seed
+siguen funcionando: `@prisma/config` solo usa la función `deepmerge`, que v8 mantiene.
+**Sacar el override cuando Prisma actualice la dependencia de fábrica**, verificando con
+`npm ls deepmerge-ts` que ya resuelva a 8 sin ayuda.
 
 ## Decisiones que el SPECS no fijaba
 

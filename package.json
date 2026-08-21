@@ -74,5 +74,9 @@
     "esbuild@0.28.2": true,
     "prisma@7.9.1": true,
     "unrs-resolver@1.12.2": true
+  },
+  "comentarioOverrides": "deepmerge-ts: GHSA-ggr8-5vv4-36mx (agotamiento de pila al mergear grafos recursivos). Entra por prisma, que es el CLI y es devDependency, a traves de @prisma/config. El runtime no la usa: @prisma/client solo depende de @prisma/client-runtime-utils. Prisma 7.9.1 (la ultima al 18/08/2026) sigue trayendo deepmerge-ts 7.1.5, asi que se fuerza la 8. Sacar este override cuando Prisma la actualice de fabrica. Ver el README.",
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   }
 }
