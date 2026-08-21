@@ -143,6 +143,25 @@ sudo journalctl -u sueldos -f
 
 Para generar los secretos: `openssl rand -hex 32`.
 
+Si `PROXY_SHARED_SECRET` falta en producción, la app responde **403 a todo**: cierra en vez
+de abrirse. Un 403 en cada request recién desplegado suele ser eso, no un problema del proxy.
+
+### 4.1. Lockfiles fuera del proyecto
+
+`next.config.ts` fija `outputFileTracingRoot` al directorio del proyecto. Sin eso, Next sube
+por el árbol de directorios buscando un `package-lock.json` —una heurística para detectar
+monorepos— y, si encuentra uno suelto en un directorio padre, avisa en cada arranque:
+
+```
+⚠ Warning: Next.js ignored package-lock.json in /home/erapetti because it is outside
+  the current Git repository (/home/erapetti/sueldos).
+```
+
+Con `outputFileTracingRoot` fijo el aviso desaparece y el rastreo deja de depender de lo que
+haya alrededor. Aun así, si aparece ese aviso conviene borrar el lockfile suelto: casi siempre
+es la marca de un `npm install` corrido por error fuera del proyecto, que además dejó un
+`node_modules` en el home.
+
 ### 5. oauth2-proxy
 
 La aplicación **no implementa login** (§3.1): corre detrás de oauth2-proxy contra Google.
