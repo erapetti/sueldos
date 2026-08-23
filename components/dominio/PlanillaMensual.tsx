@@ -125,20 +125,12 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   // Al cambiar de mes, o después de guardar, la planilla se recarga con lo guardado. Es
   // estado derivado de las props: se ajusta durante el render comparando contra el valor
   // anterior, en vez de con un efecto.
-  /**
-   * Último día que cargó el botón «Agregar renglón». El primer clic arranca en el
-   * primer día sin renglones; de ahí en adelante avanza de a un día, sin importar
-   * si el día siguiente ya tenía algo (se usa un renglón con BPS y otro sin BPS
-   * por día, así que un día ocupado no está necesariamente completo).
-   */
-  const [ultimaFechaAgregada, setUltimaFechaAgregada] = useState<string | null>(null)
   const [guardadosPrevios, setGuardadosPrevios] = useState(props.guardados)
   if (props.guardados !== guardadosPrevios) {
     setGuardadosPrevios(props.guardados)
     setRenglones(props.guardados)
     setBorrar([])
     setDiaAbierto(null)
-    setUltimaFechaAgregada(null)
   }
 
   const hayCambios = useMemo(() => {
@@ -174,25 +166,34 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   )
 
   /**
-   * Día en el que va a caer el próximo «Agregar renglón», o null si no hay ninguno
-   * y el botón tiene que quedar deshabilitado.
+   * Día en el que va a caer el próximo «Agregar renglón», o null si no queda
+   * ninguno y el botón tiene que quedar deshabilitado.
+   *
+   * Se deriva de los renglones y no de un contador propio, para que siga tanto las
+   * ediciones de fecha a mano como el «Descartar», que devuelve la lista a lo
+   * guardado.
    */
   const fechaNuevoRenglon = useMemo(() => {
     const fechas = props.dias.map((d) => d.fecha)
     if (fechas.length === 0) return null
-    if (ultimaFechaAgregada === null) {
-      // Primer clic de la sesión: el primer día del mes que todavía no tiene nada.
+
+    // Los renglones de esta sesión son los que todavía no tienen id.
+    const deLaSesion = renglones.filter((r) => !r.id).map((r) => r.fecha)
+
+    if (deLaSesion.length === 0) {
+      // Sin nada cargado se arranca en el primer día del mes que no tenga renglones.
       const ocupados = new Set(renglones.map((r) => r.fecha))
       const libre = fechas.find((f) => !ocupados.has(f))
-      // Si el mes está completo se arranca por el principio: un día con un renglón
+      // Si el mes está completo se empieza por el principio: un día con un renglón
       // igual admite el del otro tipo.
       return libre ?? fechas[0]
     }
-    const i = fechas.indexOf(ultimaFechaAgregada)
-    if (i === -1) return fechas[0]
-    // Al llegar al último día del mes ya no hay siguiente.
-    return fechas[i + 1] ?? null
-  }, [props.dias, renglones, ultimaFechaAgregada])
+
+    // De ahí en adelante, el día siguiente al último cargado. Las fechas son ISO,
+    // así que se comparan como texto.
+    const ultima = deLaSesion.reduce((a, b) => (a > b ? a : b))
+    return fechas.find((f) => f > ultima) ?? null
+  }, [props.dias, renglones])
 
   const agregar = useCallback((fecha: string, datos: Omit<Renglon, 'clave' | 'fecha'>) => {
     setRenglones((previos) => [...previos, { ...datos, clave: nuevaClave(), fecha }])
@@ -352,7 +353,6 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                   horas: 0,
                   extra: props.extraNuevoRenglon(),
                 })
-                setUltimaFechaAgregada(fechaNuevoRenglon)
               }}
             >
               Agregar renglón
