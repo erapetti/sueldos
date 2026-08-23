@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import {
+  CampoDia,
   CampoLista,
   PlanillaMensual,
   type DiaContexto,
@@ -134,14 +135,8 @@ export function PlanillaHorasExtras(props: {
       )}
       renderFilaLista={({ renglon, actualizar, quitar }) => (
         <>
-          <CampoLista etiqueta="Fecha">
-            <Input
-              type="date"
-              value={renglon.fecha}
-              onChange={(e) => actualizar({ fecha: e.target.value })}
-              className="w-full sm:w-40"
-              aria-label="Fecha"
-            />
+          <CampoLista etiqueta="Día">
+            <CampoDia valor={renglon.fecha} onChange={(iso) => actualizar({ fecha: iso })} />
           </CampoLista>
           <CampoLista etiqueta="Horas">
             <Input

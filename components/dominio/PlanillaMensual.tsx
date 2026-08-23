@@ -18,11 +18,15 @@ import { cn } from '@/lib/utils'
 import {
   aISO,
   aPeriodoISO,
+  dia,
+  diasDelMes,
   diasDelPeriodo,
   diaSemana,
   formatearPeriodoCapitalizado,
   hoy,
+  nombreDiaSemanaCorto,
   NOMBRES_DIAS_CORTOS,
+  parseFechaISO,
   parsePeriodo,
   sumarMeses,
 } from '@/lib/format/dates'
@@ -56,6 +60,46 @@ export function CampoLista({
     <div className="flex flex-col gap-1 sm:contents">
       <span className="text-xs text-muted-foreground sm:hidden">{etiqueta}</span>
       {children}
+    </div>
+  )
+}
+
+/**
+ * Día del renglón en la lista rápida. La planilla es de un mes, así que alcanza con el
+ * número de día; al costado se anota el día de la semana, que es el dato que hace falta
+ * para saber si ese día genera boletos adicionales (§6.5).
+ */
+export function CampoDia({
+  valor,
+  onChange,
+  soloLectura,
+}: {
+  valor: string
+  onChange: (iso: string) => void
+  soloLectura?: boolean
+}) {
+  const f = parseFechaISO(valor)
+  const ultimo = diasDelMes(f)
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="number"
+        min={1}
+        max={ultimo}
+        step={1}
+        value={dia(f)}
+        disabled={soloLectura}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          if (!Number.isInteger(n) || n < 1 || n > ultimo) return
+          // El ISO es AAAA-MM-DD: se reemplaza solo el día para no salir del mes.
+          onChange(`${valor.slice(0, 8)}${String(n).padStart(2, '0')}`)
+        }}
+        className="w-16 tabular"
+        aria-label="Día"
+      />
+      <span className="text-sm text-muted-foreground">{nombreDiaSemanaCorto(diaSemana(f))}</span>
     </div>
   )
 }
@@ -216,6 +260,9 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     return fechas.find((f) => f > ultima) ?? null
   }, [props.dias, renglones])
 
+  /** No se agrega otro renglón mientras haya uno sin horas cargadas. */
+  const hayRenglonSinHoras = useMemo(() => renglones.some((r) => !(r.horas > 0)), [renglones])
+
   const agregar = useCallback((fecha: string, datos: Omit<Renglon, 'clave' | 'fecha'>) => {
     setRenglones((previos) => [...previos, { ...datos, clave: nuevaClave(), fecha }])
   }, [])
@@ -370,7 +417,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
             <Button
               variant="outline"
               size="sm"
-              disabled={fechaNuevoRenglon === null}
+              disabled={fechaNuevoRenglon === null || hayRenglonSinHoras}
               onClick={() => {
                 if (!fechaNuevoRenglon) return
                 agregar(fechaNuevoRenglon, {
