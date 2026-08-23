@@ -62,11 +62,286 @@ async function feriadosFijos(anio: number) {
   console.log(`Feriados fijos de ${anio} cargados.`)
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Juego de datos de ejemplo (SEED_DEMO=1). Solo desarrollo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type EmpleadoDemo = {
+  alias: string
+  nombreCompleto: string
+  banco: string
+  cuenta: string
+  salario: string
+  horasSemanales: number
+  horasPorDia: number
+  valorHoraNegro: string
+  cobraBoletos: boolean
+  aportaBps: boolean
+  seguroSalud: string | null
+  activo?: boolean
+  visible?: boolean
+}
+
+/** Cuatro casos distintos, para que las pantallas muestren variedad real. */
+const EMPLEADOS_DEMO: EmpleadoDemo[] = [
+  {
+    alias: 'Ana',
+    nombreCompleto: 'Ana Pereyra Gómez',
+    banco: 'BROU',
+    cuenta: '001234567',
+    salario: '68500.00',
+    horasSemanales: 40,
+    horasPorDia: 8,
+    valorHoraNegro: '420.00',
+    cobraBoletos: true,
+    aportaBps: true,
+    seguroSalud: 'A1',
+  },
+  // Sin boletos: su liquidación no lleva la línea de boletos.
+  {
+    alias: 'Bruno',
+    nombreCompleto: 'Bruno Lemos Ferreira',
+    banco: 'Itaú',
+    cuenta: '99887766',
+    salario: '52000.00',
+    horasSemanales: 30,
+    horasPorDia: 6,
+    valorHoraNegro: '350.00',
+    cobraBoletos: false,
+    aportaBps: true,
+    seguroSalud: null,
+  },
+  // Sin aportes al BPS (§6.3): no se le aplica ningún descuento.
+  {
+    alias: 'Carla',
+    nombreCompleto: 'Carla Suárez Méndez',
+    banco: 'Santander',
+    cuenta: 'AB4455661',
+    salario: '81000.00',
+    horasSemanales: 44,
+    horasPorDia: 8,
+    valorHoraNegro: '510.00',
+    cobraBoletos: true,
+    aportaBps: false,
+    seguroSalud: null,
+  },
+  // Dado de baja y oculto: aparece en «Todos los empleados», no en el listado (§8.3, §8.7).
+  {
+    alias: 'Rodrigo',
+    nombreCompleto: 'Rodrigo Díaz Antúnez',
+    banco: 'BROU',
+    cuenta: '007766554',
+    salario: '45000.00',
+    horasSemanales: 20,
+    horasPorDia: 4,
+    valorHoraNegro: '300.00',
+    cobraBoletos: true,
+    aportaBps: true,
+    seguroSalud: null,
+    activo: false,
+    visible: false,
+  },
+]
+
+/** Serializa horas para las columnas `DECIMAL(n,2)`, como hace `lib/db/mapeo`. */
+function horas(valor: number) {
+  return valor.toFixed(2)
+}
+
+/**
+ * Dueño de los datos de ejemplo. Se usa el administrador de `BOOTSTRAP_ADMIN_EMAIL`,
+ * y si no existe se crea: unos datos de demostración cuyo dueño no puede entrar a la
+ * aplicación no sirven de nada. Si no hay email configurado, cae en el primer
+ * administrador que encuentre.
+ */
+async function duenoDemo() {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase()
+  if (email) {
+    const existente = await prisma.usuario.findUnique({ where: { email } })
+    if (existente) return existente
+    const creado = await prisma.usuario.create({
+      data: { email, esAdmin: true, activo: true, nombre: 'Administrador inicial' },
+    })
+    console.log(`Administrador ${creado.email} creado para ser dueño de los datos de ejemplo.`)
+    return creado
+  }
+  const admin = await prisma.usuario.findFirst({ where: { esAdmin: true } })
+  if (!admin) throw new Error('No hay ningún administrador: configurá BOOTSTRAP_ADMIN_EMAIL.')
+  return admin
+}
+
+async function datosDemo() {
+  const dueno = await duenoDemo()
+  const aud = { creadoPor: dueno.id, modificadoPor: dueno.id }
+  const hoy = new Date()
+  const anio = hoy.getUTCFullYear()
+  const mes = hoy.getUTCMonth() + 1
+  // Las series arrancan en enero para que cualquier mes del año tenga vigencia.
+  const vigencia = fecha(anio, 1, 1)
+
+  // Es idempotente: se borran y se recrean, así se puede correr muchas veces.
+  const borrados = await prisma.empleado.deleteMany({
+    where: { duenoId: dueno.id, alias: { in: EMPLEADOS_DEMO.map((e) => e.alias) } },
+  })
+  if (borrados.count > 0) console.log(`Se reemplazan ${borrados.count} empleados de ejemplo.`)
+
+  for (const demo of EMPLEADOS_DEMO) {
+    const empleado = await prisma.empleado.create({
+      data: {
+        duenoId: dueno.id,
+        alias: demo.alias,
+        nombreCompleto: demo.nombreCompleto,
+        banco: demo.banco,
+        cuenta: demo.cuenta,
+        fechaIngreso: vigencia,
+        cobraBoletos: demo.cobraBoletos,
+        aportaBps: demo.aportaBps,
+        // §4.2 — el seguro de salud solo tiene efecto si aporta BPS.
+        seguroSalud: demo.aportaBps ? demo.seguroSalud : null,
+        activo: demo.activo ?? true,
+        visible: demo.visible ?? true,
+        celular: '099 123 456',
+        direccion: 'Av. 18 de Julio 1234, Montevideo',
+        ...aud,
+      },
+    })
+
+    // §4.2.2 — los tres registros de serie, con vigencia el 1° del mes de ingreso.
+    await prisma.empleadoSalario.create({
+      data: {
+        empleadoId: empleado.id,
+        salario: demo.salario,
+        horasSemanales: horas(demo.horasSemanales),
+        fechaVigencia: vigencia,
+        origen: 'MANUAL',
+        ...aud,
+      },
+    })
+    await prisma.empleadoValorHoraNegro.create({
+      data: {
+        empleadoId: empleado.id,
+        valor: demo.valorHoraNegro,
+        fechaVigencia: vigencia,
+        origen: 'MANUAL',
+        ...aud,
+      },
+    })
+    const h = horas(demo.horasPorDia)
+    const cero = horas(0)
+    await prisma.empleadoRegimen.create({
+      data: {
+        empleadoId: empleado.id,
+        fechaVigencia: vigencia,
+        horasLunes: h,
+        horasMartes: h,
+        horasMiercoles: h,
+        horasJueves: h,
+        horasViernes: h,
+        horasSabado: cero,
+        horasDomingo: cero,
+        ...aud,
+      },
+    })
+
+    // Novedades del mes en curso, solo para el primero, para que la planilla mensual y
+    // la liquidación tengan renglones que mostrar.
+    if (demo.alias === 'Ana') {
+      await prisma.falta.create({
+        data: {
+          empleadoId: empleado.id,
+          fecha: fecha(anio, mes, 4),
+          horas: horas(8),
+          // §4.6.1 — la enfermedad es la única causal que puede no descontar.
+          causal: 'ENFERMEDAD',
+          descuenta: false,
+          nota: 'Certificado médico',
+          ...aud,
+        },
+      })
+      await prisma.falta.create({
+        data: {
+          empleadoId: empleado.id,
+          fecha: fecha(anio, mes, 11),
+          horas: horas(4),
+          causal: 'CON_AVISO',
+          descuenta: true,
+          ...aud,
+        },
+      })
+      await prisma.horaExtra.create({
+        data: {
+          empleadoId: empleado.id,
+          fecha: fecha(anio, mes, 6),
+          horas: horas(3),
+          conBps: true,
+          recargoPct: 100,
+          nota: 'Cierre de mes',
+          ...aud,
+        },
+      })
+      await prisma.horaExtra.create({
+        data: {
+          empleadoId: empleado.id,
+          fecha: fecha(anio, mes, 20),
+          horas: horas(2.5),
+          conBps: false,
+          recargoPct: 0,
+          ...aud,
+        },
+      })
+    }
+  }
+  console.log(`${EMPLEADOS_DEMO.length} empleados de ejemplo cargados (dueño: ${dueno.email}).`)
+
+  // §4.12 — sin valor de boleto vigente la liquidación no se puede calcular.
+  await prisma.valorBoleto.upsert({
+    where: { fechaVigencia: vigencia },
+    create: { monto: '55.00', fechaVigencia: vigencia, ...aud },
+    update: { monto: '55.00', modificadoPor: dueno.id },
+  })
+
+  // §4.11 — conceptos generales, aplicables a todos los empleados que aporten.
+  const CONCEPTOS: [string, string][] = [
+    ['Jubilación', '15.0000'],
+    ['FONASA', '4.5000'],
+    ['FRL', '0.1000'],
+  ]
+  for (const [concepto, porcentaje] of CONCEPTOS) {
+    await prisma.bpsConcepto.upsert({
+      where: {
+        concepto_seguroSaludClave_fechaVigencia: {
+          concepto,
+          seguroSaludClave: '*',
+          fechaVigencia: vigencia,
+        },
+      },
+      create: {
+        concepto,
+        porcentaje,
+        seguroSalud: null,
+        seguroSaludClave: '*',
+        fechaVigencia: vigencia,
+        ...aud,
+      },
+      update: { porcentaje, modificadoPor: dueno.id },
+    })
+  }
+  console.log('Valor de boleto y conceptos de BPS de ejemplo cargados.')
+}
+
 async function main() {
   await bootstrap()
   const anio = new Date().getUTCFullYear()
   await feriadosFijos(anio)
   await feriadosFijos(anio + 1)
+
+  if (process.env.SEED_DEMO === '1') {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SEED_DEMO no se puede usar en producción.')
+    }
+    await datosDemo()
+  }
 }
 
 main()
