@@ -191,9 +191,9 @@
  * acá sale de la misma cuenta hecha en CSS, sin medir nada.
  */
 .header-app {
-  padding-right: max(
-    14px,
-    calc(100% - var(--ancho-sidebar) - var(--ancho-contenido) + var(--padding-contenido))
+  padding-right: calc(
+    max(0px, 100% - var(--ancho-sidebar) - var(--ancho-contenido)) +
+      var(--padding-contenido)
   );
 }
 
