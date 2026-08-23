@@ -112,7 +112,9 @@ export function PlanillaFaltas(props: {
             <span
               className={cn(
                 'size-1.5 rounded-full',
-                extra(renglon).descuenta ? 'bg-destructive' : 'bg-primary',
+                // El rojo quedó reservado al fondo de domingos y feriados, así que acá
+                // lo distintivo es la excepción: el día que se paga (§4.6.1).
+                extra(renglon).descuenta ? 'bg-foreground/55' : 'bg-warn',
               )}
               aria-hidden
             />

@@ -22,6 +22,7 @@ import {
   diasDelMes,
   diasDelPeriodo,
   diaSemana,
+  esDomingo,
   formatearPeriodoCapitalizado,
   hoy,
   nombreDiaSemanaCorto,
@@ -484,6 +485,9 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               const delDia = porDia.get(fecha) ?? []
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
+              // Domingos y feriados se marcan con fondo, sin texto: el nombre del feriado
+              // queda en el tooltip y en la etiqueta accesible.
+              const esNoHabil = esDomingo(fechaDia) || !!contexto?.feriado
 
               return (
                 <Popover
@@ -500,13 +504,15 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                       onFocus={() => setFoco(fecha)}
                       tabIndex={foco === fecha || (!foco && fechaDia.getUTCDate() === 1) ? 0 : -1}
                       disabled={props.soloLectura}
+                      title={contexto?.feriado ?? undefined}
                       aria-label={`${fechaDia.getUTCDate()} — ${contexto?.feriado ?? ''} ${
                         delDia.length > 0 ? `${delDia.length} renglones` : 'sin cargas'
                       }`}
                       className={cn(
                         'flex min-h-20 flex-col items-start gap-1 rounded-md border p-1.5 text-left text-xs transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        noTrabaja && 'bg-muted/50',
+                        noTrabaja && !esNoHabil && 'bg-muted/50',
+                        esNoHabil && 'bg-destructive/10',
                         esHoy && 'ring-2 ring-primary',
                         !props.soloLectura && 'hover:bg-accent',
                       )}
@@ -521,12 +527,6 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                           </span>
                         ) : null}
                       </span>
-
-                      {contexto?.feriado ? (
-                        <span className="line-clamp-2 text-[10px] text-destructive">
-                          {contexto.feriado}
-                        </span>
-                      ) : null}
 
                       <span className="flex w-full flex-col gap-0.5">
                         {delDia.map((r) => (
