@@ -4,12 +4,15 @@
  * Código puro (§9): recibe una entrada ya resuelta y devuelve las líneas. No accede a la
  * base ni a la sesión.
  *
- * Redondeo (§6.7): los cálculos intermedios van con precisión completa; cada línea se
- * redondea a 2 decimales con ROUND_HALF_UP; los subtotales y el total son la suma de las
- * líneas ya redondeadas.
+ * Redondeo: los cálculos intermedios van con precisión completa; **cada línea se cierra en
+ * pesos enteros** con ROUND_HALF_UP; los subtotales y el total son la suma de las líneas ya
+ * redondeadas, así que la columna cierra exacta.
+ *
+ * Es una divergencia deliberada del §6.7, que pide 2 decimales por línea. Ver
+ * `redondearPesos` en lib/format/money.
  */
 import Decimal from 'decimal.js'
-import { redondear2 } from '@/lib/format/money'
+import { redondearPesos } from '@/lib/format/money'
 import {
   aISO,
   diasCorridos,
@@ -33,15 +36,19 @@ import {
 /**
  * §4.3 — valor hora calculado. No se persiste: es derivado.
  *
- *   valor_hora_calculado = salario / ( horas_semanales × 52/12 )
+ *   valor_hora_calculado = redondear_a_pesos( salario / ( horas_semanales × 52/12 ) )
  *
  * `horas_semanales × 52/12` son las horas que tiene el mes promedio: 52 semanas repartidas
- * en 12 meses. Se redondea a 2 decimales solo al mostrarlo; en los cálculos intermedios se
- * usa con precisión completa (§6.7).
+ * en 12 meses.
+ *
+ * **Divergencia del SPECS.** El §4.3 dice que se usa con precisión completa y que solo se
+ * redondea al mostrarlo. Por decisión del proyecto se registra ya redondeado a pesos
+ * enteros, que es lo que hace que las líneas que lo usan —faltas y horas extras— cierren
+ * sin decimales. Ver `redondearPesos`.
  */
 export function valorHoraCalculado(salario: SalarioVigente): Decimal {
   const horasDelMes = salario.horasSemanales.times(52).dividedBy(12)
-  return salario.salario.dividedBy(horasDelMes)
+  return redondearPesos(salario.salario.dividedBy(horasDelMes))
 }
 
 /**
@@ -136,7 +143,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   // ── Paso 1: salario base, prorrateado si es el primer o el último mes (§6.9) ──────────
   const prorrateo = calcularProrrateo(periodo, empleado.fechaIngreso, empleado.fechaEgreso)
-  const salarioBase = redondear2(salario.salario.times(prorrateo.factor))
+  const salarioBase = redondearPesos(salario.salario.times(prorrateo.factor))
 
   if (prorrateo.diasConVinculo === 0) {
     avisos.push(
@@ -159,7 +166,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 2: faltas (solo las que descuentan, §4.6.1) ─────────────────────────────────
   const faltasQueDescuentan = entrada.faltas.filter((f) => f.descuenta)
   const horasFalta = faltasQueDescuentan.reduce((acc, f) => acc.plus(f.horas), new Decimal(0))
-  const importeFaltas = redondear2(vhc.times(horasFalta))
+  const importeFaltas = redondearPesos(vhc.times(horasFalta))
 
   if (horasFalta.greaterThan(0)) {
     lineas.push({
@@ -179,7 +186,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   for (const grupo of extrasConBps) {
     const unitario = vhc.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
-    const importe = redondear2(grupo.horas.times(unitario))
+    const importe = redondearPesos(grupo.horas.times(unitario))
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
       orden: (orden += 1),
@@ -214,7 +221,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   if (empleado.aportaBps) {
     for (const concepto of entrada.conceptosBps) {
-      const importe = redondear2(materiaGravada.times(concepto.porcentaje).dividedBy(100))
+      const importe = redondearPesos(materiaGravada.times(concepto.porcentaje).dividedBy(100))
       totalDescuentosBps = totalDescuentosBps.plus(importe)
       lineas.push({
         orden: (orden += 1),
@@ -248,7 +255,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 7: pagos adicionales, sin descuentos de ningún tipo (§4.7) ──────────────────
   let totalPagosAdicionales = new Decimal(0)
   for (const pago of entrada.pagosAdicionales) {
-    const importe = redondear2(pago.monto)
+    const importe = redondearPesos(pago.monto)
     totalPagosAdicionales = totalPagosAdicionales.plus(importe)
     lineas.push({
       orden: (orden += 1),
@@ -264,7 +271,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 8: cuotas del plan de pagos del mes (§4.8) ──────────────────────────────────
   let totalCuotas = new Decimal(0)
   for (const cuota of entrada.cuotasPlan) {
-    const importe = redondear2(cuota.monto)
+    const importe = redondearPesos(cuota.monto)
     totalCuotas = totalCuotas.plus(importe)
     lineas.push({
       orden: (orden += 1),
@@ -293,7 +300,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     })
 
     const valorBoleto = entrada.valorBoleto!
-    importeBoletos = redondear2(new Decimal(detalleBoletos.boletos).times(valorBoleto))
+    importeBoletos = redondearPesos(new Decimal(detalleBoletos.boletos).times(valorBoleto))
 
     const detalleDias =
       detalleBoletos.diasExtraConBoleto > 0
@@ -318,7 +325,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   for (const grupo of extrasSinBps) {
     const vhn = entrada.valorHoraNegro!
     const unitario = vhn.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
-    const importe = redondear2(grupo.horas.times(unitario))
+    const importe = redondearPesos(grupo.horas.times(unitario))
     totalExtrasSinBps = totalExtrasSinBps.plus(importe)
     lineas.push({
       orden: (orden += 1),

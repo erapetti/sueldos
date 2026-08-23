@@ -9,6 +9,7 @@ import 'server-only'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { aDecimal, aDecimalOpcional, aRegimenHoras } from '@/lib/db/mapeo'
+import { redondearPesos } from '@/lib/format/money'
 import { resolverConceptosBps } from '@/lib/calculo/bps'
 import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
 import type { EntradaLiquidacion, ResultadoLiquidacion } from '@/lib/calculo/tipos'
@@ -180,7 +181,9 @@ export async function armarContextoLiquidacion(
     cuotasPlan: cuotas.map((c) => ({
       id: c.id,
       fecha: c.fecha,
-      monto: aDecimal(c.monto),
+      // Se redondea acá y no solo en la línea, para que el importe que descuenta la
+      // liquidación y el que se suma al devengado bruto del asiento (§4.9) sean el mismo.
+      monto: redondearPesos(aDecimal(c.monto)),
       yaAplicada: c.estado === 'APLICADA',
     })),
     feriados: feriados.map((f) => ({ fecha: f.fecha, noLaborable: f.noLaborable })),

@@ -40,14 +40,17 @@ export function devengadoBruto(totalAPagar: Decimal, cuotasDescontadas: Decimal)
 }
 
 /**
- * §7.4 — reparto de un préstamo en cuotas. El redondeo se ajusta en la última cuota para
- * que la suma dé exactamente el monto prestado.
+ * §7.4 — reparto de un préstamo en cuotas, en pesos enteros.
+ *
+ * La última cuota absorbe la diferencia para que la suma dé **exactamente** el monto
+ * prestado: no se inventa ni se pierde dinero. Si el préstamo se cargó con centavos, esos
+ * centavos quedan en la última cuota, que es lo honesto; con montos enteros —el caso
+ * normal— todas las cuotas salen enteras.
  */
 export function repartirEnCuotas(monto: Decimal, cantidad: number): Decimal[] {
   if (cantidad < 1) return []
-  const base = monto.dividedBy(cantidad).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+  const base = monto.dividedBy(cantidad).toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
   const cuotas = Array.from({ length: cantidad }, () => base)
-  const suma = base.times(cantidad)
-  cuotas[cantidad - 1] = base.plus(monto.minus(suma))
+  cuotas[cantidad - 1] = monto.minus(base.times(cantidad - 1))
   return cuotas
 }

@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
 import { FormularioSeries } from './FormularioSeries'
 import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
-import { formatearDias, formatearImporte } from '@/lib/format/money'
+import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
 
 type Salario = {
@@ -132,6 +132,20 @@ const ETIQUETA_TIPO: Record<string, string> = {
 export function FichaEmpleado(props: FichaProps) {
   const router = useRouter()
   const [seccion, setSeccion] = useState(props.seccionInicial)
+
+  /**
+   * Los importes que se mueven se registran en pesos enteros, así que el `,00` sobra. Pero
+   * puede haber movimientos viejos con centavos —no se migraron—, y ahí conviene mostrarlos:
+   * si **todos** los montos de la pestaña son enteros se ocultan los decimales, y si alguno
+   * tiene centavos se muestran en todos, para que la columna se lea pareja.
+   */
+  const importesDeCuenta = [
+    props.saldo,
+    ...props.cuentaCorriente.flatMap((m) => [m.debe, m.haber, m.saldoAcumulado]),
+    ...props.cuotas.map((c) => c.monto),
+  ]
+  const cuentaSinCentavos = todosEnteros(importesDeCuenta)
+  const importeCuenta = cuentaSinCentavos ? formatearImporteEntero : formatearImporte
 
   return (
     <div className="space-y-5">
@@ -339,7 +353,7 @@ export function FichaEmpleado(props: FichaProps) {
                 Number(props.saldo) < 0 && 'text-destructive',
               )}
             >
-              {formatearImporte(props.saldo)}
+              {importeCuenta(props.saldo)}
             </span>
             <span className="text-sm text-muted-foreground">
               {Number(props.saldo) > 0
@@ -385,10 +399,10 @@ export function FichaEmpleado(props: FichaProps) {
                       <TableCell className="tabular">{m.fecha}</TableCell>
                       <TableCell>{m.concepto}</TableCell>
                       <TableCell className="text-right tabular">
-                        {Number(m.debe) > 0 ? formatearImporte(m.debe) : ''}
+                        {Number(m.debe) > 0 ? importeCuenta(m.debe) : ''}
                       </TableCell>
                       <TableCell className="text-right tabular">
-                        {Number(m.haber) > 0 ? formatearImporte(m.haber) : ''}
+                        {Number(m.haber) > 0 ? importeCuenta(m.haber) : ''}
                       </TableCell>
                       <TableCell
                         className={cn(
@@ -396,7 +410,7 @@ export function FichaEmpleado(props: FichaProps) {
                           Number(m.saldoAcumulado) < 0 && 'text-destructive',
                         )}
                       >
-                        {formatearImporte(m.saldoAcumulado)}
+                        {importeCuenta(m.saldoAcumulado)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -422,7 +436,7 @@ export function FichaEmpleado(props: FichaProps) {
                       <TableRow key={c.id}>
                         <TableCell className="tabular">{c.fecha}</TableCell>
                         <TableCell className="text-right tabular">
-                          {formatearImporte(c.monto)}
+                          {importeCuenta(c.monto)}
                         </TableCell>
                         <TableCell>
                           <Badge variant={c.estado === 'APLICADA' ? 'secondary' : 'outline'}>

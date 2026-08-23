@@ -224,9 +224,10 @@ describe('reparto de un préstamo en cuotas (§7.4)', () => {
     ])
   })
 
-  it('el redondeo se ajusta en la última cuota', () => {
+  it('las cuotas son pesos enteros y la última ajusta la diferencia', () => {
     const cuotas = repartirEnCuotas(D(10000), 3)
-    expect(cuotas.map((c) => c.toFixed(2))).toEqual(['3333.33', '3333.33', '3333.34'])
+    expect(cuotas.map((c) => c.toFixed(2))).toEqual(['3333.00', '3333.00', '3334.00'])
+    expect(cuotas.every((c) => c.isInteger())).toBe(true)
     const suma = cuotas.reduce((acc: Decimal, c) => acc.plus(c), D(0))
     expect(suma.toFixed(2)).toBe('10000.00')
   })

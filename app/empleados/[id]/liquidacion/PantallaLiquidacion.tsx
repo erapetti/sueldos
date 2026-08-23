@@ -21,7 +21,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
-import { formatearImporte, formatearCantidad } from '@/lib/format/money'
+import { formatearImporteEntero, formatearCantidad } from '@/lib/format/money'
 import {
   aPeriodoISO,
   formatearFecha,
@@ -195,7 +195,7 @@ export function PantallaLiquidacion(props: {
             {props.alias} — {formatearPeriodoCapitalizado(periodo)}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Valor hora calculado: {formatearImporte(props.valorHoraCalculado)}
+            Valor hora calculado: {formatearImporteEntero(props.valorHoraCalculado)}
             {!props.aportaBps ? ' · Empleado sin aportes al BPS' : ''}
           </p>
         </div>
@@ -227,7 +227,7 @@ export function PantallaLiquidacion(props: {
                     {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
                   </td>
                   <td className="hidden px-2 py-2 text-right tabular text-muted-foreground sm:table-cell">
-                    {linea.valorUnitario ? formatearImporte(linea.valorUnitario) : ''}
+                    {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
                   </td>
                   <td
                     className={cn(
@@ -237,8 +237,8 @@ export function PantallaLiquidacion(props: {
                     )}
                   >
                     {negativa
-                      ? `−${formatearImporte(linea.importe).replace('$ ', '$ ')}`
-                      : formatearImporte(linea.importe)}
+                      ? `−${formatearImporteEntero(linea.importe)}`
+                      : formatearImporteEntero(linea.importe)}
                   </td>
                 </tr>
               )
@@ -253,7 +253,7 @@ export function PantallaLiquidacion(props: {
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between gap-4">
               <dt>Total recalculado del período</dt>
-              <dd className="tabular">{formatearImporte(props.totalRecalculado)}</dd>
+              <dd className="tabular">{formatearImporteEntero(props.totalRecalculado)}</dd>
             </div>
             <div className="flex justify-between gap-4 text-muted-foreground">
               <dt>
@@ -262,12 +262,12 @@ export function PantallaLiquidacion(props: {
                   ? '(liquidación #1)'
                   : `(${props.previas.length} liquidaciones)`}
               </dt>
-              <dd className="tabular">{formatearImporte(props.totalYaLiquidado)}</dd>
+              <dd className="tabular">{formatearImporteEntero(props.totalYaLiquidado)}</dd>
             </div>
             <div className="mt-2 flex justify-between gap-4 border-t pt-2 text-base font-semibold">
               <dt>{diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}</dt>
               <dd className={cn('tabular', diferencia < 0 && 'text-destructive')}>
-                {formatearImporte(props.totalAPagar)}
+                {formatearImporteEntero(props.totalAPagar)}
               </dd>
             </div>
           </dl>
@@ -314,10 +314,10 @@ export function PantallaLiquidacion(props: {
               {hayPagada && ultima?.confirmadaEn
                 ? `La liquidación de ${formatearPeriodoCapitalizado(periodo)} ya fue pagada el ${formatearFecha(
                     new Date(ultima.confirmadaEn),
-                  )} por ${formatearImporte(ultima.totalAPagar)}. No se puede modificar. `
+                  )} por ${formatearImporteEntero(ultima.totalAPagar)}. No se puede modificar. `
                 : `${formatearPeriodoCapitalizado(periodo)} ya tiene una liquidación confirmada. `}
               Se generará una liquidación complementaria por la diferencia de{' '}
-              {formatearImporte(props.totalAPagar)}.
+              {formatearImporteEntero(props.totalAPagar)}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

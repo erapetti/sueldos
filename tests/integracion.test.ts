@@ -383,13 +383,13 @@ describe('26. registrar una licencia crea las cuatro cosas del §7.11', () => {
     })
     expect(liquidacion.estado).toBe('CONFIRMADA')
     expect(liquidacion.periodo.toISOString().slice(0, 10)).toBe('2026-04-01')
-    // 65.000 / 30 × 11 = 23.833,33
-    expect(liquidacion.totalAPagar.toString()).toBe('23833.33')
+    // 65.000 / 30 × 11 = 23.833,33 -> 23.833
+    expect(liquidacion.totalAPagar.toString()).toBe('23833')
 
     const asiento = await prisma.cuentaCorriente.findFirstOrThrow({
       where: { liquidacionId: liquidacion.id },
     })
-    expect(asiento.haber.toString()).toBe('23833.33')
+    expect(asiento.haber.toString()).toBe('23833')
 
     expect(await saldoDeDias(empleado.id)).toBe('9')
   })

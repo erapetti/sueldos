@@ -21,6 +21,7 @@ import { exigirAdmin } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
 import { fechaVigenciaISO, importePositivo, idUuid } from '@/lib/validacion/esquemas'
 import { aColumnaImporte, aDecimal } from '@/lib/db/mapeo'
+import { redondearPesos } from '@/lib/format/money'
 import { parseFechaISO } from '@/lib/format/dates'
 import { AUMENTO_NO_IMPLEMENTADO } from '@/lib/calculo/aumento'
 
@@ -110,7 +111,7 @@ export async function previsualizarAumento(fechaVigenciaISOTexto: string) {
  *    **misma** `fecha_vigencia`, aplicándole el mismo porcentaje de aumento:
  *
  *      pct_aumento            = salario_nuevo / salario_actual − 1
- *      valor_hora_negro_nuevo = redondear2( valor_hora_negro_vigente × (1 + pct_aumento) )
+ *      valor_hora_negro_nuevo = redondear_a_pesos( valor_hora_negro_vigente × (1 + pct_aumento) )
  *
  * El porcentaje es por empleado.
  */
@@ -181,9 +182,10 @@ export async function aplicarAumentoMasivo(entrada: unknown) {
 
         if (empleado.valoresHoraNegro.length > 0) {
           const pctAumento = salarioNuevo.dividedBy(salarioActual).minus(1)
-          valorHoraNegroNuevo = aDecimal(empleado.valoresHoraNegro[0].valor)
-            .times(new Decimal(1).plus(pctAumento))
-            .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          // Se registra redondeado a pesos enteros, igual que el valor hora calculado.
+          valorHoraNegroNuevo = redondearPesos(
+            aDecimal(empleado.valoresHoraNegro[0].valor).times(new Decimal(1).plus(pctAumento)),
+          )
 
           await tx.empleadoValorHoraNegro.upsert({
             where: {

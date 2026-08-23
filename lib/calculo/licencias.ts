@@ -2,7 +2,7 @@
  * §4.15 y §7.11 — licencia: días hábiles, generación anual y salario vacacional.
  */
 import Decimal from 'decimal.js'
-import { redondear2 } from '@/lib/format/money'
+import { redondearPesos } from '@/lib/format/money'
 import {
   aISO,
   aniversario,
@@ -135,7 +135,7 @@ export function calcularSalarioVacacional(
   salarioMensual: Decimal,
   diasHabiles: Decimal,
 ): Decimal {
-  return redondear2(salarioMensual.dividedBy(30).times(diasHabiles))
+  return redondearPesos(salarioMensual.dividedBy(30).times(diasHabiles))
 }
 
 /** Saldo de días de licencia: Σ haber − Σ debe (§4.15.1). */

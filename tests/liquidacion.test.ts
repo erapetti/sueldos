@@ -490,12 +490,42 @@ describe('13. redondeo: las líneas suman exactamente el total (§6.7)', () => {
     expect(r.subtotal.toFixed(2)).toBe(r.materiaGravada.minus(descuentos).toFixed(2))
   })
 
-  it('el redondeo de cada línea es ROUND_HALF_UP', () => {
-    // 65.000 × 0,005 % = 3,25 exactos; con 0,0077 % da 5,005 → 5,01
+  it('el medio peso redondea hacia arriba', () => {
+    // Valor hora impar: 65.130 / 130 = 501. Media hora de falta da 250,50 -> 251.
     const r = calcularLiquidacionMensual(
-      entradaBase({ conceptosBps: [conceptoBps('Medio', 0.0077)] }),
+      entradaBase({
+        salario: { salario: D(65130), horasSemanales: D(30) },
+        faltas: [falta('2026-04-08', 0.5)],
+      }),
     )
-    expect(r.totalDescuentosBps.toFixed(2)).toBe('5.01')
+    expect(r.valorHoraCalculado.toString()).toBe('501')
+    expect(r.lineas.find((l) => l.codigo === CODIGOS.FALTAS)!.importe.toFixed(2)).toBe('251.00')
+  })
+
+  it('cada línea es un peso entero y la columna cierra exacta', () => {
+    // Los mismos números "feos" del caso anterior, que antes dejaban centavos en todas partes.
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        salario: { salario: D(57777), horasSemanales: D(37) },
+        regimen: regimen(7.5, 7.5, 7.5, 7.5, 7, 0, 0),
+        conceptosBps: [conceptoBps('Montepío', 15), conceptoBps('FRL', 0.125)],
+        faltas: [falta('2026-04-08', 3.5)],
+        horasExtras: [
+          horaExtra('2026-04-09', 2.5, true, 120),
+          horaExtra('2026-04-11', 1.5, false, 170),
+        ],
+        pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D('1234.57'), concepto: 'Premio' }],
+        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(333), yaAplicada: false }],
+        valorHoraNegro: D(317),
+        valorBoleto: D(47),
+      }),
+    )
+
+    for (const l of r.lineas) {
+      expect(l.importe.isInteger(), `${l.descripcion} = ${l.importe.toString()}`).toBe(true)
+    }
+    expect(sumarLineas(r.lineas).toString()).toBe(r.totalRecalculado.toString())
+    expect(r.totalRecalculado.isInteger()).toBe(true)
   })
 })
 
@@ -599,7 +629,7 @@ describe('16. prorrateo del primer mes (§6.9)', () => {
     expect(r.diasConVinculo).toBe(20)
     expect(r.diasDelMes).toBe(31)
     const linea = r.lineas.find((l) => l.codigo === CODIGOS.SALARIO_BASE)!
-    expect(linea.importe.toFixed(2)).toBe('41935.48') // 65.000 × 20/31
+    expect(linea.importe.toFixed(2)).toBe('41935.00') // 65.000 × 20/31 = 41.935,48
     expect(linea.descripcion).toBe('Salario base (20/31 días)')
   })
 
@@ -623,7 +653,7 @@ describe('16. prorrateo del primer mes (§6.9)', () => {
     )
     expect(r.diasConVinculo).toBe(1)
     expect(r.lineas.find((l) => l.codigo === CODIGOS.SALARIO_BASE)!.importe.toFixed(2)).toBe(
-      '2096.77', // 65.000 × 1/31
+      '2097.00', // 65.000 × 1/31 = 2.096,77
     )
   })
 
@@ -646,7 +676,7 @@ describe('16. prorrateo del primer mes (§6.9)', () => {
         conceptosBps: [conceptoBps('Montepío', 15)],
       }),
     )
-    expect(r.totalDescuentosBps.toFixed(2)).toBe('6290.32') // 15 % de 41.935,48
+    expect(r.totalDescuentosBps.toFixed(2)).toBe('6290.00') // 15 % de 41.935 = 6.290,25
   })
 
   it('mes de egreso: prorratea y avisa que la liquidación final está incompleta (§13.1)', () => {
@@ -724,15 +754,21 @@ describe('23. horas extras sin BPS de un mes anterior a un aumento', () => {
 describe('valor hora calculado (§4.3)', () => {
   it('salario / (horas semanales × 52/12)', () => {
     expect(valorHoraCalculado({ salario: D(65000), horasSemanales: D(30) }).toFixed(2)).toBe('500.00')
-    expect(valorHoraCalculado({ salario: D(60000), horasSemanales: D(40) }).toFixed(2)).toBe('346.15')
+    // 60.000 / (40 × 52/12) = 346,153846 -> 346
+    expect(valorHoraCalculado({ salario: D(60000), horasSemanales: D(40) }).toFixed(2)).toBe('346.00')
     // A igual proporción salario/horas, igual valor hora.
-    expect(valorHoraCalculado({ salario: D(45000), horasSemanales: D(30) }).toFixed(2)).toBe('346.15')
+    expect(valorHoraCalculado({ salario: D(45000), horasSemanales: D(30) }).toFixed(2)).toBe('346.00')
   })
 
-  it('se usa con precisión completa, no redondeado a 2 decimales', () => {
+  /**
+   * Divergencia deliberada del §4.3, que pide usarlo con precisión completa: se registra
+   * redondeado a pesos enteros para que las líneas que lo usan cierren sin decimales.
+   */
+  it('se registra redondeado a pesos enteros', () => {
     const vhc = valorHoraCalculado({ salario: D(57777), horasSemanales: D(37) })
-    expect(vhc.toFixed(6)).toBe('360.355509')
-    expect(vhc.times(10).toDecimalPlaces(2).toFixed(2)).toBe('3603.56')
+    // El valor exacto es 360,355509…
+    expect(vhc.toString()).toBe('360')
+    expect(vhc.isInteger()).toBe(true)
   })
 })
 

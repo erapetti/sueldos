@@ -309,6 +309,30 @@ Otros pendientes que no bloquean pantallas:
 - **Otros eventos que generan días de licencia** (§13.5) — el modelo ya contempla el tipo
   `AJUSTE`.
 
+## Modificaciones a shadcn/ui
+
+shadcn no es una dependencia: es un generador que copia el código a `components/ui/`, así que
+esos archivos son nuestros. Aun así conviene mantenerlos lo más cerca posible del original,
+para poder regenerarlos sin pensar. **Hoy hay una sola divergencia**, y si algún día corrés
+`npx shadcn@latest add <componente> --overwrite` hay que volver a aplicarla:
+
+### `components/ui/select.tsx`
+
+`SelectTrigger`: `w-fit` → `w-full min-w-0`, y el valor trunca con elipsis.
+
+El original crece con el texto de la opción elegida y no tiene tope. Con las descripciones de
+seguro de salud del Anexo A, que pasan los 200 caracteres, el disparador llegaba a 1562 px:
+en `/admin/bps` se solapaba con los campos vecinos y, ya solo en su fila, hacía scrollear la
+página entera en horizontal. También afectaba al selector de seguro del alta y de la ficha.
+
+Se corrigió en el componente y no en cada uso, ni con un wrapper, porque el problema había
+aparecido en tres pantallas escritas en momentos distintos: un default correcto cubre también
+los usos que todavía no existen. Los selects que necesitan un ancho propio lo pasan por
+`className` y siguen ganando, porque tailwind-merge se queda con la última clase de ancho.
+
+Para comprobar que sigue bien después de tocar algo: elegir el seguro 9 en `/admin/bps` y
+verificar que `document.documentElement.scrollWidth` no supere al `clientWidth`.
+
 ## Overrides de dependencias
 
 `package.json` fuerza `deepmerge-ts` a `^8` con un `overrides`.
@@ -330,6 +354,39 @@ Con el override, `prisma validate`, `generate`, `migrate status`, `migrate diff`
 siguen funcionando: `@prisma/config` solo usa la función `deepmerge`, que v8 mantiene.
 **Sacar el override cuando Prisma actualice la dependencia de fábrica**, verificando con
 `npm ls deepmerge-ts` que ya resuelva a 8 sin ayuda.
+
+## Redondeo: pesos enteros
+
+**Divergencia deliberada del SPECS.** El §4.3 dice que el valor hora se usa con precisión
+completa y el §6.7 que cada línea se redondea a 2 decimales. Por decisión del proyecto los
+importes se llevan a **pesos enteros en el cálculo**, no solo al mostrarlos.
+
+El motivo: la liquidación se controla a mano. Redondeando solo en la presentación, la columna
+no cerraba en 6 de cada 10 casos —se despegaba entre 1 y 3 pesos, medido sobre 5.000
+liquidaciones simuladas—. Redondeando en el cálculo, lo que se ve es exactamente lo que se
+suma.
+
+Se redondea al **cerrar cada línea**; los pasos intermedios siguen con precisión completa.
+Los puntos son:
+
+| Qué | Dónde |
+|---|---|
+| Valor hora calculado | `valorHoraCalculado`, en `lib/calculo/liquidacion.ts` |
+| Valor hora «en negro» del aumento masivo | `actions/aumento.ts` |
+| Las 8 líneas de la liquidación | `lib/calculo/liquidacion.ts` |
+| Salario vacacional | `lib/calculo/licencias.ts` |
+| Cuotas de un préstamo | `repartirEnCuotas`, en `lib/calculo/cuentaCorriente.ts` |
+
+El valor del boleto se carga en pesos enteros, así que la línea de boletos sale entera sola.
+
+Lo que **no** se toca son los importes que tipea el usuario: salario, pagos adicionales,
+préstamos y valor del boleto se guardan tal cual. Si alguno viene con centavos, el redondeo
+de la línea lo absorbe y la columna cierra igual.
+
+Las columnas siguen siendo `DECIMAL(14,2)` y no se migraron los datos anteriores al cambio.
+Por eso la pestaña de cuenta corriente decide sola: si **todos** los importes de la pantalla
+son enteros no muestra los centavos, y si alguno los tiene los muestra en toda la columna
+para que se lea pareja.
 
 ## Decisiones que el SPECS no fijaba
 

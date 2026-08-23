@@ -113,7 +113,7 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
           {formulario.darDeBaja ? 'Dar de baja un concepto' : 'Nuevo concepto o cambio de porcentaje'}
         </h2>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <CampoTexto
             id="bps-concepto"
             etiqueta="Concepto"
@@ -124,27 +124,6 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
             placeholder="Montepío, FONASA, FRL…"
             maxLength={80}
           />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="bps-seguro">Alcance</Label>
-            <Select
-              value={formulario.seguroSalud}
-              onValueChange={(v) => setFormulario((f) => ({ ...f, seguroSalud: v }))}
-              disabled={enviando}
-            >
-              <SelectTrigger id="bps-seguro">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todos los empleados</SelectItem>
-                {SEGUROS_SALUD.map((s) => (
-                  <SelectItem key={s.codigo} value={s.codigo}>
-                    Seguro {s.codigo} — {s.descripcion}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="bps-porcentaje">Porcentaje</Label>
@@ -168,6 +147,31 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
               <p className="text-sm text-destructive">{campos.porcentaje}</p>
             ) : null}
           </div>
+        </div>
+
+        {/*
+          El alcance va solo en su fila: las descripciones del Anexo A llegan a más de 200
+          caracteres y no entran al lado de otro campo.
+        */}
+        <div className="space-y-1.5">
+          <Label htmlFor="bps-seguro">Alcance</Label>
+          <Select
+            value={formulario.seguroSalud}
+            onValueChange={(v) => setFormulario((f) => ({ ...f, seguroSalud: v }))}
+            disabled={enviando}
+          >
+            <SelectTrigger id="bps-seguro">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los empleados</SelectItem>
+              {SEGUROS_SALUD.map((s) => (
+                <SelectItem key={s.codigo} value={s.codigo}>
+                  Seguro {s.codigo} — {s.descripcion}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {advertenciaAlcance ? (

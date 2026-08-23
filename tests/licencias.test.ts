@@ -76,9 +76,10 @@ describe('25. salario vacacional (§7.11)', () => {
     expect(calcularSalarioVacacional(D(60000), D(20)).toFixed(2)).toBe('40000.00')
   })
 
-  it('redondea a 2 decimales', () => {
-    // 57.777 / 30 × 11 = 21.184,9
-    expect(calcularSalarioVacacional(D(57777), D(11)).toFixed(2)).toBe('21184.90')
+  it('se registra en pesos enteros', () => {
+    // 57.777 / 30 × 11 = 21.184,90 -> 21.185
+    expect(calcularSalarioVacacional(D(57777), D(11)).toFixed(2)).toBe('21185.00')
+    expect(calcularSalarioVacacional(D(57777), D(11)).isInteger()).toBe(true)
   })
 
   it('con 0 días hábiles da 0', () => {
