@@ -98,13 +98,13 @@ export function PlanillaFaltas(props: {
           <span
             className={cn(
               'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
-              renglon.id ? 'bg-primary/10 text-primary' : 'bg-emerald-100 text-emerald-900',
+              renglon.id ? 'bg-primary/10 text-primary' : 'bg-warn-soft text-warn-ink',
             )}
           >
             <span
               className={cn(
                 'size-1.5 rounded-full',
-                extra(renglon).descuenta ? 'bg-red-500' : 'bg-sky-500',
+                extra(renglon).descuenta ? 'bg-destructive' : 'bg-primary',
               )}
               aria-hidden
             />

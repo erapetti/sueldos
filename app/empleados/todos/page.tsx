@@ -9,6 +9,7 @@ import { exigirUsuario } from '@/lib/auth/guards'
 import { listarTodosLosEmpleados } from '@/lib/consultas/empleados'
 import { aISO, formatearFecha } from '@/lib/format/dates'
 import { TablaTodos, type FilaTabla } from './TablaTodos'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,14 +35,16 @@ export default async function PantallaTodos() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Todos los empleados</h1>
-        <p className="text-sm text-muted-foreground">
-          {usuario.esAdmin
+      <EncabezadoPagina
+        className="mb-0"
+        rotulo="Listado completo"
+        titulo="Todos los empleados"
+        bajada={
+          usuario.esAdmin
             ? 'Todos los empleados del sistema, incluidos los ocultos y los dados de baja.'
-            : 'Tus empleados y los compartidos con vos, incluidos los ocultos y los dados de baja.'}
-        </p>
-      </div>
+            : 'Tus empleados y los compartidos con vos, incluidos los ocultos y los dados de baja.'
+        }
+      />
 
       <TablaTodos filas={filas} usuarioId={usuario.id} esAdmin={usuario.esAdmin} />
     </div>

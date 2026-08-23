@@ -41,6 +41,7 @@ import {
 import { CampoTexto } from '@/components/dominio/CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
 import { actualizarUsuario, borrarUsuario, crearUsuario } from '@/actions/admin'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 type Usuario = {
   id: string
@@ -117,16 +118,15 @@ export function PantallaUsuarios({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Usuarios</h1>
-        <p className="text-sm text-muted-foreground">
-          El alta se hace con el email de Google. El usuario queda vinculado a su cuenta en el
-          primer ingreso.
-        </p>
-      </div>
+      <EncabezadoPagina
+        className="mb-0"
+        rotulo="Configuración"
+        titulo="Usuarios"
+        bajada="El alta se hace con el email de Google. El usuario queda vinculado a su cuenta en el primer ingreso."
+      />
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-medium">Nuevo usuario</h2>
+      <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">Nuevo usuario</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <CampoTexto
@@ -165,8 +165,8 @@ export function PantallaUsuarios({
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Usuarios del sistema</h2>
-        <div className="overflow-x-auto rounded-lg border">
+        <h2 className="text-[20px]">Usuarios del sistema</h2>
+        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
           <Table>
             <TableHeader>
               <TableRow>

@@ -23,6 +23,7 @@ import { CampoTexto } from '@/components/dominio/CampoMonto'
 import { SelectorFecha } from '@/components/dominio/SelectorFecha'
 import { useAccion } from '@/hooks/useAccion'
 import { borrarFeriado, guardarFeriado } from '@/actions/admin'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 type Feriado = {
   fechaISO: string
@@ -61,13 +62,12 @@ export function PantallaFeriados({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Feriados</h1>
-          <p className="text-sm text-muted-foreground">
-            Los no laborables descuentan boletos; los laborables no afectan ni el sueldo ni los
-            boletos.
-          </p>
-        </div>
+        <EncabezadoPagina
+          className="mb-0 flex-1"
+          rotulo="Calendario"
+          titulo="Feriados"
+          bajada="Los no laborables descuentan boletos; los laborables no afectan ni el sueldo ni los boletos."
+        />
 
         <div className="flex items-center gap-1">
           <Button
@@ -90,8 +90,8 @@ export function PantallaFeriados({
         </div>
       </div>
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-medium">Nuevo feriado</h2>
+      <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">Nuevo feriado</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -138,8 +138,8 @@ export function PantallaFeriados({
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Feriados de {anio}</h2>
-        <div className="overflow-x-auto rounded-lg border">
+        <h2 className="text-[20px]">Feriados de {anio}</h2>
+        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
           <Table>
             <TableHeader>
               <TableRow>

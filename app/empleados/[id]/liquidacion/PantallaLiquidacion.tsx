@@ -31,6 +31,7 @@ import {
   primerDiaDelMes,
   sumarMeses,
 } from '@/lib/format/dates'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export type LineaVista = {
   orden: number
@@ -133,15 +134,19 @@ export function PantallaLiquidacion(props: {
   return (
     <div className="space-y-5">
       <div className="no-print space-y-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Cálculo de sueldo</h1>
-          <p className="text-sm text-muted-foreground">
-            <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
-              {props.alias}
-            </Link>{' '}
-            — {props.nombreCompleto}
-          </p>
-        </div>
+        <EncabezadoPagina
+          className="mb-0"
+          rotulo="Liquidación"
+          titulo="Cálculo de sueldo"
+          bajada={
+            <>
+              <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
+                {props.alias}
+              </Link>{' '}
+              — {props.nombreCompleto}
+            </>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => irAMes(-1)} aria-label="Mes anterior">
@@ -170,7 +175,7 @@ export function PantallaLiquidacion(props: {
       {props.avisos.map((aviso) => (
         <p
           key={aviso}
-          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink"
         >
           {aviso}
         </p>
@@ -189,9 +194,9 @@ export function PantallaLiquidacion(props: {
       ) : null}
 
       {/* Encabezado de la liquidación */}
-      <div className="rounded-lg border">
-        <div className="border-b px-4 py-3">
-          <h2 className="font-semibold">
+      <div className="overflow-hidden rounded-card border bg-card shadow-soft">
+        <div className="border-b px-[22px] pt-4 pb-3">
+          <h2 className="text-[20px]">
             {props.alias} — {formatearPeriodoCapitalizado(periodo)}
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -200,7 +205,12 @@ export function PantallaLiquidacion(props: {
           </p>
         </div>
 
-        <table className="w-full text-sm">
+        <table
+          className={cn(
+            'w-full text-sm',
+            '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
+          )}
+        >
           <caption className="sr-only">Desglose de la liquidación</caption>
           <thead className="sr-only">
             <tr>
@@ -222,16 +232,16 @@ export function PantallaLiquidacion(props: {
                     linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
                   )}
                 >
-                  <td className="px-4 py-2">{linea.descripcion}</td>
-                  <td className="px-2 py-2 text-right tabular text-muted-foreground">
+                  <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
+                  <td className="px-2 py-3 text-right tabular text-muted-foreground">
                     {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
                   </td>
-                  <td className="hidden px-2 py-2 text-right tabular text-muted-foreground sm:table-cell">
+                  <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
                     {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
                   </td>
                   <td
                     className={cn(
-                      'px-4 py-2 text-right tabular',
+                      'py-3 pr-[22px] pl-2 text-right tabular',
                       // §8.5 — los importes negativos van en rojo y con signo menos.
                       negativa && 'text-destructive',
                     )}
@@ -249,7 +259,7 @@ export function PantallaLiquidacion(props: {
 
       {/* §7.6.1 — bloque de cierre de la complementaria */}
       {esComplementaria ? (
-        <div className="rounded-lg border-2 border-primary/40 p-4">
+        <div className="rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between gap-4">
               <dt>Total recalculado del período</dt>

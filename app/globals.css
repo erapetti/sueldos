@@ -3,49 +3,99 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Paleta y lenguaje visual tomados del diseño "webapp" de Claude Design
+ * (componente "App Shell"). Los valores van en hex tal cual los define el
+ * diseño, para poder auditarlos contra el original.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.45 0.13 250);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.6 0.1 250);
+  /* Controles (inputs, selects): radio medio. Las píldoras y las tarjetas
+     grandes se piden explícitas con rounded-full y --radius-card. */
+  --radius: 0.75rem;
+  --radius-card: 1.75rem;
+
+  --background: #f6f2ec;
+  --foreground: #26241f;
+  --card: #fbf9f5;
+  --card-foreground: #26241f;
+  --popover: #fbf9f5;
+  --popover-foreground: #26241f;
+
+  --primary: #0f766e;
+  --primary-foreground: #fdfcfa;
+  /* Derivados del acento, con las mismas mezclas que hace el diseño. */
+  --primary-deep: #115049;
+  --primary-ink: #0c615a;
+  --primary-soft: #d1e1dd;
+
+  --secondary: #ece8e0;
+  --secondary-foreground: #6b675e;
+  --muted: #ece8e0;
+  --muted-foreground: #6b675e;
+  /* Texto terciario del diseño (metadatos, contadores, notas). */
+  --muted-foreground-soft: #8b867b;
+  --accent: #26241f0d;
+  --accent-foreground: #26241f;
+
+  /* Acento cálido secundario: puntos de estado, avisos, chips. */
+  --warn: #e0714a;
+  --warn-soft: #f6e3d9;
+  --warn-ink: #a84a26;
+
+  /* El diseño no define un botón destructivo; se deriva de su familia cálida. */
+  --destructive: #b8462a;
+  --destructive-foreground: #fdfcfa;
+
+  --border: #26241f12;
+  --input: #26241f1f;
+  --ring: #0f766e;
+
+  --sombra-suave: 0 8px 24px -20px rgb(38 36 31 / 0.5);
+  --sombra-panel: 0 20px 44px -34px rgb(38 36 31 / 0.7);
+  --sombra-acento: 0 10px 24px -12px rgb(15 118 110 / 0.75);
+  --sombra-acento-lg: 0 14px 28px -12px rgb(15 118 110 / 0.85);
+  --sombra-hero: 0 18px 40px -26px rgb(15 118 110 / 0.9);
+  --sombra-drawer: 24px 0 60px -28px rgb(38 36 31 / 0.55);
 }
 
+/*
+ * El diseño solo entrega la variante clara. Esta es una derivación que
+ * conserva su temperatura cálida en vez de caer en grises neutros.
+ * Nota: hoy el layout no monta ThemeProvider, así que no hay forma de
+ * activarla desde la UI.
+ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.7 0.12 250);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #1c1b18;
+  --foreground: #f2efe8;
+  --card: #24231f;
+  --card-foreground: #f2efe8;
+  --popover: #24231f;
+  --popover-foreground: #f2efe8;
+
+  --primary: #5fbdb0;
+  --primary-foreground: #0c2b28;
+  --primary-deep: #0c3d38;
+  --primary-ink: #a8ded6;
+  --primary-soft: #1f4a45;
+
+  --secondary: #302e29;
+  --secondary-foreground: #d6d1c7;
+  --muted: #302e29;
+  --muted-foreground: #a8a29a;
+  --muted-foreground-soft: #8d877e;
+  --accent: #f2efe80d;
+  --accent-foreground: #f2efe8;
+
+  --warn: #e0714a;
+  --warn-soft: #3a2620;
+  --warn-ink: #f0b49b;
+
+  --destructive: #d4592f;
+  --destructive-foreground: #fdfcfa;
+
+  --border: #f2efe81f;
+  --input: #f2efe826;
+  --ring: #5fbdb0;
 }
 
 @theme inline {
@@ -53,6 +103,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-card: var(--radius-card);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -61,19 +112,33 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-muted-foreground-soft: var(--muted-foreground-soft);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-ink: var(--warn-ink);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow-soft: var(--sombra-suave);
+  --shadow-panel: var(--sombra-panel);
+  --shadow-accent: var(--sombra-acento);
+  --shadow-accent-lg: var(--sombra-acento-lg);
+  --shadow-hero: var(--sombra-hero);
+  --shadow-drawer: var(--sombra-drawer);
 }
 
 @layer base {
@@ -82,12 +147,32 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  /* Los títulos del diseño van en la serif de display. */
+  h1,
+  h2 {
+    @apply font-serif;
+    letter-spacing: -0.015em;
+    font-weight: 400;
   }
 }
 
 /* Tabular numbers para columnas de importes */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Lienzo del panel principal: dos halos radiales (acento frío arriba a la
+ * izquierda, cálido arriba a la derecha) sobre el fondo cálido base.
+ */
+.canvas-app {
+  background:
+    radial-gradient(120% 70% at 12% -8%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 60%),
+    radial-gradient(90% 60% at 108% 6%, color-mix(in srgb, var(--warn) 9%, transparent), transparent 58%),
+    var(--background);
 }
 
 @media print {
@@ -97,6 +182,9 @@
   body {
     background: #fff;
     color: #000;
+  }
+  .canvas-app {
+    background: #fff !important;
   }
   .print-full {
     max-width: none !important;

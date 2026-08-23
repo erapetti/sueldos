@@ -157,7 +157,7 @@ export function TablaTodos({
         {visibles.length} de {filas.length} empleados
       </p>
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
         <Table>
           <TableHeader>
             <TableRow>

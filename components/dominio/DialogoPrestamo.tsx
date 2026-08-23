@@ -235,7 +235,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
                   </div>
 
                   {descuadre ? (
-                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                    <p className="text-sm text-warn-ink">
                       Las cuotas suman ${sumaCuotas.toFixed(2)} y el préstamo es de $
                       {totalPrestamo!.toFixed(2)}.
                     </p>

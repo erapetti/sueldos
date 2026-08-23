@@ -13,6 +13,7 @@ import { AccionesEmpleado } from '@/components/dominio/AccionesEmpleado'
 import { exigirUsuario } from '@/lib/auth/guards'
 import { listarEmpleadosVisibles } from '@/lib/consultas/empleados'
 import { aISO } from '@/lib/format/dates'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function PantallaEmpleados() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Empleados</h1>
+        <EncabezadoPagina className="mb-0 flex-1" rotulo="Personal" titulo="Empleados" />
         <Button asChild>
           <Link href="/empleados/nuevo">
             <Plus className="size-4" aria-hidden />
@@ -33,7 +34,7 @@ export default async function PantallaEmpleados() {
       </div>
 
       {empleados.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
+        <div className="rounded-card border border-dashed p-10 text-center">
           <Users className="mx-auto size-10 text-muted-foreground" aria-hidden />
           <p className="mt-3 font-medium">Todavía no tenés empleados en el listado</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -49,7 +50,7 @@ export default async function PantallaEmpleados() {
           </div>
         </div>
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y overflow-hidden rounded-card border bg-card shadow-soft [&>li:first-child]:pt-4 [&>li:last-child]:pb-4">
           {empleados.map((empleado) => {
             const compartidoConmigo = empleado.duenoId !== usuario.id
             const soloLectura = empleado.nivel === 'VER'
@@ -57,7 +58,7 @@ export default async function PantallaEmpleados() {
             return (
               <li
                 key={empleado.id}
-                className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap sm:p-4"
+                className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:px-[22px]"
               >
                 <div className="min-w-0 flex-1">
                   <Link

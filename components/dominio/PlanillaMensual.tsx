@@ -26,6 +26,7 @@ import {
   parsePeriodo,
   sumarMeses,
 } from '@/lib/format/dates'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export type Renglon = {
   /** Clave local; los ya guardados traen además `id`. */
@@ -224,15 +225,19 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     <div className="space-y-4 pb-32">
       {/* Encabezado */}
       <div className="space-y-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{props.titulo}</h1>
-          <p className="text-sm text-muted-foreground">
-            <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
-              {props.alias}
-            </Link>{' '}
-            — {props.nombreCompleto}
-          </p>
-        </div>
+        <EncabezadoPagina
+          className="mb-0"
+          rotulo="Planilla mensual"
+          titulo={props.titulo}
+          bajada={
+            <>
+              <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
+                {props.alias}
+              </Link>{' '}
+              — {props.nombreCompleto}
+            </>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
@@ -280,7 +285,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
 
       {/* Cuerpo */}
       {modoLista ? (
-        <div className="space-y-2 rounded-lg border p-3">
+        <div className="space-y-2 rounded-card bg-card shadow-soft border px-[22px] py-5">
           {renglones.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               Todavía no cargaste nada. Agregá el primer renglón.
@@ -317,7 +322,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           ) : null}
         </div>
       ) : (
-        <div ref={grillaRef} className="rounded-lg border p-2 sm:p-3">
+        <div ref={grillaRef} className="rounded-card bg-card shadow-soft border px-[22px] py-5">
           <div className="grid grid-cols-7 gap-1 pb-2 text-center text-xs font-medium text-muted-foreground">
             {NOMBRES_DIAS_CORTOS.map((d) => (
               <div key={d}>{d}</div>

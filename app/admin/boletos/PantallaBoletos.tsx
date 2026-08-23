@@ -19,6 +19,7 @@ import { useAccion } from '@/hooks/useAccion'
 import { borrarValorBoleto, registrarValorBoleto } from '@/actions/admin'
 import { formatearImporte } from '@/lib/format/money'
 import { aISO, hoy, primerDiaDelMes } from '@/lib/format/dates'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 type Valor = {
   id: string
@@ -53,15 +54,19 @@ export function PantallaBoletos({ valores }: { valores: Valor[] }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Costo de boletos</h1>
-        <p className="text-sm text-muted-foreground">
-          Costo de <strong>un</strong> boleto. Cada día trabajado paga ida y vuelta.
-        </p>
-      </div>
+      <EncabezadoPagina
+        className="mb-0"
+        rotulo="Parámetros"
+        titulo="Costo de boletos"
+        bajada={
+          <>
+            Costo de <strong>un</strong> boleto. Cada día trabajado paga ida y vuelta.
+          </>
+        }
+      />
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-medium">Nuevo valor</h2>
+      <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">Nuevo valor</h2>
 
         <CampoMonto
           id="boleto-monto"
@@ -91,8 +96,8 @@ export function PantallaBoletos({ valores }: { valores: Valor[] }) {
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Histórico</h2>
-        <div className="overflow-x-auto rounded-lg border">
+        <h2 className="text-[20px]">Histórico</h2>
+        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
           <Table>
             <TableHeader>
               <TableRow>

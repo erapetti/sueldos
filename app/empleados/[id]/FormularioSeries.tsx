@@ -89,7 +89,7 @@ export function FormularioSeries({
   const sumaRegimen = dias.reduce((a, d) => a + Number(d || 0), 0)
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
       <h3 className="font-medium">{TITULOS[tipo]}</h3>
 
       {tipo === 'SALARIO' ? (

@@ -72,8 +72,8 @@ export function PanelCompartir({
 
   return (
     <div className="space-y-5">
-      <section className="space-y-3 rounded-lg border p-4">
-        <h2 className="font-medium">Compartir con otro usuario</h2>
+      <section className="space-y-3 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">Compartir con otro usuario</h2>
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
@@ -129,13 +129,13 @@ export function PanelCompartir({
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Ya compartido con</h2>
+        <h2 className="text-[20px]">Ya compartido con</h2>
         {permisos.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-card border border-dashed p-6 text-center text-sm text-muted-foreground">
             Todavía no lo compartiste con nadie.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
                 <TableRow>

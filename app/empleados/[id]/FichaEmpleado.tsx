@@ -23,6 +23,7 @@ import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
 import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 type Salario = {
   id: string
@@ -150,17 +151,19 @@ export function FichaEmpleado(props: FichaProps) {
   return (
     <div className="space-y-5">
       {props.comoAdministrador ? (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
           Estás viendo un empleado de {props.duenoNombre} como administrador. Para operarlo tenés
           que compartírtelo desde «Todos los empleados».
         </p>
       ) : null}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{props.empleado.alias}</h1>
-          <p className="text-muted-foreground">{props.empleado.nombreCompleto}</p>
-        </div>
+        <EncabezadoPagina
+          className="mb-0 flex-1"
+          rotulo="Empleado"
+          titulo={props.empleado.alias}
+          bajada={props.empleado.nombreCompleto}
+        />
         <div className="flex flex-wrap gap-2">
           {!props.empleado.activo ? <Badge variant="secondary">Dado de baja</Badge> : null}
           {!props.empleado.visible ? <Badge variant="outline">Oculto del listado</Badge> : null}
@@ -182,19 +185,21 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 1 — Datos */}
         <TabsContent value="datos" className="pt-4">
-          <FormularioDatos
-            empleadoId={props.empleadoId}
-            valores={props.empleado}
-            soloLectura={props.soloLectura}
-            esDueno={props.esDueno}
-          />
+          <div className="rounded-card border bg-card px-[22px] py-5 shadow-soft">
+            <FormularioDatos
+              empleadoId={props.empleadoId}
+              valores={props.empleado}
+              soloLectura={props.soloLectura}
+              esDueno={props.esDueno}
+            />
+          </div>
         </TabsContent>
 
         {/* 2 — Salario */}
         <TabsContent value="salario" className="space-y-6 pt-4">
           <section className="space-y-3">
-            <h2 className="font-semibold">Salario y horas semanales</h2>
-            <div className="overflow-x-auto rounded-lg border">
+            <h2 className="text-[20px]">Salario y horas semanales</h2>
+            <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -235,11 +240,11 @@ export function FichaEmpleado(props: FichaProps) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-semibold">Valor hora «en negro»</h2>
+            <h2 className="text-[20px]">Valor hora «en negro»</h2>
             <p className="text-sm text-muted-foreground">
               Con el que se pagan las horas extras sin descuento de BPS (§4.3.1).
             </p>
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -286,7 +291,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 3 — Régimen */}
         <TabsContent value="regimen" className="space-y-4 pt-4">
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -325,7 +330,8 @@ export function FichaEmpleado(props: FichaProps) {
         </TabsContent>
 
         {/* 4 — Novedades */}
-        <TabsContent value="novedades" className="space-y-3 pt-4">
+        <TabsContent value="novedades" className="pt-4">
+          <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
           <p className="text-sm text-muted-foreground">
             Las horas extras y las inasistencias se cargan en su planilla mensual, que permite
             cargar un mes entero de una sola vez.
@@ -340,6 +346,7 @@ export function FichaEmpleado(props: FichaProps) {
             <Button asChild variant="outline">
               <Link href={`/empleados/${props.empleadoId}/liquidacion`}>Cálculo de sueldo</Link>
             </Button>
+          </div>
           </div>
         </TabsContent>
 
@@ -365,7 +372,7 @@ export function FichaEmpleado(props: FichaProps) {
           </div>
 
           {props.mesesSinLiquidar.length > 0 ? (
-            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
               El saldo puede estar incompleto: faltan confirmar las liquidaciones de{' '}
               {props.mesesSinLiquidar.slice(0, 8).join(', ')}
               {props.mesesSinLiquidar.length > 8
@@ -375,7 +382,7 @@ export function FichaEmpleado(props: FichaProps) {
             </p>
           ) : null}
 
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -421,8 +428,8 @@ export function FichaEmpleado(props: FichaProps) {
 
           {props.cuotas.length > 0 ? (
             <section className="space-y-2">
-              <h2 className="font-semibold">Plan de pagos</h2>
-              <div className="overflow-x-auto rounded-lg border">
+              <h2 className="text-[20px]">Plan de pagos</h2>
+              <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -466,7 +473,7 @@ export function FichaEmpleado(props: FichaProps) {
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -505,8 +512,8 @@ export function FichaEmpleado(props: FichaProps) {
 
           {props.licencias.length > 0 ? (
             <section className="space-y-2">
-              <h2 className="font-semibold">Períodos gozados</h2>
-              <div className="overflow-x-auto rounded-lg border">
+              <h2 className="text-[20px]">Períodos gozados</h2>
+              <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -539,7 +546,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 7 — Liquidaciones */}
         <TabsContent value="liquidaciones" className="space-y-3 pt-4">
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
                 <TableRow>

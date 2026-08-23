@@ -233,8 +233,8 @@ export function FormularioAlta() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-medium">Salario y régimen horario</h2>
+      <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">Salario y régimen horario</h2>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <CampoMonto

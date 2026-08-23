@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { Construction } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export function NoImplementado({
   titulo,
@@ -21,12 +22,9 @@ export function NoImplementado({
 }) {
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
-        {subtitulo ? <p className="text-sm text-muted-foreground">{subtitulo}</p> : null}
-      </div>
+      <EncabezadoPagina className="mb-0" titulo={titulo} bajada={subtitulo} />
 
-      <div className="rounded-lg border border-dashed p-10 text-center">
+      <div className="rounded-card border border-dashed p-10 text-center">
         <Construction className="mx-auto size-10 text-muted-foreground" aria-hidden />
         <p className="mt-3 text-lg font-medium">Funcionalidad no implementada aún</p>
         <p className="mx-auto mt-2 max-w-prose text-sm text-muted-foreground">{motivo}</p>

@@ -20,7 +20,7 @@ export default async function SinAcceso() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
       <ShieldAlert className="size-12 text-muted-foreground" aria-hidden />
-      <h1 className="text-xl font-semibold">Acceso no autorizado</h1>
+      <h1 className="text-[28px] leading-tight">Acceso no autorizado</h1>
       <p className="text-muted-foreground">{MENSAJES[motivo]}</p>
       {email ? (
         <p className="text-sm text-muted-foreground">

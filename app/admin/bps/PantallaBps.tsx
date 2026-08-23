@@ -25,6 +25,7 @@ import { useAccion } from '@/hooks/useAccion'
 import { guardarConceptoBps } from '@/actions/admin'
 import { SEGUROS_SALUD } from '@/constants/segurosSalud'
 import { formatearPorcentaje } from '@/lib/format/money'
+import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 type Registro = {
   id: string
@@ -101,15 +102,15 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Descuentos de BPS</h1>
-        <p className="text-sm text-muted-foreground">
-          Los conceptos son disjuntos entre sí: todos los aplicables a un empleado se suman.
-        </p>
-      </div>
+      <EncabezadoPagina
+        className="mb-0"
+        rotulo="Parámetros"
+        titulo="Descuentos de BPS"
+        bajada="Los conceptos son disjuntos entre sí: todos los aplicables a un empleado se suman."
+      />
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-medium">
+      <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
+        <h2 className="text-[20px]">
           {formulario.darDeBaja ? 'Dar de baja un concepto' : 'Nuevo concepto o cambio de porcentaje'}
         </h2>
 
@@ -175,7 +176,7 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
         </div>
 
         {advertenciaAlcance ? (
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
             Ya existe un concepto con ese nombre y otro alcance. Se pueden tener los dos: los
             conceptos de BPS se suman entre sí.
           </p>
@@ -209,15 +210,15 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">Conceptos</h2>
+        <h2 className="text-[20px]">Conceptos</h2>
 
         {grupos.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          <p className="rounded-card border border-dashed p-8 text-center text-sm text-muted-foreground">
             Todavía no hay conceptos cargados. Sin conceptos vigentes, ninguna liquidación lleva
             descuentos de BPS.
           </p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className="divide-y rounded-card bg-card shadow-soft border overflow-hidden">
             {grupos.map((grupo) => {
               const abierto = expandido === grupo.clave
               const deBaja = grupo.vigente === null || grupo.vigente.porcentaje === null
