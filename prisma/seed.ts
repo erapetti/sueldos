@@ -4,6 +4,7 @@
  * Crea el administrador de `BOOTSTRAP_ADMIN_EMAIL` si la tabla `usuarios` está vacía (§3.3)
  * y, en desarrollo, un juego de datos de ejemplo con `SEED_DEMO=1`.
  */
+import 'dotenv/config'
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import { PrismaClient } from '../lib/db/generated/client'
 
