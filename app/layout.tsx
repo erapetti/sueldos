@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="flex flex-1">
             {usuario ? <MenuLateral esAdmin={usuario.esAdmin} /> : null}
             <main className="canvas-app min-w-0 flex-1">
-              <div className="mr-auto w-full max-w-[var(--ancho-contenido)] px-[18px] pt-[26px] pb-[60px] print-full">
+              <div className="mr-auto w-full max-w-[var(--ancho-contenido)] px-[var(--padding-contenido)] pt-[26px] pb-[60px] print-full">
                 {children}
               </div>
             </main>

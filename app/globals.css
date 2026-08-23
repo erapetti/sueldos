@@ -198,14 +198,19 @@
 }
 
 /*
- * Lienzo del panel principal: dos halos radiales (acento frío arriba a la
- * izquierda, cálido arriba a la derecha) sobre el fondo cálido base.
+ * Lienzo del panel principal. La revisión del diseño reemplazó los dos halos
+ * radiales por una textura de grano en dos capas, multiplicada sobre el crema
+ * plano: `feTurbulence` fino teselado cada 300px y un veteado grueso cada 900px,
+ * los dos desaturados. Son los SVG del diseño, embebidos tal cual.
  */
 .canvas-app {
-  background:
-    radial-gradient(120% 70% at 12% -8%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 60%),
-    radial-gradient(90% 60% at 108% 6%, color-mix(in srgb, var(--warn) 9%, transparent), transparent 58%),
-    var(--background);
+  background-color: var(--background);
+  background-image:
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJnIiB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC40MiIgbnVtT2N0YXZlcz0iNCIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9InNhdHVyYXRlIiB2YWx1ZXM9IjAiLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjQ2Ii8+PC9zdmc+'),
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5MDAiIGhlaWdodD0iOTAwIj48ZmlsdGVyIGlkPSJtIiB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC4wMDYiIG51bU9jdGF2ZXM9IjQiIHNlZWQ9IjciIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI5MDAiIGZpbHRlcj0idXJsKCNtKSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+');
+  background-size: 300px 300px, 900px 900px;
+  background-repeat: repeat, repeat;
+  background-blend-mode: multiply, multiply;
 }
 
 @media print {
