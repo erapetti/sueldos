@@ -139,9 +139,13 @@ export function PlanillaHorasExtras(props: {
           <Input
             type="number"
             step={0.5}
-            min={0.5}
-            value={renglon.horas || ''}
-            onChange={(e) => actualizar({ horas: Number(e.target.value) })}
+            min={0}
+            value={renglon.horas}
+            onChange={(e) => {
+              // No se aceptan negativos ni vacío: el campo cae a 0, que es el valor inicial.
+              const valor = Number(e.target.value)
+              actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
+            }}
             className="w-24 tabular"
             aria-label="Horas"
           />
@@ -224,7 +228,7 @@ export function PlanillaHorasExtras(props: {
             </span>
             {boletosExtra > 0 ? (
               <span className="text-muted-foreground">
-                +{boletosExtra * 2} boletos por días no laborables
+                +{boletosExtra * 2} boletos adicionales
               </span>
             ) : null}
           </span>
