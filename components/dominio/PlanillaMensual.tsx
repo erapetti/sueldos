@@ -79,6 +79,8 @@ export const COL_HORAS = 'sm:w-24'
 export const COL_OPCION = 'sm:w-32'
 /** Columna del interruptor de la fila. El ancho lo fija la etiqueta del encabezado. */
 export const COL_INTERRUPTOR = 'sm:w-24'
+/** Columna angosta: un dato que no se edita, o un interruptor de etiqueta corta. */
+export const COL_ANGOSTA = 'sm:w-14'
 
 /**
  * Día del renglón en la lista rápida. La planilla es de un mes, así que alcanza con el
@@ -172,10 +174,11 @@ export type PlanillaMensualProps = {
    * que usa el popover.
    */
   extraNuevoRenglon: () => Record<string, unknown>
-  /** Etiqueta de la tercera columna en el encabezado de la lista: «Recargo» o «Causal». */
-  etiquetaOpcion: string
-  /** Etiqueta de la columna del interruptor: «BPS» o «Descontar días». */
-  etiquetaInterruptor?: string
+  /**
+   * Encabezado de columnas de la lista rápida, solo visible desde `sm`. Lo arma cada
+   * planilla con las constantes `COL_*`, que son las mismas que usan sus campos.
+   */
+  encabezadoLista: React.ReactNode
   /**
    * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
    * el lote; la planilla se recarga sola cuando cambian los renglones guardados.
@@ -421,12 +424,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
             <>
               {/* Abajo de sm cada campo lleva su etiqueta al lado; desde sm alcanza una vez. */}
               <div className="hidden gap-2 pb-1 text-xs text-muted-foreground sm:flex">
-                <span className={COL_DIA}>Día</span>
-                <span className={COL_HORAS}>Horas</span>
-                <span className={COL_OPCION}>{props.etiquetaOpcion}</span>
-                {props.etiquetaInterruptor ? (
-                  <span className={COL_INTERRUPTOR}>{props.etiquetaInterruptor}</span>
-                ) : null}
+                {props.encabezadoLista}
               </div>
             </>
           )}
@@ -485,9 +483,12 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               const delDia = porDia.get(fecha) ?? []
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
-              // Domingos y feriados se marcan con fondo, sin texto: el nombre del feriado
-              // queda en el tooltip y en la etiqueta accesible.
-              const esNoHabil = esDomingo(fechaDia) || !!contexto?.feriado
+              // El fondo marca los días en los que no se trabaja: domingos y feriados
+              // no laborables. El borde marca que es feriado, de cualquiera de los dos
+              // tipos, así un domingo feriado se distingue de un domingo común. El nombre
+              // del feriado queda en el tooltip y en la etiqueta accesible, no en la celda.
+              const esFeriado = !!contexto?.feriado
+              const fondoNoHabil = esDomingo(fechaDia) || !!contexto?.feriadoNoLaborable
 
               return (
                 <Popover
@@ -511,8 +512,9 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                       className={cn(
                         'flex min-h-20 flex-col items-start gap-1 rounded-md border p-1.5 text-left text-xs transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        noTrabaja && !esNoHabil && 'bg-muted/50',
-                        esNoHabil && 'bg-destructive/10',
+                        noTrabaja && !fondoNoHabil && 'bg-muted/50',
+                        fondoNoHabil && 'bg-destructive/10',
+                        esFeriado && 'border-destructive/60',
                         esHoy && 'ring-2 ring-primary',
                         !props.soloLectura && 'hover:bg-accent',
                       )}

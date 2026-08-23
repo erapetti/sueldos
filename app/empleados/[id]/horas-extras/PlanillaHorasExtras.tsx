@@ -19,8 +19,9 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  COL_ANGOSTA,
+  COL_DIA,
   COL_HORAS,
-  COL_INTERRUPTOR,
   COL_OPCION,
   PlanillaMensual,
   type DiaContexto,
@@ -136,12 +137,17 @@ export function PlanillaHorasExtras(props: {
           cerrar={cerrar}
         />
       )}
-      renderFilaLista={({ renglon, actualizar, quitar }) => (
+      renderFilaLista={({ renglon, contexto, actualizar, quitar }) => (
         <>
           <CampoLista etiqueta="Día">
             <CampoDia valor={renglon.fecha} onChange={(iso) => actualizar({ fecha: iso })} />
           </CampoLista>
           <CampoLista etiqueta="Horas">
+            <span className={cn('flex min-h-9 items-center text-sm tabular', COL_ANGOSTA)}>
+              {contexto ? `${contexto.horasRegimen} h` : '—'}
+            </span>
+          </CampoLista>
+          <CampoLista etiqueta="Horas extra">
             <Input
               type="number"
               step={0.5}
@@ -173,7 +179,7 @@ export function PlanillaHorasExtras(props: {
             </select>
           </CampoLista>
           <CampoLista etiqueta="BPS">
-            <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
+            <div className={cn('flex min-h-9 items-center', COL_ANGOSTA)}>
               <Switch
                 checked={extra(renglon).conBps}
                 onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
@@ -193,8 +199,15 @@ export function PlanillaHorasExtras(props: {
           </Button>
         </>
       )}
-      etiquetaOpcion="Recargo"
-      etiquetaInterruptor="BPS"
+      encabezadoLista={
+        <>
+          <span className={COL_DIA}>Día</span>
+          <span className={COL_ANGOSTA}>Horas</span>
+          <span className={COL_HORAS}>Horas extra</span>
+          <span className={COL_OPCION}>Recargo</span>
+          <span className={COL_ANGOSTA}>BPS</span>
+        </>
+      }
       extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
         const conBpsHoras = renglones

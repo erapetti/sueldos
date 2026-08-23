@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  COL_DIA,
   COL_HORAS,
   COL_INTERRUPTOR,
   COL_OPCION,
@@ -211,8 +212,14 @@ export function PlanillaFaltas(props: {
           </Button>
         </>
       )}
-      etiquetaOpcion="Causal"
-      etiquetaInterruptor="Descontar días"
+      encabezadoLista={
+        <>
+          <span className={COL_DIA}>Día</span>
+          <span className={COL_HORAS}>Horas</span>
+          <span className={COL_OPCION}>Causal</span>
+          <span className={COL_INTERRUPTOR}>Descontar días</span>
+        </>
+      }
       extraNuevoRenglon={() => ({
         causal,
         // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.
