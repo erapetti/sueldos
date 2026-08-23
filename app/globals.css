@@ -198,21 +198,26 @@
 }
 
 /*
- * Lienzo del panel principal. La revisión del diseño reemplazó los dos halos
- * radiales por una textura de grano en dos capas, multiplicada sobre el crema
- * plano: `feTurbulence` fino teselado cada 300px y un veteado grueso cada 900px,
- * los dos desaturados y con el rango comprimido por `feComponentTransfer` —a
- * [0.62, 1] y [0.66, 1]— para que el multiply no llegue a manchar. Son los SVG
- * del diseño, embebidos tal cual.
+ * Lienzo del panel principal, en dos capas sobre el crema plano:
+ *
+ * 1. `bg-triangles.svg`, la malla low-poly del diseño, a `cover` y sin repetir.
+ *    El SVG trae `preserveAspectRatio="slice"`, así que recorta en vez de
+ *    deformarse cuando el panel no tiene su misma proporción.
+ * 2. El grano fino de `feTurbulence`, teselado cada 300px, desaturado y con el
+ *    rango comprimido a [0.62, 1] por `feComponentTransfer` para que el multiply
+ *    no llegue a manchar.
+ *
+ * La capa de veteado grueso de 900px que había antes la reemplaza la malla.
  */
 .canvas-app {
   background-color: var(--background);
   background-image:
-    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJnIiB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC40MiIgbnVtT2N0YXZlcz0iNCIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9InNhdHVyYXRlIiB2YWx1ZXM9IjAiLz48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jUiB0eXBlPSJsaW5lYXIiIHNsb3BlPSIwLjQiIGludGVyY2VwdD0iMC42MiIvPjxmZUZ1bmNHIHR5cGU9ImxpbmVhciIgc2xvcGU9IjAuNCIgaW50ZXJjZXB0PSIwLjYyIi8+PGZlRnVuY0IgdHlwZT0ibGluZWFyIiBzbG9wZT0iMC40IiBpbnRlcmNlcHQ9IjAuNjIiLz48L2ZlQ29tcG9uZW50VHJhbnNmZXI+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjMwMCIgaGVpZ2h0PSIzMDAiIGZpbHRlcj0idXJsKCNnKSIgb3BhY2l0eT0iMC44Ii8+PC9zdmc+'),
-    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5MDAiIGhlaWdodD0iOTAwIj48ZmlsdGVyIGlkPSJtIiB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC4wMDYiIG51bU9jdGF2ZXM9IjQiIHNlZWQ9IjciIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PGZlQ29tcG9uZW50VHJhbnNmZXI+PGZlRnVuY1IgdHlwZT0ibGluZWFyIiBzbG9wZT0iMC4zNCIgaW50ZXJjZXB0PSIwLjY2Ii8+PGZlRnVuY0cgdHlwZT0ibGluZWFyIiBzbG9wZT0iMC4zNCIgaW50ZXJjZXB0PSIwLjY2Ii8+PGZlRnVuY0IgdHlwZT0ibGluZWFyIiBzbG9wZT0iMC4zNCIgaW50ZXJjZXB0PSIwLjY2Ii8+PC9mZUNvbXBvbmVudFRyYW5zZmVyPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSI5MDAiIGhlaWdodD0iOTAwIiBmaWx0ZXI9InVybCgjbSkiIG9wYWNpdHk9IjAuOSIvPjwvc3ZnPg==');
-  background-size: 300px 300px, 900px 900px;
-  background-repeat: repeat, repeat;
-  background-blend-mode: multiply, multiply;
+    url('/bg-triangles.svg'),
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJnIiB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC40MiIgbnVtT2N0YXZlcz0iNCIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9InNhdHVyYXRlIiB2YWx1ZXM9IjAiLz48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jUiB0eXBlPSJsaW5lYXIiIHNsb3BlPSIwLjQiIGludGVyY2VwdD0iMC42MiIvPjxmZUZ1bmNHIHR5cGU9ImxpbmVhciIgc2xvcGU9IjAuNCIgaW50ZXJjZXB0PSIwLjYyIi8+PGZlRnVuY0IgdHlwZT0ibGluZWFyIiBzbG9wZT0iMC40IiBpbnRlcmNlcHQ9IjAuNjIiLz48L2ZlQ29tcG9uZW50VHJhbnNmZXI+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjMwMCIgaGVpZ2h0PSIzMDAiIGZpbHRlcj0idXJsKCNnKSIgb3BhY2l0eT0iMC44Ii8+PC9zdmc+');
+  background-size: cover, 300px 300px;
+  background-position: center top, 0 0;
+  background-repeat: no-repeat, repeat;
+  background-blend-mode: normal, multiply;
 }
 
 @media print {
