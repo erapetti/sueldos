@@ -35,14 +35,23 @@ En desarrollo, dejar `PROXY_SHARED_SECRET` **sin definir** en `.env` para poder 
 sin oauth2-proxy delante, y usar `DEV_IMPERSONATE_USER` para simular identidad (§3.2).
 
 ```bash
-npm test          # 226 tests: motor de cálculo, licencia, estado derivado, integración
+npm test          # 182 tests: motor de cálculo, licencia, estado derivado, validación
 npm run lint
 npm run typecheck # la aplicación y los tests; `tsc --noEmit` solo mira la aplicación
 npm audit         # tiene que dar 0 vulnerabilidades
 ```
 
 Los tests de integración **borran todas las tablas** de la base apuntada por `DATABASE_URL`.
-Nunca apuntarlos a la base de producción.
+Por eso `npm test` no los corre: fallan a propósito, con un mensaje que explica por qué. Para
+correr la suite completa, 240 tests, hay que pedirlo por el nombre del script:
+
+```bash
+npm run delete_all_data_and_test   # ⚠ CUIDADO: BORRA TODOS LOS DATOS de DATABASE_URL
+```
+
+Antes de correrlo, verificar que `DATABASE_URL` **no** apunte a producción. Después de
+correrlo la base queda vacía; si se estaba trabajando con datos de ejemplo, recargarlos con
+`SEED_DEMO=1 npm run db:seed`.
 
 ## Variables de entorno
 

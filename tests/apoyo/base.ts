@@ -3,10 +3,27 @@
  *
  * Los tests corren contra la base apuntada por `DATABASE_URL`. **Borran todas las tablas**
  * antes de cada caso, así que nunca deben apuntarse a una base con datos reales.
+ *
+ * Por eso importar este módulo requiere `DELETE_ALL_DATA=1`, que solo pone el script
+ * `delete_all_data_and_test`. Con `npm test` a secas, los tests que borran datos fallan
+ * al cargar en vez de vaciar la base por descuido.
  */
 import { vi } from 'vitest'
 import { prisma } from '@/lib/db/prisma'
 import { fecha, primerDiaDelMes } from '@/lib/format/dates'
+
+if (process.env.DELETE_ALL_DATA !== '1') {
+  throw new Error(
+    'Estos tests BORRAN TODAS LAS TABLAS de la base apuntada por DATABASE_URL.\n' +
+      'Para correrlos: npm run delete_all_data_and_test\n' +
+      'Antes de hacerlo, verificá que DATABASE_URL no apunte a producción.',
+  )
+}
+
+// Segunda barrera: ni con la variable puesta se borra una base de producción.
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Los tests que borran datos no se pueden correr con NODE_ENV=production.')
+}
 
 export type UsuarioDePrueba = {
   id: string
