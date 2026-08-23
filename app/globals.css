@@ -14,6 +14,17 @@
   --radius: 0.75rem;
   --radius-card: 1.75rem;
 
+  /*
+   * Techo de ancho del contenido. La tabla más ancha de la aplicación (los 7
+   * campos de «Todos los empleados») necesita 1202px, más 2×18px de padding:
+   * 1280 le deja holgura y evita el scroll horizontal permanente. El diseño lo
+   * expone como parámetro entre 1080 y 1600; acá se cambia en este solo lugar.
+   */
+  --ancho-contenido: 1280px;
+  /* Ancho del menú lateral, que solo existe desde el breakpoint lg. */
+  --ancho-sidebar: 0px;
+  --padding-contenido: 18px;
+
   --background: #f6f2ec;
   --foreground: #26241f;
   --card: #fbf9f5;
@@ -56,6 +67,13 @@
   --sombra-acento-lg: 0 14px 28px -12px rgb(15 118 110 / 0.85);
   --sombra-hero: 0 18px 40px -26px rgb(15 118 110 / 0.9);
   --sombra-drawer: 24px 0 60px -28px rgb(38 36 31 / 0.55);
+}
+
+/* El menú lateral solo existe desde el breakpoint lg (1024px). */
+@media (min-width: 64rem) {
+  :root {
+    --ancho-sidebar: 16rem;
+  }
 }
 
 /*
@@ -162,6 +180,21 @@
 /* Tabular numbers para columnas de importes */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * El contenido se ancla a la izquierda, así que en pantallas anchas todo el
+ * espacio sobrante queda a la derecha. Para que el bloque de usuario del header
+ * no se despegue del contenido, el header se reserva ese mismo hueco de padding
+ * derecho: ancho disponible − menú lateral − techo de contenido, más el padding
+ * del contenido. El diseño lo calcula midiendo `main` con un ResizeObserver;
+ * acá sale de la misma cuenta hecha en CSS, sin medir nada.
+ */
+.header-app {
+  padding-right: max(
+    14px,
+    calc(100% - var(--ancho-sidebar) - var(--ancho-contenido) + var(--padding-contenido))
+  );
 }
 
 /*

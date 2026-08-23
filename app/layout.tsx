@@ -52,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="es-UY" className={`h-full antialiased ${sans.variable} ${serif.variable}`}>
       <body className="flex min-h-full flex-col">
         <TooltipProvider delayDuration={300}>
-          <header className="sticky top-0 z-40 flex h-[62px] items-center gap-2.5 border-b bg-card pr-3.5 pl-2.5 no-print">
+          <header className="header-app sticky top-0 z-40 flex h-[62px] items-center gap-2.5 border-b bg-card pl-2.5 no-print">
             {usuario ? <MenuMobile esAdmin={usuario.esAdmin} email={usuario.email} /> : null}
 
             <div className="flex min-w-0 items-center gap-2.5 pl-1">
@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="flex flex-1">
             {usuario ? <MenuLateral esAdmin={usuario.esAdmin} /> : null}
             <main className="canvas-app min-w-0 flex-1">
-              <div className="mx-auto w-full max-w-[1080px] px-[18px] pt-[26px] pb-[60px] print-full">
+              <div className="mr-auto w-full max-w-[var(--ancho-contenido)] px-[18px] pt-[26px] pb-[60px] print-full">
                 {children}
               </div>
             </main>
