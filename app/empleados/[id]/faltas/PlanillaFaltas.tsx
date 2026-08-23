@@ -185,6 +185,11 @@ export function PlanillaFaltas(props: {
           </Button>
         </>
       )}
+      extraNuevoRenglon={() => ({
+        causal,
+        // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.
+        descuenta: descuentaEsEditable(causal) ? descuenta : true,
+      })}
       renderResumen={(renglones) => {
         const total = renglones.reduce((a, r) => a.plus(r.horas), new Decimal(0))
         const queDescuentan = renglones

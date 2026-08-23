@@ -176,6 +176,7 @@ export function PlanillaHorasExtras(props: {
           </Button>
         </>
       )}
+      extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
         const conBpsHoras = renglones
           .filter((r) => extra(r).conBps)
