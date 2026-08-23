@@ -173,11 +173,7 @@ export type PlanillaMensualProps = {
   extraNuevoRenglon: () => Record<string, unknown>
   /** Etiqueta de la tercera columna en el encabezado de la lista: «Recargo» o «Causal». */
   etiquetaOpcion: string
-  /**
-   * Etiqueta de la columna del interruptor. Solo se pasa cuando el interruptor es
-   * condicional y su etiqueta no cabe al lado; si va siempre visible, conviene que la
-   * lleve al lado y no acá.
-   */
+  /** Etiqueta de la columna del interruptor: «BPS» o «Descontar días». */
   etiquetaInterruptor?: string
   /**
    * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
@@ -259,6 +255,11 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
    * Día en el que va a caer el próximo «Agregar renglón», o null si no queda
    * ninguno y el botón tiene que quedar deshabilitado.
    *
+   * La carga avanza hacia adelante: el día siguiente al último que ya tiene algo,
+   * sin importar si es un renglón guardado o de esta sesión. Al pasarse de fin de
+   * mes se vuelve a buscar el primer día libre, así se pueden completar los huecos
+   * que quedaron atrás.
+   *
    * Se deriva de los renglones y no de un contador propio, para que siga tanto las
    * ediciones de fecha a mano como el «Descartar», que devuelve la lista a lo
    * guardado.
@@ -267,22 +268,18 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     const fechas = props.dias.map((d) => d.fecha)
     if (fechas.length === 0) return null
 
-    // Los renglones de esta sesión son los que todavía no tienen id.
-    const deLaSesion = renglones.filter((r) => !r.id).map((r) => r.fecha)
+    const ocupados = new Set(renglones.map((r) => r.fecha))
+    const primerLibre = fechas.find((f) => !ocupados.has(f)) ?? null
 
-    if (deLaSesion.length === 0) {
-      // Sin nada cargado se arranca en el primer día del mes que no tenga renglones.
-      const ocupados = new Set(renglones.map((r) => r.fecha))
-      const libre = fechas.find((f) => !ocupados.has(f))
-      // Si el mes está completo se empieza por el principio: un día con un renglón
-      // igual admite el del otro tipo.
-      return libre ?? fechas[0]
-    }
+    if (renglones.length === 0) return primerLibre ?? fechas[0]
 
-    // De ahí en adelante, el día siguiente al último cargado. Las fechas son ISO,
-    // así que se comparan como texto.
-    const ultima = deLaSesion.reduce((a, b) => (a > b ? a : b))
-    return fechas.find((f) => f > ultima) ?? null
+    // Las fechas son ISO, así que el máximo sale comparando como texto.
+    const ultima = renglones.map((r) => r.fecha).reduce((a, b) => (a > b ? a : b))
+    const siguiente = fechas.find((f) => f > ultima)
+    if (siguiente) return siguiente
+
+    // Se llegó a fin de mes: se completan los huecos de atrás.
+    return primerLibre
   }, [props.dias, renglones])
 
   /** No se agrega otro renglón mientras haya uno sin horas cargadas. */

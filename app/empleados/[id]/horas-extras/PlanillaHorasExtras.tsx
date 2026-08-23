@@ -20,6 +20,7 @@ import {
   CampoDia,
   CampoLista,
   COL_HORAS,
+  COL_INTERRUPTOR,
   COL_OPCION,
   PlanillaMensual,
   type DiaContexto,
@@ -171,14 +172,15 @@ export function PlanillaHorasExtras(props: {
               ))}
             </select>
           </CampoLista>
-          <label className="flex min-h-9 items-center gap-2 text-sm">
-            <Switch
-              checked={extra(renglon).conBps}
-              onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
-              aria-label="Lleva descuento BPS"
-            />
-            BPS
-          </label>
+          <CampoLista etiqueta="BPS">
+            <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
+              <Switch
+                checked={extra(renglon).conBps}
+                onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
+                aria-label="Lleva descuento BPS"
+              />
+            </div>
+          </CampoLista>
           <Button
             variant="ghost"
             size="icon"
@@ -192,6 +194,7 @@ export function PlanillaHorasExtras(props: {
         </>
       )}
       etiquetaOpcion="Recargo"
+      etiquetaInterruptor="BPS"
       extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
         const conBpsHoras = renglones
