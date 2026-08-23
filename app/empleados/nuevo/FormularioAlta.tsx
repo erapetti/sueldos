@@ -133,6 +133,7 @@ export function FormularioAlta() {
           onChange={(v) => cambiar('banco', v)}
           error={campos.banco}
           disabled={enviando}
+          ayuda="Opcional."
         />
         <CampoTexto
           id="cuenta"
@@ -142,6 +143,7 @@ export function FormularioAlta() {
           error={campos.cuenta}
           disabled={enviando}
           maxLength={32}
+          ayuda="Opcional. Alfanumérica, hasta 32 caracteres. Se admite guion para cuenta-subcuenta."
         />
 
         <div className="space-y-1.5">

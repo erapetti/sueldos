@@ -103,8 +103,8 @@ model Empleado {
   duenoId        String    @map("dueno_id") @db.Char(36)
   alias          String    @db.VarChar(40)
   nombreCompleto String    @map("nombre_completo") @db.VarChar(120)
-  banco          String    @db.VarChar(120)
-  cuenta         String    @db.VarChar(32)
+  banco          String?   @db.VarChar(120)
+  cuenta         String?   @db.VarChar(32)
   fechaIngreso   DateTime  @map("fecha_ingreso") @db.Date
   cobraBoletos   Boolean   @map("cobra_boletos")
   aportaBps      Boolean   @default(true) @map("aporta_bps")

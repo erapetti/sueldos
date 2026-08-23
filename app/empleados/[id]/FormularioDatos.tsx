@@ -48,8 +48,8 @@ export function FormularioDatos({
   valores: {
     alias: string
     nombreCompleto: string
-    banco: string
-    cuenta: string
+    banco: string | null
+    cuenta: string | null
     fechaIngreso: string
     fechaEgreso: string | null
     cobraBoletos: boolean
@@ -71,8 +71,8 @@ export function FormularioDatos({
   const [datos, setDatos] = useState({
     alias: valores.alias,
     nombreCompleto: valores.nombreCompleto,
-    banco: valores.banco,
-    cuenta: valores.cuenta,
+    banco: valores.banco ?? '',
+    cuenta: valores.cuenta ?? '',
     fechaIngreso: valores.fechaIngreso as string | null,
     cobraBoletos: valores.cobraBoletos,
     aportaBps: valores.aportaBps,
@@ -132,6 +132,7 @@ export function FormularioDatos({
           onChange={(v) => cambiar('banco', v)}
           error={campos.banco}
           disabled={deshabilitado}
+          ayuda="Opcional."
         />
         <CampoTexto
           id="cuenta"
@@ -141,7 +142,7 @@ export function FormularioDatos({
           error={campos.cuenta}
           disabled={deshabilitado}
           maxLength={32}
-          ayuda="Alfanumérica, hasta 32 caracteres."
+          ayuda="Opcional. Alfanumérica, hasta 32 caracteres. Se admite guion para cuenta-subcuenta."
         />
 
         <div className="space-y-1.5">

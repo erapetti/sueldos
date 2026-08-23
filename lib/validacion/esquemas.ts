@@ -77,11 +77,18 @@ export const datosEmpleado = z.object({
     .trim()
     .min(1, 'El nombre completo es obligatorio')
     .max(120, 'Máximo 120 caracteres'),
-  banco: z.string().trim().min(1, 'El banco es obligatorio').max(120),
+  banco: z.string().trim().max(120, 'Máximo 120 caracteres').optional(),
+  // Opcional. Hay bancos que numeran cuenta-subcuenta, así que se admite el guion
+  // como separador: no al principio ni al final, y sin guiones consecutivos.
   cuenta: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9]{1,32}$/, 'La cuenta es alfanumérica, de hasta 32 caracteres'),
+    .max(32, 'Máximo 32 caracteres')
+    .regex(
+      /^([A-Za-z0-9]+(-[A-Za-z0-9]+)*)?$/,
+      'La cuenta es alfanumérica; el guion solo separa cuenta de subcuenta',
+    )
+    .optional(),
   fechaIngreso: fechaNoFutura,
   cobraBoletos: z.boolean(),
   aportaBps: z.boolean(),
