@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
-  COL_DIA,
+  COL_ANGOSTA,
   COL_HORAS,
   COL_INTERRUPTOR,
   COL_OPCION,
@@ -143,6 +143,11 @@ export function PlanillaFaltas(props: {
             <CampoDia valor={renglon.fecha} onChange={(iso) => actualizar({ fecha: iso })} />
           </CampoLista>
           <CampoLista etiqueta="Horas">
+            <span className={cn('flex min-h-9 items-center text-sm tabular', COL_ANGOSTA)}>
+              {contexto ? `${contexto.horasRegimen} h` : '—'}
+            </span>
+          </CampoLista>
+          <CampoLista etiqueta="Horas falta">
             <Input
               type="number"
               step={0.5}
@@ -212,14 +217,9 @@ export function PlanillaFaltas(props: {
           </Button>
         </>
       )}
-      encabezadoLista={
-        <>
-          <span className={COL_DIA}>Día</span>
-          <span className={COL_HORAS}>Horas</span>
-          <span className={COL_OPCION}>Causal</span>
-          <span className={COL_INTERRUPTOR}>Descontar días</span>
-        </>
-      }
+      etiquetaEntrada="Horas falta"
+      etiquetaOpcion="Causal"
+      etiquetaInterruptor="Descontar días"
       extraNuevoRenglon={() => ({
         causal,
         // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.

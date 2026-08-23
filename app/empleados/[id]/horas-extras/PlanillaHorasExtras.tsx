@@ -20,7 +20,7 @@ import {
   CampoDia,
   CampoLista,
   COL_ANGOSTA,
-  COL_DIA,
+  COL_INTERRUPTOR,
   COL_HORAS,
   COL_OPCION,
   PlanillaMensual,
@@ -179,7 +179,7 @@ export function PlanillaHorasExtras(props: {
             </select>
           </CampoLista>
           <CampoLista etiqueta="BPS">
-            <div className={cn('flex min-h-9 items-center', COL_ANGOSTA)}>
+            <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
               <Switch
                 checked={extra(renglon).conBps}
                 onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
@@ -199,15 +199,9 @@ export function PlanillaHorasExtras(props: {
           </Button>
         </>
       )}
-      encabezadoLista={
-        <>
-          <span className={COL_DIA}>Día</span>
-          <span className={COL_ANGOSTA}>Horas</span>
-          <span className={COL_HORAS}>Horas extra</span>
-          <span className={COL_OPCION}>Recargo</span>
-          <span className={COL_ANGOSTA}>BPS</span>
-        </>
-      }
+      etiquetaEntrada="Horas extra"
+      etiquetaOpcion="Recargo"
+      etiquetaInterruptor="BPS"
       extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
         const conBpsHoras = renglones

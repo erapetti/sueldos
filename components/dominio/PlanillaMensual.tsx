@@ -70,12 +70,12 @@ export function CampoLista({
  * los campos, para que una sola definición mantenga la alineación.
  *
  * La columna del día suma el input, el gap y el nombre del día de la semana:
- * 64 + 8 + 36 = 108px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
+ * 56 + 8 + 36 = 100px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
  * 22,4px, y esa diferencia corría 9px todo lo que venía después.
  */
-export const COL_DIA = 'sm:w-[108px]'
+export const COL_DIA = 'sm:w-[100px]'
 export const COL_NOMBRE_DIA = 'w-9'
-export const COL_HORAS = 'sm:w-24'
+export const COL_HORAS = 'sm:w-20'
 export const COL_OPCION = 'sm:w-32'
 /** Columna del interruptor de la fila. El ancho lo fija la etiqueta del encabezado. */
 export const COL_INTERRUPTOR = 'sm:w-24'
@@ -114,7 +114,7 @@ export function CampoDia({
           // El ISO es AAAA-MM-DD: se reemplaza solo el día para no salir del mes.
           onChange(`${valor.slice(0, 8)}${String(n).padStart(2, '0')}`)
         }}
-        className="w-16 tabular"
+        className="w-14 tabular"
         aria-label="Día"
       />
       <span className={cn('shrink-0 text-sm text-muted-foreground', COL_NOMBRE_DIA)}>
@@ -175,10 +175,12 @@ export type PlanillaMensualProps = {
    */
   extraNuevoRenglon: () => Record<string, unknown>
   /**
-   * Encabezado de columnas de la lista rápida, solo visible desde `sm`. Lo arma cada
-   * planilla con las constantes `COL_*`, que son las mismas que usan sus campos.
+   * Etiquetas de las tres columnas que cambian entre planillas. Las otras dos —el día y
+   * las horas del régimen— son iguales en las dos, así que el encabezado se arma acá.
    */
-  encabezadoLista: React.ReactNode
+  etiquetaEntrada: string
+  etiquetaOpcion: string
+  etiquetaInterruptor: string
   /**
    * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
    * el lote; la planilla se recarga sola cuando cambian los renglones guardados.
@@ -424,7 +426,11 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
             <>
               {/* Abajo de sm cada campo lleva su etiqueta al lado; desde sm alcanza una vez. */}
               <div className="hidden gap-2 pb-1 text-xs text-muted-foreground sm:flex">
-                {props.encabezadoLista}
+                <span className={COL_DIA}>Día</span>
+                <span className={COL_ANGOSTA}>Horas</span>
+                <span className={COL_HORAS}>{props.etiquetaEntrada}</span>
+                <span className={COL_OPCION}>{props.etiquetaOpcion}</span>
+                <span className={COL_INTERRUPTOR}>{props.etiquetaInterruptor}</span>
               </div>
             </>
           )}
