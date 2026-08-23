@@ -60,8 +60,8 @@ export type FichaProps = {
   empleado: {
     alias: string
     nombreCompleto: string
-    banco: string
-    cuenta: string
+    banco: string | null
+    cuenta: string | null
     fechaIngreso: string
     fechaEgreso: string | null
     cobraBoletos: boolean
