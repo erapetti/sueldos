@@ -160,7 +160,7 @@ export function PlanillaHorasExtras(props: {
                 actualizar({ extra: { ...extra(renglon), recargoPct: Number(e.target.value) } })
               }
               aria-label="Recargo"
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-auto"
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-32"
             >
               {RECARGOS.map((r) => (
                 <option key={r} value={r}>
@@ -189,6 +189,7 @@ export function PlanillaHorasExtras(props: {
           </Button>
         </>
       )}
+      etiquetaOpcion="Recargo"
       extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
         const conBpsHoras = renglones

@@ -65,6 +65,19 @@ export function CampoLista({
 }
 
 /**
+ * Anchos de las columnas de la lista rápida desde `sm`. Los comparten el encabezado y
+ * los campos, para que una sola definición mantenga la alineación.
+ *
+ * La columna del día suma el input, el gap y el nombre del día de la semana:
+ * 64 + 8 + 36 = 108px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
+ * 22,4px, y esa diferencia corría 9px todo lo que venía después.
+ */
+const COL_DIA = 'sm:w-[108px]'
+const COL_NOMBRE_DIA = 'w-9'
+const COL_HORAS = 'sm:w-24'
+const COL_OPCION = 'sm:w-32'
+
+/**
  * Día del renglón en la lista rápida. La planilla es de un mes, así que alcanza con el
  * número de día; al costado se anota el día de la semana, que es el dato que hace falta
  * para saber si ese día genera boletos adicionales (§6.5).
@@ -99,7 +112,9 @@ export function CampoDia({
         className="w-16 tabular"
         aria-label="Día"
       />
-      <span className="text-sm text-muted-foreground">{nombreDiaSemanaCorto(diaSemana(f))}</span>
+      <span className={cn('shrink-0 text-sm text-muted-foreground', COL_NOMBRE_DIA)}>
+        {nombreDiaSemanaCorto(diaSemana(f))}
+      </span>
     </div>
   )
 }
@@ -154,6 +169,8 @@ export type PlanillaMensualProps = {
    * que usa el popover.
    */
   extraNuevoRenglon: () => Record<string, unknown>
+  /** Etiqueta de la tercera columna en el encabezado de la lista: «Recargo» o «Causal». */
+  etiquetaOpcion: string
   /**
    * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
    * el lote; la planilla se recarga sola cuando cambian los renglones guardados.
@@ -395,6 +412,16 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               Todavía no cargaste nada. Agregá el primer renglón.
             </p>
           ) : (
+            <>
+              {/* Abajo de sm cada campo lleva su etiqueta al lado; desde sm alcanza una vez. */}
+              <div className="hidden gap-2 pb-1 text-xs text-muted-foreground sm:flex">
+                <span className={COL_DIA}>Día</span>
+                <span className={COL_HORAS}>Horas</span>
+                <span className={COL_OPCION}>{props.etiquetaOpcion}</span>
+              </div>
+            </>
+          )}
+          {renglones.length === 0 ? null : (
             renglones
               .slice()
               .sort((a, b) => a.fecha.localeCompare(b.fecha))

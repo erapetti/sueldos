@@ -166,7 +166,7 @@ export function PlanillaFaltas(props: {
                 })
               }}
               aria-label="Causal"
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-auto"
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-32"
             >
               {CAUSALES_FALTA.map((c) => (
                 <option key={c.valor} value={c.valor}>
@@ -197,6 +197,7 @@ export function PlanillaFaltas(props: {
           </Button>
         </>
       )}
+      etiquetaOpcion="Causal"
       extraNuevoRenglon={() => ({
         causal,
         // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.
