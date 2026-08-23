@@ -1,0 +1,18 @@
+/*
+ * Typecheck de los tests, aparte del que corre `next build`.
+ *
+ * El tsconfig.json principal excluye `tests/` a propósito: el código de prueba no se
+ * despliega y no tiene por qué poder romper un build de producción. Ver
+ * IMPLEMENTATION_HINTS.md §3.
+ *
+ * Se corre con `npm run typecheck`, que chequea las dos cosas.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"],
+    "incremental": false
+  },
+  "include": ["tests/**/*.ts", "vitest.config.mts", "lib/**/*.ts", "actions/**/*.ts", "app/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -173,6 +173,33 @@ archivo no sirve: nadie lee un archivo que está por sobrescribir.
 | `npm audit` en rojo por `deepmerge-ts` | Llega por el CLI de Prisma, que es devDependency | `overrides` en `package.json`. **Nunca `npm audit fix --force`**: baja a Prisma 6 y rompe todo |
 | ESLint: `set-state-in-effect` | Estado derivado sincronizado con un efecto | Patrón «comparar contra el valor anterior durante el render», o montar el componente solo cuando hace falta. Los diálogos usan lo segundo |
 | Un test de integración deja la base vacía | `limpiarBase()` **borra todas las tablas** de `DATABASE_URL` | Nunca apuntar los tests a una base con datos reales. Si desarrollás y corrés tests, tenés que volver a sembrar |
+| Un archivo de tests rompe el build de producción | `tsconfig.json` incluía `**/*.ts`, así que `next build` typechequeaba `tests/` | Resuelto: ver abajo |
+
+### Los tests están fuera del typecheck de producción
+
+`tsconfig.json` excluye `tests/`. El código de prueba no se despliega y no tiene por qué poder
+frenar un deploy.
+
+Pasó de verdad: un commit subió un test nuevo pero no el módulo que ese test importaba, y el
+build de producción se cayó con `TS2724` aunque la aplicación estaba bien. Hay un segundo
+riesgo, peor: si el servidor instala con `npm ci --omit=dev`, `vitest` no existe, el
+`import { describe } from 'vitest'` no resuelve y **el build falla con el código de la
+aplicación intacto**.
+
+El reparto quedó así:
+
+| Comando | Qué chequea |
+|---|---|
+| `next build` | Solo la aplicación. Un test roto **no** lo frena |
+| `npm run typecheck` | Las dos cosas: `tsconfig.json` y `tsconfig.test.json` |
+| `npx eslint .` | Todo, tests incluidos |
+
+Los tres comportamientos están verificados metiendo un error de tipos a propósito en un test.
+**Usá `npm run typecheck`, no `npx tsc --noEmit` a secas**, o los tests dejan de chequearse.
+
+Un efecto lateral que no es obvio: excluir `tests/` del tsconfig también los saca de la
+resolución de `paths`, así que Vitest dejaba de resolver `@/`. Por eso el alias está
+declarado explícitamente en `vitest.config.mts` en vez de deducirse del tsconfig.
 
 ---
 

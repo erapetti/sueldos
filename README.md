@@ -35,9 +35,9 @@ En desarrollo, dejar `PROXY_SHARED_SECRET` **sin definir** en `.env` para poder 
 sin oauth2-proxy delante, y usar `DEV_IMPERSONATE_USER` para simular identidad (§3.2).
 
 ```bash
-npm test          # 217 tests: motor de cálculo, licencia, estado derivado, integración
+npm test          # 226 tests: motor de cálculo, licencia, estado derivado, integración
 npm run lint
-npx tsc --noEmit
+npm run typecheck # la aplicación y los tests; `tsc --noEmit` solo mira la aplicación
 npm audit         # tiene que dar 0 vulnerabilidades
 ```
 
