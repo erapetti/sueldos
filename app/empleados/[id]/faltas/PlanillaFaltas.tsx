@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  COL_HORAS,
+  COL_INTERRUPTOR,
+  COL_OPCION,
   PlanillaMensual,
   type DiaContexto, type Renglon
 } from '@/components/dominio/PlanillaMensual'
@@ -148,7 +151,7 @@ export function PlanillaFaltas(props: {
                 const valor = Number(e.target.value)
                 actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
               }}
-              className="w-full tabular sm:w-24"
+              className={cn('w-full tabular', COL_HORAS)}
               aria-label="Horas"
             />
           </CampoLista>
@@ -166,7 +169,7 @@ export function PlanillaFaltas(props: {
                 })
               }}
               aria-label="Causal"
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-32"
+              className={cn('h-9 w-full rounded-md border bg-transparent px-2 text-sm', COL_OPCION)}
             >
               {CAUSALES_FALTA.map((c) => (
                 <option key={c.valor} value={c.valor}>
@@ -175,16 +178,25 @@ export function PlanillaFaltas(props: {
               ))}
             </select>
           </CampoLista>
+          {/*
+            §4.6.1 — solo la enfermedad puede no descontar: el subsidio de BPS cubre desde
+            el 4° día, así que los primeros pueden quedar a cargo del empleador. En las
+            demás causales el campo se fuerza a true y no se muestra, pero la columna se
+            reserva igual para que no se corra el resto de la fila.
+          */}
           {descuentaEsEditable(extra(renglon).causal) ? (
-            <label className="flex min-h-9 items-center gap-2 text-sm">
-              <Switch
-                checked={extra(renglon).descuenta}
-                onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), descuenta: v } })}
-                aria-label="Se descuenta del sueldo"
-              />
-              Descuenta
-            </label>
-          ) : null}
+            <CampoLista etiqueta="Descontar días">
+              <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
+                <Switch
+                  checked={extra(renglon).descuenta}
+                  onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), descuenta: v } })}
+                  aria-label="Descontar los días del sueldo"
+                />
+              </div>
+            </CampoLista>
+          ) : (
+            <div className={cn('hidden sm:block', COL_INTERRUPTOR)} aria-hidden />
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -198,6 +210,7 @@ export function PlanillaFaltas(props: {
         </>
       )}
       etiquetaOpcion="Causal"
+      etiquetaInterruptor="Descontar días"
       extraNuevoRenglon={() => ({
         causal,
         // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.

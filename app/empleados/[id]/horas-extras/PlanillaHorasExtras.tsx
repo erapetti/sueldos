@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  COL_HORAS,
+  COL_OPCION,
   PlanillaMensual,
   type DiaContexto,
   type Renglon,
@@ -149,7 +151,7 @@ export function PlanillaHorasExtras(props: {
                 const valor = Number(e.target.value)
                 actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
               }}
-              className="w-full tabular sm:w-24"
+              className={cn('w-full tabular', COL_HORAS)}
               aria-label="Horas"
             />
           </CampoLista>
@@ -160,7 +162,7 @@ export function PlanillaHorasExtras(props: {
                 actualizar({ extra: { ...extra(renglon), recargoPct: Number(e.target.value) } })
               }
               aria-label="Recargo"
-              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-32"
+              className={cn('h-9 w-full rounded-md border bg-transparent px-2 text-sm', COL_OPCION)}
             >
               {RECARGOS.map((r) => (
                 <option key={r} value={r}>

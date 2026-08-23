@@ -72,10 +72,12 @@ export function CampoLista({
  * 64 + 8 + 36 = 108px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
  * 22,4px, y esa diferencia corría 9px todo lo que venía después.
  */
-const COL_DIA = 'sm:w-[108px]'
-const COL_NOMBRE_DIA = 'w-9'
-const COL_HORAS = 'sm:w-24'
-const COL_OPCION = 'sm:w-32'
+export const COL_DIA = 'sm:w-[108px]'
+export const COL_NOMBRE_DIA = 'w-9'
+export const COL_HORAS = 'sm:w-24'
+export const COL_OPCION = 'sm:w-32'
+/** Columna del interruptor de la fila. El ancho lo fija la etiqueta del encabezado. */
+export const COL_INTERRUPTOR = 'sm:w-24'
 
 /**
  * Día del renglón en la lista rápida. La planilla es de un mes, así que alcanza con el
@@ -171,6 +173,12 @@ export type PlanillaMensualProps = {
   extraNuevoRenglon: () => Record<string, unknown>
   /** Etiqueta de la tercera columna en el encabezado de la lista: «Recargo» o «Causal». */
   etiquetaOpcion: string
+  /**
+   * Etiqueta de la columna del interruptor. Solo se pasa cuando el interruptor es
+   * condicional y su etiqueta no cabe al lado; si va siempre visible, conviene que la
+   * lleve al lado y no acá.
+   */
+  etiquetaInterruptor?: string
   /**
    * Guardado en lote. El aviso de §6.11 lo emite la acción y aparece una sola vez para todo
    * el lote; la planilla se recarga sola cuando cambian los renglones guardados.
@@ -418,6 +426,9 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                 <span className={COL_DIA}>Día</span>
                 <span className={COL_HORAS}>Horas</span>
                 <span className={COL_OPCION}>{props.etiquetaOpcion}</span>
+                {props.etiquetaInterruptor ? (
+                  <span className={COL_INTERRUPTOR}>{props.etiquetaInterruptor}</span>
+                ) : null}
               </div>
             </>
           )}
