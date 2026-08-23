@@ -39,6 +39,27 @@ export type Renglon = {
   extra: Record<string, unknown>
 }
 
+/**
+ * Campo de una fila de la lista rápida. Abajo de `sm` la fila se apila y cada campo
+ * ocupa su renglón con su etiqueta visible; desde `sm` el envoltorio desaparece con
+ * `display: contents` y el campo vuelve a ser hijo directo de la fila, así el
+ * layout de escritorio queda igual que antes.
+ */
+export function CampoLista({
+  etiqueta,
+  children,
+}: {
+  etiqueta: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1 sm:contents">
+      <span className="text-xs text-muted-foreground sm:hidden">{etiqueta}</span>
+      {children}
+    </div>
+  )
+}
+
 export type DiaContexto = {
   fecha: string
   /** Horas que le corresponden al día según el régimen vigente. */
@@ -258,7 +279,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   const noPuedeAvanzar = periodo.getTime() >= parsePeriodo(aPeriodoISO(hoy())).getTime()
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-48 sm:pb-32">
       {/* Encabezado */}
       <div className="space-y-3">
         <EncabezadoPagina
@@ -331,7 +352,10 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               .slice()
               .sort((a, b) => a.fecha.localeCompare(b.fecha))
               .map((renglon) => (
-                <div key={renglon.clave} className="flex items-center gap-2">
+                <div
+                  key={renglon.clave}
+                  className="flex flex-col gap-2 border-b pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:border-0 sm:pb-0"
+                >
                   {props.renderFilaLista({
                     renglon,
                     contexto: contextoPorDia.get(renglon.fecha),
@@ -455,13 +479,22 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
       {/* Pie fijo (§7.1) */}
       {!props.soloLectura ? (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 backdrop-blur no-print">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 p-3 lg:pl-72">
-            <div className="min-w-0 flex-1 text-sm">{props.renderResumen(renglones)}</div>
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:pl-72">
+            <div className="min-w-0 text-sm sm:flex-1">{props.renderResumen(renglones)}</div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={descartar} disabled={!hayCambios || props.enviando}>
+              <Button
+                variant="outline"
+                onClick={descartar}
+                disabled={!hayCambios || props.enviando}
+                className="flex-1 sm:flex-none"
+              >
                 Descartar
               </Button>
-              <Button onClick={guardar} disabled={!hayCambios || props.enviando}>
+              <Button
+                onClick={guardar}
+                disabled={!hayCambios || props.enviando}
+                className="flex-1 sm:flex-none"
+              >
                 {props.enviando ? 'Guardando…' : 'Guardar'}
               </Button>
             </div>

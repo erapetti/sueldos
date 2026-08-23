@@ -16,7 +16,12 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { PlanillaMensual, type DiaContexto, type Renglon } from '@/components/dominio/PlanillaMensual'
+import {
+  CampoLista,
+  PlanillaMensual,
+  type DiaContexto,
+  type Renglon,
+} from '@/components/dominio/PlanillaMensual'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarHorasExtras } from '@/actions/novedades'
 import { RECARGOS } from '@/constants/recargos'
@@ -129,41 +134,47 @@ export function PlanillaHorasExtras(props: {
       )}
       renderFilaLista={({ renglon, actualizar, quitar }) => (
         <>
-          <Input
-            type="date"
-            value={renglon.fecha}
-            onChange={(e) => actualizar({ fecha: e.target.value })}
-            className="w-40"
-            aria-label="Fecha"
-          />
-          <Input
-            type="number"
-            step={0.5}
-            min={0}
-            value={renglon.horas}
-            onChange={(e) => {
-              // No se aceptan negativos ni vacío: el campo cae a 0, que es el valor inicial.
-              const valor = Number(e.target.value)
-              actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
-            }}
-            className="w-24 tabular"
-            aria-label="Horas"
-          />
-          <select
-            value={extra(renglon).recargoPct}
-            onChange={(e) =>
-              actualizar({ extra: { ...extra(renglon), recargoPct: Number(e.target.value) } })
-            }
-            aria-label="Recargo"
-            className="h-9 rounded-md border bg-transparent px-2 text-sm"
-          >
-            {RECARGOS.map((r) => (
-              <option key={r} value={r}>
-                {r} %
-              </option>
-            ))}
-          </select>
-          <label className="flex items-center gap-2 text-sm">
+          <CampoLista etiqueta="Fecha">
+            <Input
+              type="date"
+              value={renglon.fecha}
+              onChange={(e) => actualizar({ fecha: e.target.value })}
+              className="w-full sm:w-40"
+              aria-label="Fecha"
+            />
+          </CampoLista>
+          <CampoLista etiqueta="Horas">
+            <Input
+              type="number"
+              step={0.5}
+              min={0}
+              value={renglon.horas}
+              onChange={(e) => {
+                // No se aceptan negativos ni vacío: el campo cae a 0, que es el valor inicial.
+                const valor = Number(e.target.value)
+                actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
+              }}
+              className="w-full tabular sm:w-24"
+              aria-label="Horas"
+            />
+          </CampoLista>
+          <CampoLista etiqueta="Recargo">
+            <select
+              value={extra(renglon).recargoPct}
+              onChange={(e) =>
+                actualizar({ extra: { ...extra(renglon), recargoPct: Number(e.target.value) } })
+              }
+              aria-label="Recargo"
+              className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:w-auto"
+            >
+              {RECARGOS.map((r) => (
+                <option key={r} value={r}>
+                  {r} %
+                </option>
+              ))}
+            </select>
+          </CampoLista>
+          <label className="flex min-h-9 items-center gap-2 text-sm">
             <Switch
               checked={extra(renglon).conBps}
               onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
@@ -171,8 +182,15 @@ export function PlanillaHorasExtras(props: {
             />
             BPS
           </label>
-          <Button variant="ghost" size="icon" onClick={quitar} aria-label="Quitar el renglón">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={quitar}
+            aria-label="Quitar el renglón"
+            className="w-full justify-start sm:w-9 sm:justify-center"
+          >
             <Trash2 className="size-4" />
+            <span className="sm:hidden">Quitar el renglón</span>
           </Button>
         </>
       )}
