@@ -18,7 +18,7 @@ type Tipo = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'REGIMEN'
 
 const TITULOS: Record<Tipo, string> = {
   SALARIO: 'Nuevo salario',
-  VALOR_HORA_NEGRO: 'Nuevo valor hora «en negro»',
+  VALOR_HORA_NEGRO: 'Nuevo valor hora sin aportes',
   REGIMEN: 'Nuevo régimen horario',
 }
 

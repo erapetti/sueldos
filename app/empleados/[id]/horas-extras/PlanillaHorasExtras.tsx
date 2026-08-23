@@ -92,7 +92,7 @@ export function PlanillaHorasExtras(props: {
           Valor hora calculado:{' '}
           <strong>{props.valorHoraCalculado ? formatearImporte(props.valorHoraCalculado) : '—'}</strong>
           {' · '}
-          Valor hora «en negro»:{' '}
+          Valor hora sin aportes:{' '}
           <strong>{props.valorHoraNegro ? formatearImporte(props.valorHoraNegro) : '—'}</strong>
         </span>
       }

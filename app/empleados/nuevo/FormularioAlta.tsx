@@ -261,7 +261,7 @@ export function FormularioAlta() {
           </div>
           <CampoMonto
             id="valor-hora-negro"
-            etiqueta="Valor hora «en negro»"
+            etiqueta="Valor hora sin aportes"
             valor={valorHoraNegro}
             onChange={setValorHoraNegroManual}
             error={campos.valorHoraNegro}

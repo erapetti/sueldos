@@ -240,7 +240,7 @@ export function FichaEmpleado(props: FichaProps) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-[20px]">Valor hora «en negro»</h2>
+            <h2 className="text-[20px]">Valor hora sin aportes</h2>
             <p className="text-sm text-muted-foreground">
               Con el que se pagan las horas extras sin descuento de BPS (§4.3.1).
             </p>

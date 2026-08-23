@@ -99,7 +99,7 @@ function verificarDatos(entrada: EntradaLiquidacion): void {
   if (hayExtrasSinBps && !entrada.valorHoraNegro) {
     faltantes.push({
       codigo: 'VALOR_HORA_NEGRO',
-      mensaje: `Hay horas extras sin descuento BPS y no hay valor hora "en negro" vigente para ${formatearPeriodo(entrada.periodo)}`,
+      mensaje: `Hay horas extras sin descuento BPS y no hay valor hora sin aportes vigente para ${formatearPeriodo(entrada.periodo)}`,
       destino: 'salario',
     })
   }
