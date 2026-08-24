@@ -176,6 +176,9 @@ export function PlanillaFaltas(props: {
               value={extra(renglon).causal}
               onChange={(e) => {
                 const nueva = e.target.value as CausalFaltaValor
+                // §7.1 — los opcionales son persistentes entre cargas: lo que se elige acá
+                // es con lo que nace el próximo «Agregar renglón».
+                setCausal(nueva)
                 actualizar({
                   extra: {
                     causal: nueva,
@@ -205,7 +208,10 @@ export function PlanillaFaltas(props: {
               <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
                 <Switch
                   checked={extra(renglon).descuenta}
-                  onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), descuenta: v } })}
+                  onCheckedChange={(v) => {
+                    setDescuenta(v)
+                    actualizar({ extra: { ...extra(renglon), descuenta: v } })
+                  }}
                   aria-label="Descontar los días del sueldo"
                 />
               </div>

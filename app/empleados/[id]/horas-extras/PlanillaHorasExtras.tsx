@@ -172,9 +172,13 @@ export function PlanillaHorasExtras(props: {
           <CampoLista etiqueta="Recargo">
             <select
               value={extra(renglon).recargoPct}
-              onChange={(e) =>
-                actualizar({ extra: { ...extra(renglon), recargoPct: Number(e.target.value) } })
-              }
+              onChange={(e) => {
+                const nuevo = Number(e.target.value)
+                // §7.1 — el recargo es persistente entre cargas: lo que se elige acá es con
+                // lo que nace el próximo «Agregar renglón».
+                setRecargo(nuevo)
+                actualizar({ extra: { ...extra(renglon), recargoPct: nuevo } })
+              }}
               aria-label="Recargo"
               className={cn('h-9 w-full rounded-md border bg-transparent px-2 text-sm', COL_OPCION)}
             >
@@ -189,7 +193,10 @@ export function PlanillaHorasExtras(props: {
             <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
               <Switch
                 checked={extra(renglon).conBps}
-                onCheckedChange={(v) => actualizar({ extra: { ...extra(renglon), conBps: v } })}
+                onCheckedChange={(v) => {
+                  setConBps(v)
+                  actualizar({ extra: { ...extra(renglon), conBps: v } })
+                }}
                 aria-label="Lleva descuento BPS"
               />
             </div>
