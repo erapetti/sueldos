@@ -84,9 +84,13 @@ resultado al servidor:
 
 ```bash
 npm ci
-npx prisma generate
 npm run build
 ```
+
+`npm run build` corre `prisma generate` antes de compilar, y no es opcional: `lib/db/generated/`
+está en `.gitignore`, así que sobrevive de un deploy al siguiente y `git pull` no lo actualiza.
+Generarlo dentro del build evita compilar contra el cliente del deploy anterior, que falla con
+errores de tipos que no corresponden al código.
 
 Al servidor hay que copiar: `.next/`, `public/`, `node_modules/`, `package.json`,
 `prisma/`, `prisma.config.ts` y `lib/db/generated/`.
