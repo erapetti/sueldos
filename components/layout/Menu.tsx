@@ -35,8 +35,8 @@ type OpcionMenu = {
 }
 
 const GENERALES: OpcionMenu[] = [
-  { etiqueta: 'Empleados', ruta: '/empleados', icono: Users },
-  { etiqueta: 'Todos los empleados', ruta: '/empleados/todos', icono: UsersRound },
+  { etiqueta: 'Mi Personal', ruta: '/empleados', icono: Users },
+  { etiqueta: 'Todo el Personal', ruta: '/empleados/todos', icono: UsersRound },
 ]
 
 const ADMINISTRACION: OpcionMenu[] = [

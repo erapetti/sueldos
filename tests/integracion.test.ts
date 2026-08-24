@@ -622,7 +622,7 @@ describe('42 y autorización de las Server Actions (§3.4)', () => {
 
     const dadoDeBaja = await cambiarVisibilidad({ empleadoId: empleado.id, visible: false })
     expect(dadoDeBaja.ok).toBe(true)
-    if (dadoDeBaja.ok) expect(dadoDeBaja.aviso).toContain('Todos los empleados')
+    if (dadoDeBaja.ok) expect(dadoDeBaja.aviso).toContain('Todo el Personal')
   })
 })
 

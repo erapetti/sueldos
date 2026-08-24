@@ -99,7 +99,7 @@ export function FormularioAlta() {
           },
         }),
       {
-        exito: 'Empleado creado.',
+        exito: 'Empleada creada.',
         onExito: (creado) => router.push(`/empleados/${creado.id}`),
       },
     )
@@ -313,7 +313,7 @@ export function FormularioAlta() {
 
       <div className="flex gap-2">
         <Button onClick={guardar} disabled={enviando}>
-          {enviando ? 'Creando…' : 'Crear empleado'}
+          {enviando ? 'Creando…' : 'Crear empleada'}
         </Button>
         <Button variant="outline" onClick={() => router.push('/empleados')} disabled={enviando}>
           Cancelar

@@ -106,7 +106,7 @@ function verificarDatos(entrada: EntradaLiquidacion): void {
   if (entrada.empleado.cobraBoletos && !entrada.valorBoleto) {
     faltantes.push({
       codigo: 'VALOR_BOLETO',
-      mensaje: `El empleado cobra boletos y no hay valor de boleto vigente para ${formatearPeriodo(entrada.periodo)}`,
+      mensaje: `La empleada cobra boletos y no hay valor de boleto vigente para ${formatearPeriodo(entrada.periodo)}`,
       destino: '/admin/boletos',
     })
   }
@@ -147,7 +147,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   if (prorrateo.diasConVinculo === 0) {
     avisos.push(
-      `El empleado no tuvo vínculo vigente en ${formatearPeriodo(periodo)}: el salario base es cero.`,
+      `La empleada no tuvo vínculo vigente en ${formatearPeriodo(periodo)}: el salario base es cero.`,
     )
   }
 

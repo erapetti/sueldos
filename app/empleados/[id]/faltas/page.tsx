@@ -55,7 +55,7 @@ export default async function PaginaFaltas({
       {!contexto.hayRegimen ? (
         <p className="mb-4 rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
           No hay un régimen horario vigente para este mes: no se puede validar el tope de horas
-          por día. Cargalo en la ficha del empleado antes de registrar inasistencias.
+          por día. Cargalo en la ficha de la empleada antes de registrar inasistencias.
         </p>
       ) : null}
 

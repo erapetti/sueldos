@@ -172,7 +172,7 @@ export function PantallaUsuarios({
               <TableRow>
                 <TableHead>Usuario</TableHead>
                 <TableHead className="hidden sm:table-cell">Último acceso</TableHead>
-                <TableHead className="text-right">Empleados</TableHead>
+                <TableHead className="text-right">Personal</TableHead>
                 <TableHead>Administrador</TableHead>
                 <TableHead>Activo</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -240,14 +240,14 @@ export function PantallaUsuarios({
             <AlertDialogTitle>Borrar a {aBorrar?.nombre ?? aBorrar?.email}</AlertDialogTitle>
             <AlertDialogDescription>
               {aBorrar && aBorrar.empleados > 0
-                ? `Es dueño de ${aBorrar.empleados} empleado(s). Elegí a quién transferirlos: sin eso no se puede borrar.`
-                : 'Se borra el usuario y sus permisos sobre empleados compartidos. La auditoría se conserva.'}
+                ? `Es dueño de ${aBorrar.empleados} empleada(s). Elegí a quién transferirlas: sin eso no se puede borrar.`
+                : 'Se borra el usuario y sus permisos sobre el personal compartido. La auditoría se conserva.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {aBorrar && aBorrar.empleados > 0 ? (
             <div className="space-y-1.5">
-              <Label htmlFor="nuevo-dueno">Nuevo dueño de sus empleados</Label>
+              <Label htmlFor="nuevo-dueno">Nuevo dueño de su personal</Label>
               <Select value={nuevoDuenoId} onValueChange={setNuevoDuenoId} disabled={enviando}>
                 <SelectTrigger id="nuevo-dueno">
                   <SelectValue placeholder="Elegí un usuario" />

@@ -29,7 +29,7 @@ const serif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: 'Liquidación de sueldos',
-  description: 'Cálculo del total a pagar a empleados',
+  description: 'Cálculo del sueldo mensual del personal doméstico',
 }
 
 /** Iniciales para el avatar de la barra superior (dos palabras como máximo). */

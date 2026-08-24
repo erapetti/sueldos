@@ -154,7 +154,7 @@ export function TablaTodos({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {visibles.length} de {filas.length} empleados
+        {visibles.length} de {filas.length} en el personal
       </p>
 
       <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
@@ -174,7 +174,7 @@ export function TablaTodos({
             {visibles.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Ningún empleado coincide con el filtro.
+                  Ninguna empleada coincide con el filtro.
                 </TableCell>
               </TableRow>
             ) : (

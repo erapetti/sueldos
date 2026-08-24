@@ -69,8 +69,8 @@ export function DialogoOcultar({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {visible
-              ? 'Deja de aparecer en «Empleados». Sigue disponible en «Todos los empleados», que es desde donde se lo puede volver a mostrar. No se borra nada.'
-              : 'Vuelve a aparecer en la pantalla «Empleados».'}
+              ? 'Deja de aparecer en «Mi Personal». Sigue disponible en «Todo el Personal», que es desde donde se lo puede volver a mostrar. No se borra nada.'
+              : 'Vuelve a aparecer en la pantalla «Mi Personal».'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {/*

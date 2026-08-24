@@ -236,7 +236,7 @@ export function FormularioDatos({
         </Select>
         {!datos.aportaBps ? (
           <p className="text-sm text-muted-foreground">
-            El empleado no aporta al BPS: el seguro de salud no tiene efecto.
+            La empleada no aporta al BPS: el seguro de salud no tiene efecto.
           </p>
         ) : null}
       </div>
@@ -274,7 +274,7 @@ export function FormularioDatos({
           <AlertDialogHeader>
             <AlertDialogTitle>Dar de baja a {valores.alias}</AlertDialogTitle>
             <AlertDialogDescription>
-              No se borra nada. El empleado sigue apareciendo en el listado con su estado hasta
+              No se borra nada. La empleada sigue apareciendo en el listado con su estado hasta
               que lo ocultes, y queda excluido del aumento masivo de sueldos.
             </AlertDialogDescription>
           </AlertDialogHeader>

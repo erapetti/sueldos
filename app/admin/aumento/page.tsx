@@ -20,10 +20,10 @@ export default async function PaginaAumento() {
   return (
     <NoImplementado
       titulo="Aumento de sueldos"
-      subtitulo="Alcanza a todos los empleados activos del sistema, sea quien sea el dueño."
-      motivo={`${AUMENTO_NO_IMPLEMENTADO} Falta definir qué parámetros entran: IPC, porcentaje por franja salarial, correctivo y tope. El resto del caso de uso ya está resuelto: al confirmarse, cada empleado incluido recibe en una sola transacción su nuevo salario y su nuevo valor hora sin aportes ajustado por el mismo porcentaje, ambos con la misma fecha de vigencia.`}
+      subtitulo="Alcanza a todo el personal activo del sistema, sea quien sea el dueño."
+      motivo={`${AUMENTO_NO_IMPLEMENTADO} Falta definir qué parámetros entran: IPC, porcentaje por franja salarial, correctivo y tope. El resto del caso de uso ya está resuelto: al confirmarse, cada empleada incluida recibe en una sola transacción su nuevo salario y su nuevo valor hora sin aportes ajustado por el mismo porcentaje, ambos con la misma fecha de vigencia.`}
       volverA="/empleados"
-      volverTexto="Volver a Empleados"
+      volverTexto="Volver a Mi Personal"
     />
   )
 }

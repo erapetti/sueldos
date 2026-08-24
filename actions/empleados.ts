@@ -58,7 +58,7 @@ export async function crearEmpleado(entrada: unknown) {
       select: { id: true },
     })
     if (yaExiste) {
-      throw new ErrorNegocio('Ya tenés un empleado con ese alias.', {
+      throw new ErrorNegocio('Ya tenés una empleada con ese alias.', {
         alias: 'Ya usaste este alias',
       })
     }
@@ -145,7 +145,7 @@ export async function actualizarEmpleado(empleadoId: string, entrada: unknown) {
       select: { id: true },
     })
     if (duplicado) {
-      throw new ErrorNegocio('El dueño ya tiene otro empleado con ese alias.', {
+      throw new ErrorNegocio('El dueño ya tiene otra empleada con ese alias.', {
         alias: 'Ya usaste este alias',
       })
     }
@@ -232,7 +232,7 @@ export async function borrarEmpleado(empleadoId: string) {
 
     if (liquidaciones > 0 || movimientos > 0) {
       throw new ErrorNegocio(
-        'El empleado tiene liquidaciones o movimientos registrados: en vez de borrarlo, dalo de baja.',
+        'La empleada tiene liquidaciones o movimientos registrados: en vez de borrarla, dala de baja.',
       )
     }
 
@@ -245,7 +245,7 @@ export async function borrarEmpleado(empleadoId: string) {
 
 /**
  * §8.3 / §8.7 — ocultar del listado o volver a mostrar. Ocultar requiere que el empleado
- * esté dado de baja; volver a mostrarlo se puede siempre, desde "Todos los empleados".
+ * esté dado de baja; volver a mostrarlo se puede siempre, desde "Todo el Personal".
  */
 export async function cambiarVisibilidad(entrada: unknown) {
   return ejecutar('empleados.visibilidad', async (log) => {
@@ -254,7 +254,7 @@ export async function cambiarVisibilidad(entrada: unknown) {
     log({ usuarioId: usuario.id, entidad: 'empleado', entidadId: empleado.id })
 
     if (!datos.visible && empleado.activo) {
-      throw new ErrorNegocio('Solo se puede ocultar del listado a un empleado dado de baja.')
+      throw new ErrorNegocio('Solo se puede ocultar del listado a una empleada dada de baja.')
     }
 
     await prisma.empleado.update({
@@ -269,7 +269,7 @@ export async function cambiarVisibilidad(entrada: unknown) {
       undefined,
       datos.visible
         ? `${empleado.alias} vuelve a aparecer en el listado.`
-        : `${empleado.alias} ya no aparece en el listado. Está en «Todos los empleados».`,
+        : `${empleado.alias} ya no aparece en el listado. Está en «Todo el Personal».`,
     )
   })
 }
@@ -284,7 +284,7 @@ export async function compartirEmpleado(entrada: unknown) {
     // §8.7 — un administrador sobre un empleado ajeno solo puede compartírselo a sí mismo.
     if (nivel === 'ADMIN' && datos.usuarioId !== usuario.id) {
       throw new ErrorNegocio(
-        'Como administrador solo podés compartirte el empleado a vos mismo; el resto lo decide el dueño.',
+        'Como administrador solo podés compartirte la empleada a vos mismo; el resto lo decide el dueño.',
       )
     }
     if (datos.usuarioId === empleado.duenoId) {

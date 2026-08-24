@@ -34,7 +34,7 @@ async function avisoDeEmpleadosAfectados(fechaVigencia: Date): Promise<string | 
 
   if (afectados.length === 0) return undefined
   return afectados.length === 1
-    ? 'Hay 1 empleado con liquidaciones confirmadas afectadas. El cambio no las modifica; para aplicarlo hay que recalcular esos períodos.'
+    ? 'Hay 1 empleada con liquidaciones confirmadas afectadas. El cambio no las modifica; para aplicarlo hay que recalcular esos períodos.'
     : `Hay ${afectados.length} empleados con liquidaciones confirmadas afectadas. El cambio no las modifica; para aplicarlo hay que recalcular esos períodos.`
 }
 
@@ -390,7 +390,7 @@ export async function borrarUsuario(entrada: unknown) {
     if (destino.empleados.length > 0) {
       if (!datos.nuevoDuenoId) {
         throw new ErrorNegocio(
-          `El usuario es dueño de ${destino.empleados.length} empleado(s). Elegí a quién transferirlos antes de borrarlo.`,
+          `El usuario es dueño de ${destino.empleados.length} empleada(s). Elegí a quién transferirlas antes de borrarlo.`,
           { nuevoDuenoId: 'Elegí el nuevo dueño' },
         )
       }
@@ -406,7 +406,7 @@ export async function borrarUsuario(entrada: unknown) {
       const choques = destino.empleados.filter((e) => aliasDelDestino.has(e.alias))
       if (choques.length > 0) {
         throw new ErrorNegocio(
-          `El nuevo dueño ya tiene empleados con estos alias: ${choques.map((c) => c.alias).join(', ')}. Cambialos antes de transferir.`,
+          `El nuevo dueño ya tiene personal con estos alias: ${choques.map((c) => c.alias).join(', ')}. Cambialos antes de transferir.`,
         )
       }
     }

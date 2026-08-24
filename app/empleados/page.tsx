@@ -24,11 +24,11 @@ export default async function PantallaEmpleados() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <EncabezadoPagina className="mb-0 flex-1" rotulo="Personal" titulo="Empleados" />
+        <EncabezadoPagina className="mb-0 flex-1" rotulo="Espacio de trabajo" titulo="Mi Personal" />
         <Button asChild>
           <Link href="/empleados/nuevo">
             <Plus className="size-4" aria-hidden />
-            Nuevo empleado
+            Nueva empleada
           </Link>
         </Button>
       </div>
@@ -36,16 +36,16 @@ export default async function PantallaEmpleados() {
       {empleados.length === 0 ? (
         <div className="rounded-card border border-dashed p-10 text-center">
           <Users className="mx-auto size-10 text-muted-foreground" aria-hidden />
-          <p className="mt-3 font-medium">Todavía no tenés empleados en el listado</p>
+          <p className="mt-3 font-medium">Todavía no tenés personal en el listado</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Creá el primero, o revisá «Todos los empleados» por si alguno está oculto.
+            Creá el primero, o revisá «Todo el Personal» por si alguno está oculto.
           </p>
           <div className="mt-4 flex justify-center gap-2">
             <Button asChild>
-              <Link href="/empleados/nuevo">Nuevo empleado</Link>
+              <Link href="/empleados/nuevo">Nueva empleada</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/empleados/todos">Todos los empleados</Link>
+              <Link href="/empleados/todos">Todo el Personal</Link>
             </Button>
           </div>
         </div>

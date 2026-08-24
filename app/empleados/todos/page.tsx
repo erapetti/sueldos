@@ -38,11 +38,11 @@ export default async function PantallaTodos() {
       <EncabezadoPagina
         className="mb-0"
         rotulo="Listado completo"
-        titulo="Todos los empleados"
+        titulo="Todo el Personal"
         bajada={
           usuario.esAdmin
-            ? 'Todos los empleados del sistema, incluidos los ocultos y los dados de baja.'
-            : 'Tus empleados y los compartidos con vos, incluidos los ocultos y los dados de baja.'
+            ? 'Todo el personal del sistema, incluido el oculto y el dado de baja.'
+            : 'Tu personal y el compartido con vos, incluido el oculto y el dado de baja.'
         }
       />
 

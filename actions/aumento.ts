@@ -123,7 +123,7 @@ export async function aplicarAumentoMasivo(entrada: unknown) {
 
     const fechaVigencia = parseFechaISO(datos.fechaVigencia)
     const incluidas = datos.lineas.filter((l) => l.incluido)
-    if (incluidas.length === 0) throw new ErrorNegocio('No hay empleados incluidos en el aumento.')
+    if (incluidas.length === 0) throw new ErrorNegocio('No hay personal incluido en el aumento.')
 
     const empleados = await prisma.empleado.findMany({
       where: { id: { in: incluidas.map((l) => l.empleadoId) }, activo: true },
@@ -231,7 +231,7 @@ export async function aplicarAumentoMasivo(entrada: unknown) {
 
     return exito(
       { aplicados: aplicados.length },
-      `Se aplicó el aumento a ${aplicados.length} empleado(s).`,
+      `Se aplicó el aumento a ${aplicados.length} empleada(s).`,
     )
   })
 }

@@ -106,7 +106,7 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
         className="mb-0"
         rotulo="Parámetros"
         titulo="Descuentos de BPS"
-        bajada="Los conceptos son disjuntos entre sí: todos los aplicables a un empleado se suman."
+        bajada="Los conceptos son disjuntos entre sí: todos los aplicables a una empleada se suman."
       />
 
       <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
@@ -165,7 +165,7 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={TODOS}>Todos los empleados</SelectItem>
+              <SelectItem value={TODOS}>Todo el personal</SelectItem>
               {SEGUROS_SALUD.map((s) => (
                 <SelectItem key={s.codigo} value={s.codigo}>
                   Seguro {s.codigo} — {s.descripcion}
@@ -241,7 +241,7 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
                     </button>
 
                     <Badge variant="outline">
-                      {grupo.seguroSalud ? `Seguro ${grupo.seguroSalud}` : 'Todos los empleados'}
+                      {grupo.seguroSalud ? `Seguro ${grupo.seguroSalud}` : 'Todo el personal'}
                     </Badge>
 
                     <span className="tabular">

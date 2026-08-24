@@ -131,30 +131,30 @@ async function exigirAcceso(
 ): Promise<{ usuario: UsuarioActual } & EmpleadoConAcceso> {
   const usuario = await exigirUsuarioEnAccion()
   const acceso = await accesoAEmpleado(empleadoId, usuario)
-  if (!acceso) throw new ErrorNoEncontrado('No se encontró el empleado.')
+  if (!acceso) throw new ErrorNoEncontrado('No se encontró la empleada.')
   if (!predicado(acceso.nivel)) throw new ErrorAutorizacion(mensaje)
   return { usuario, ...acceso }
 }
 
 export function exigirLectura(empleadoId: string) {
-  return exigirAcceso(empleadoId, puedeVer, 'No tenés acceso a este empleado.')
+  return exigirAcceso(empleadoId, puedeVer, 'No tenés acceso a esta empleada.')
 }
 
 export async function exigirEdicion(empleadoId: string) {
   const usuario = await exigirUsuarioEnAccion()
   const acceso = await accesoAEmpleado(empleadoId, usuario)
-  if (!acceso) throw new ErrorNoEncontrado('No se encontró el empleado.')
+  if (!acceso) throw new ErrorNoEncontrado('No se encontró la empleada.')
 
   // Se distingue "no lo ves" de "lo ves pero no lo podés tocar": son dos situaciones
   // distintas para el usuario y el mensaje genérico confunde.
   if (!puedeVer(acceso.nivel)) {
-    throw new ErrorAutorizacion('No tenés acceso a este empleado.')
+    throw new ErrorAutorizacion('No tenés acceso a esta empleada.')
   }
   if (!puedeEditar(acceso.nivel)) {
     throw new ErrorAutorizacion(
       acceso.nivel === 'ADMIN'
-        ? 'Como administrador podés ver este empleado, pero para operarlo tenés que compartírtelo primero.'
-        : 'Solo podés consultar este empleado; no tenés permiso para modificarlo.',
+        ? 'Como administradora podés ver a esta empleada, pero para operarla tenés que compartírtela primero.'
+        : 'Solo podés consultar a esta empleada; no tenés permiso para modificarla.',
     )
   }
 
@@ -165,7 +165,7 @@ export function exigirDueno(empleadoId: string) {
   return exigirAcceso(
     empleadoId,
     esDueno,
-    'Solo el dueño del empleado puede hacer esto.',
+    'Solo el dueño de la empleada puede hacer esto.',
   )
 }
 

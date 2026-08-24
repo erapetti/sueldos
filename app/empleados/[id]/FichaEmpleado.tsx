@@ -152,7 +152,7 @@ export function FichaEmpleado(props: FichaProps) {
     <div className="space-y-5">
       {props.comoAdministrador ? (
         <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
-          Estás viendo un empleado de {props.duenoNombre} como administrador. Para operarlo tenés
+          Estás viendo una empleada de {props.duenoNombre} como administradora. Para operarla tenés
           que compartírtelo desde «Todos los empleados».
         </p>
       ) : null}
@@ -160,7 +160,7 @@ export function FichaEmpleado(props: FichaProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <EncabezadoPagina
           className="mb-0 flex-1"
-          rotulo="Empleado"
+          rotulo="Empleada"
           titulo={props.empleado.alias}
           bajada={props.empleado.nombreCompleto}
         />
@@ -364,7 +364,7 @@ export function FichaEmpleado(props: FichaProps) {
             </span>
             <span className="text-sm text-muted-foreground">
               {Number(props.saldo) > 0
-                ? 'la empresa le debe al empleado'
+                ? 'la empresa le debe a la empleada'
                 : Number(props.saldo) < 0
                   ? 'saldo pendiente de préstamos'
                   : 'al día'}

@@ -5,7 +5,8 @@
  * `MetadataRoute.Manifest` valida los campos en el build, y los colores salen de la misma
  * paleta que `globals.css` en vez de quedar en un JSON que nadie vuelve a mirar.
  *
- * El nombre tiene que decir lo mismo que el `title` de `app/layout.tsx`.
+ * El nombre y la descripción tienen que decir lo mismo que el `title` y el `description`
+ * de `app/layout.tsx`.
  */
 import type { MetadataRoute } from 'next'
 

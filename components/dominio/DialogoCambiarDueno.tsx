@@ -120,7 +120,7 @@ export function DialogoCambiarDueno({
           <DialogHeader>
             <DialogTitle>Cambiar el dueño de {alias}</DialogTitle>
             <DialogDescription>
-              El dueño tiene permiso total y es el único que puede compartir o borrar el empleado.
+              El dueño tiene permiso total y es el único que puede compartir o borrar a la empleada.
               La acción queda registrada en la auditoría.
             </DialogDescription>
           </DialogHeader>
@@ -159,7 +159,7 @@ export function DialogoCambiarDueno({
           <DialogHeader>
             <DialogTitle>Compartirme {alias}</DialogTitle>
             <DialogDescription>
-              A partir de acá el empleado aparece en tu pantalla «Empleados» y podés operarlo con
+              A partir de acá la empleada aparece en tu pantalla «Mi Personal» y podés operarla con
               el permiso elegido. La acción queda registrada en la auditoría.
             </DialogDescription>
           </DialogHeader>

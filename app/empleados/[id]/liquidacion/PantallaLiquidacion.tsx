@@ -309,7 +309,7 @@ export function PantallaLiquidacion(props: {
 
           {diferencia < 0 ? (
             <p className="mt-2 text-sm text-destructive">
-              Queda como saldo a favor de la empresa en la cuenta corriente del empleado hasta
+              Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta
               que se compense.
             </p>
           ) : null}
