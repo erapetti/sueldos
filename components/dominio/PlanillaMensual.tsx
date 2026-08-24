@@ -192,6 +192,18 @@ export function CampoDia({
   )
 }
 
+/**
+ * Horas tal como se tipean en el popover del día: acepta coma o punto decimal. Devuelve
+ * `null` mientras no haya un número positivo, que es lo que deshabilita el «Agregar».
+ *
+ * No usa `parsearNumero` de `lib/format/money`: ese trata el punto como separador de miles y
+ * convertiría «2.5» en 25, que acá sería un error de carga silencioso.
+ */
+export function horasTipeadas(texto: string): number | null {
+  const valor = Number(texto.trim().replace(',', '.'))
+  return Number.isFinite(valor) && valor > 0 ? valor : null
+}
+
 export type DiaContexto = {
   fecha: string
   /** Horas que le corresponden al día según el régimen vigente. */

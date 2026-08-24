@@ -22,6 +22,7 @@ import {
   CampoLista,
   CampoNumero,
   COL_ANGOSTA,
+  horasTipeadas,
   COL_HORAS,
   COL_INTERRUPTOR,
   COL_OPCION,
@@ -300,11 +301,14 @@ function PopoverFalta({
   const yaCargadas = renglones.reduce((a, r) => a + r.horas, 0)
   const disponible = Math.max(0, contexto.horasRegimen - yaCargadas)
 
+  // Mientras no haya horas válidas el «Agregar» queda deshabilitado, en vez de habilitado
+  // y sin efecto. Pasa con los días que no se trabajan, que arrancan con el campo vacío.
+  const horasValidas = horasTipeadas(horas)
+
   function confirmar() {
-    const valor = Number(horas.replace(',', '.'))
-    if (!valor || valor <= 0) return
+    if (horasValidas === null) return
     agregar({
-      horas: valor,
+      horas: horasValidas,
       nota,
       // §4.6.1 — el servidor vuelve a forzarlo; acá se refleja para que la UI no mienta.
       extra: { causal, descuenta: descuentaEsEditable(causal) ? descuenta : true },
@@ -417,7 +421,7 @@ function PopoverFalta({
         <Button variant="outline" size="sm" onClick={cerrar}>
           Cerrar
         </Button>
-        <Button size="sm" onClick={confirmar}>
+        <Button size="sm" onClick={confirmar} disabled={horasValidas === null}>
           Agregar
         </Button>
       </div>

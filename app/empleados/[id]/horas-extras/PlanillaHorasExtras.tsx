@@ -21,6 +21,7 @@ import {
   CampoLista,
   CampoNumero,
   COL_ANGOSTA,
+  horasTipeadas,
   COL_INTERRUPTOR,
   COL_HORAS,
   COL_OPCION,
@@ -297,10 +298,13 @@ function PopoverHoras({
   const [horas, setHoras] = useState('')
   const [nota, setNota] = useState('')
 
+  // Mientras no haya horas válidas el «Agregar» queda deshabilitado, en vez de habilitado
+  // y sin efecto: acá el campo arranca vacío siempre.
+  const horasValidas = horasTipeadas(horas)
+
   function confirmar() {
-    const valor = Number(horas.replace(',', '.'))
-    if (!valor || valor <= 0) return
-    agregar({ horas: valor, nota, extra: { conBps, recargoPct: recargo } })
+    if (horasValidas === null) return
+    agregar({ horas: horasValidas, nota, extra: { conBps, recargoPct: recargo } })
     setHoras('')
     setNota('')
     cerrar()
@@ -406,7 +410,7 @@ function PopoverHoras({
         <Button variant="outline" size="sm" onClick={cerrar}>
           Cerrar
         </Button>
-        <Button size="sm" onClick={confirmar}>
+        <Button size="sm" onClick={confirmar} disabled={horasValidas === null}>
           Agregar
         </Button>
       </div>
