@@ -48,6 +48,19 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Se excluyen los assets estáticos: no llevan datos y no vale la pena el costo por request.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  /**
+   * Se excluyen los assets estáticos: no llevan datos y no vale la pena el costo por request.
+   *
+   * Los iconos y el manifest están en la lista porque el navegador los pide **sin sesión**.
+   * El manifest es el caso que obliga: se busca con `credentials: omit`, así que detrás de
+   * oauth2-proxy llega sin cookie. Los iconos aparecen además en contextos donde todavía no
+   * hay sesión, como la propia pantalla de login.
+   *
+   * Sacarlos del control no debilita el §3.2: devuelven bytes estáticos y no leen ningún
+   * header de identidad. Quién puede alcanzarlos se sigue decidiendo en el borde —el proceso
+   * escucha solo en 127.0.0.1—, no acá.
+   */
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|icon1\\.png|icon2\\.png|apple-icon\\.png|manifest\\.webmanifest).*)',
+  ],
 }

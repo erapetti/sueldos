@@ -205,6 +205,56 @@ propio control (§7.12).
 La opción «Salir» del menú apunta a `/oauth2/sign_out`, que borra la cookie del proxy sin
 tocar la sesión de Google del navegador (§3.5).
 
+#### 5.1. Iconos y manifest sin autenticación
+
+Cinco rutas tienen que poder verse **sin sesión**, y necesitan su propio `location` en nginx
+que saltee oauth2-proxy:
+
+```nginx
+# Arriba del `location /` que va a oauth2-proxy. Al ser un location con regex le gana
+# igual, pero conviene que se lea primero.
+location ~ ^/(favicon\.ico|icon1\.png|icon2\.png|apple-icon\.png|manifest\.webmanifest)$ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+
+    # Estas rutas están excluidas del matcher de `proxy.ts`, así que acá NO hace falta
+    # repetir X-Proxy-Auth: el secreto queda escrito en un solo lugar de la configuración.
+
+    # Este location no pasa por oauth2-proxy, así que ningún encabezado de identidad
+    # puede entrar por acá desde afuera.
+    proxy_set_header X-Forwarded-User "";
+    proxy_set_header X-Forwarded-Email "";
+    proxy_set_header X-Forwarded-Preferred-Username "";
+
+    access_log off;
+}
+```
+
+El que **obliga** a esto es el manifest: el navegador lo pide con `credentials: omit`, así que
+detrás del login llega sin cookie, oauth2-proxy contesta el redirect y Chrome descarta la
+instalación sin decir por qué. Los iconos, además, se piden en contextos donde todavía no hay
+sesión, como la propia pantalla de login.
+
+Vaciar los tres encabezados de identidad no es decorativo: la app confía en ellos para saber
+quién sos (§3.2), y esa confianza se sostiene porque nadie llega sin pasar por oauth2-proxy.
+Este `location` es una excepción a esa regla, así que tiene que cerrar la puerta que abre.
+
+La alternativa, si se prefiere no agregar un `location`, es dejar todo entrando por un solo
+camino y saltear la autenticación en el propio proxy —el flag es `--skip-auth-route` en las
+versiones nuevas y `--skip-auth-regex` en las viejas—:
+
+```
+--skip-auth-route='GET=^/(favicon\.ico|icon[12]\.png|apple-icon\.png|manifest\.webmanifest)$'
+```
+
+Para verificarlo después del deploy, sin cookie:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://tu-dominio/manifest.webmanifest
+```
+
+Tiene que dar `200`, y la raíz tiene que seguir redirigiendo al login.
+
 ### 6. Alta del primer usuario
 
 Al arrancar, si la tabla `usuarios` está vacía, se crea el usuario de
