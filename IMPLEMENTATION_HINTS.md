@@ -88,7 +88,24 @@ nadie lo note.
 La ficha del empleado **sí** conserva el chip «Sin aportes al BPS» (`FichaEmpleado`): ahí no
 hay liquidación de la cual deducirlo.
 
-### 1.5 El loopback del cron no se puede implementar como está escrito
+### 1.5 Las planillas aceptan todo el mes en curso, no solo hasta hoy
+
+El §6.11 cierra con: «Validación de fecha, común a las tres novedades: no anterior a
+`fecha_ingreso` ni posterior al día de hoy». Las planillas mensuales de §7.1 y §7.2 aceptan
+**cualquier día del mes en curso**, incluidos los que todavía no pasaron, por pedido del
+usuario: se cargan sobre la marcha y hay ausencias y horas que se saben antes de que ocurran.
+
+Lo que se sigue impidiendo es cargar en un **mes posterior al actual**, y ese control es el
+que importa: sin él, una novedad caería en un período que todavía no existe para la
+liquidación. Vive en `verificarFechaDeNovedad` (`actions/novedades.ts`), que toma el límite
+por parámetro, y lo respalda el `noPuedeAvanzar` de la flecha de mes en la planilla.
+
+**El pago adicional (§7.3) conserva el tope de hoy**, aunque comparte la misma función: es un
+hecho consumado, no algo que se anticipe, y su selector de fecha tampoco ofrece días futuros.
+Lo mismo vale para los movimientos de cuenta corriente (§7.4 y §7.5), que validan con
+`fechaNoFutura` en el esquema zod.
+
+### 1.6 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -102,7 +119,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.6 Funcionalidad pendiente de definición (§13)
+### 1.7 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

@@ -47,15 +47,37 @@ async function avisoDePeriodoLiquidado(
     : base
 }
 
-/** Validación de fecha común a las tres novedades (§6.11). */
-function verificarFechaDeNovedad(fecha: Date, fechaIngreso: Date, campo: string) {
+/**
+ * Validación de fecha común a las tres novedades (§6.11).
+ *
+ * **Divergencia con el §6.11**, que pide «no posterior al día de hoy». Las planillas
+ * mensuales aceptan **cualquier día del mes en curso**, incluso los que todavía no pasaron:
+ * se cargan sobre la marcha y hay ausencias y horas que se saben antes de que ocurran. Lo
+ * que se sigue impidiendo es cargar en un mes posterior al actual.
+ *
+ * El pago adicional conserva el tope de hoy: es un hecho consumado, y su selector de fecha
+ * ya no ofrece días futuros.
+ */
+function verificarFechaDeNovedad(
+  fecha: Date,
+  fechaIngreso: Date,
+  campo: string,
+  limite: 'HOY' | 'FIN_DEL_MES_EN_CURSO',
+) {
   if (fecha.getTime() < fechaIngreso.getTime()) {
-    throw new ErrorNegocio('La fecha no puede ser anterior al ingreso del empleado.', {
+    throw new ErrorNegocio('La fecha no puede ser anterior al ingreso de la empleada.', {
       [campo]: 'Anterior al ingreso',
     })
   }
-  if (fecha.getTime() > hoy().getTime()) {
+
+  if (limite === 'HOY' && fecha.getTime() > hoy().getTime()) {
     throw new ErrorNegocio('La fecha no puede ser posterior a hoy.', { [campo]: 'Fecha futura' })
+  }
+
+  if (limite === 'FIN_DEL_MES_EN_CURSO' && fecha.getTime() > ultimoDiaDelMes(hoy()).getTime()) {
+    throw new ErrorNegocio('No se pueden cargar novedades de un mes posterior al actual.', {
+      [campo]: 'Mes futuro',
+    })
   }
 }
 
@@ -77,7 +99,7 @@ export async function guardarHorasExtras(entrada: unknown) {
           `El renglón del ${renglon.fecha} no pertenece a ${formatearPeriodo(periodo)}.`,
         )
       }
-      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha')
+      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'FIN_DEL_MES_EN_CURSO')
     }
 
     const auditoria = { creadoPor: usuario.id, modificadoPor: usuario.id }
@@ -170,7 +192,7 @@ export async function guardarFaltas(entrada: unknown) {
           `El renglón del ${renglon.fecha} no pertenece a ${formatearPeriodo(periodo)}.`,
         )
       }
-      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha')
+      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'FIN_DEL_MES_EN_CURSO')
 
       const clave = aISO(fecha)
       const acumulado = (acumuladoPorDia.get(clave) ?? new Decimal(0)).plus(renglon.horas)
@@ -231,7 +253,8 @@ export async function guardarPagoAdicional(entrada: unknown) {
     log({ usuarioId: usuario.id, entidad: 'pagos_adicionales', entidadId: empleado.id })
 
     const fecha = parseFechaISO(datos.fecha)
-    verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha')
+    // El pago adicional sigue con el tope del §6.11: no es una novedad que se anticipe.
+    verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'HOY')
 
     const comun = {
       fecha,
