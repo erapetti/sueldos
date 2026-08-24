@@ -88,6 +88,8 @@ export default async function PaginaLiquidacion({
       {...comunes}
       lineas={lineas}
       valorHoraCalculado={resultado.valorHoraCalculado.toFixed(2)}
+      // §5.2 — las del registro de salario vigente en el período, no las de hoy.
+      horasSemanales={contexto.entrada.salario?.horasSemanales.toString() ?? null}
       materiaGravada={resultado.materiaGravada.toFixed(2)}
       subtotal={resultado.subtotal.toFixed(2)}
       totalRecalculado={resultado.totalRecalculado.toFixed(2)}

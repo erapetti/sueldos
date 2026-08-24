@@ -21,7 +21,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
-import { formatearImporteEntero, formatearCantidad } from '@/lib/format/money'
+import { formatearImporteEntero, formatearCantidad, formatearHoras } from '@/lib/format/money'
 import {
   aPeriodoISO,
   formatearFecha,
@@ -61,6 +61,8 @@ export function PantallaLiquidacion(props: {
   puedeEditar: boolean
   lineas: LineaVista[]
   valorHoraCalculado: string
+  /** Del registro de salario vigente en el período (§5.2). */
+  horasSemanales: string | null
   materiaGravada: string
   subtotal: string
   totalRecalculado: string
@@ -221,6 +223,13 @@ export function PantallaLiquidacion(props: {
 
             <dt className="text-muted-foreground">Ingreso</dt>
             <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
+
+            {props.horasSemanales !== null ? (
+              <>
+                <dt className="text-muted-foreground">Horas semanales</dt>
+                <dd className="tabular">{formatearHoras(props.horasSemanales)}</dd>
+              </>
+            ) : null}
 
             <dt className="text-muted-foreground">Valor hora calculado</dt>
             <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
