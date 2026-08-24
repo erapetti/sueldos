@@ -73,9 +73,20 @@ export function DialogoOcultar({
               : 'Vuelve a aparecer en la pantalla «Empleados».'}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {/*
+          El acento va en la opción que no cambia nada. Ocultar saca al empleado del listado
+          —es reversible, pero es el lado que hay que confirmar—; mostrar lo devuelve, así que
+          ahí el acento se queda en la acción.
+        */}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={enviando}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmar} disabled={enviando}>
+          <AlertDialogCancel variant={visible ? 'default' : 'outline'} disabled={enviando}>
+            Cancelar
+          </AlertDialogCancel>
+          <AlertDialogAction
+            variant={visible ? 'destructive' : 'default'}
+            onClick={confirmar}
+            disabled={enviando}
+          >
             {visible ? 'Ocultar' : 'Mostrar'}
           </AlertDialogAction>
         </AlertDialogFooter>

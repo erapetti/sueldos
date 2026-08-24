@@ -348,9 +348,12 @@ export function PantallaLiquidacion(props: {
               de cuenta corriente se revierte con un contra-asiento. No se borra nada.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* Anular revierte una liquidación confirmada: el acento va en «Cancelar». */}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={enviando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={anular} disabled={enviando}>
+            <AlertDialogCancel variant="default" disabled={enviando}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={anular} disabled={enviando}>
               Anular
             </AlertDialogAction>
           </AlertDialogFooter>

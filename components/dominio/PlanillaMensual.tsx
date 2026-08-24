@@ -14,6 +14,16 @@ import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import {
   aISO,
@@ -70,10 +80,10 @@ export function CampoLista({
  * los campos, para que una sola definición mantenga la alineación.
  *
  * La columna del día suma el input, el gap y el nombre del día de la semana:
- * 56 + 8 + 36 = 100px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
+ * 64 + 8 + 36 = 108px. El nombre va a ancho fijo porque «Dom» mide 31,6px y «Jue»
  * 22,4px, y esa diferencia corría 9px todo lo que venía después.
  */
-export const COL_DIA = 'sm:w-[100px]'
+export const COL_DIA = 'sm:w-[108px]'
 export const COL_NOMBRE_DIA = 'w-9'
 export const COL_HORAS = 'sm:w-20'
 export const COL_OPCION = 'sm:w-32'
@@ -83,9 +93,71 @@ export const COL_INTERRUPTOR = 'sm:w-24'
 export const COL_ANGOSTA = 'sm:w-14'
 
 /**
+ * Campo numérico de la lista rápida.
+ *
+ * Un `<input type="number">` controlado directamente por el número **no se puede vaciar**:
+ * al borrar el último dígito el valor intermedio es `''`, que no es un número aceptable, el
+ * padre lo rechaza y React repone el dígito anterior. Visto desde el teclado, el primer
+ * dígito no se puede borrar y solo se puede escribir a su derecha.
+ *
+ * Se resuelve guardando el texto tipeado en estado local y avisando al padre únicamente
+ * cuando ese texto ya es un número que `aceptar` admite. Al salir del campo, si quedó vacío
+ * o inválido, se repone el último valor bueno: ningún renglón queda sin número.
+ */
+export function CampoNumero({
+  valor,
+  onValor,
+  aceptar,
+  className,
+  ...resto
+}: {
+  valor: number
+  onValor: (n: number) => void
+  /** Qué números puede recibir el padre. El resto se tipea igual, pero no se propaga. */
+  aceptar: (n: number) => boolean
+} & Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'>) {
+  const [texto, setTexto] = useState(String(valor))
+
+  // Estado derivado de la prop: se sincroniza durante el render comparando contra el valor
+  // anterior, no con un efecto (regla `set-state-in-effect`).
+  const [valorPrevio, setValorPrevio] = useState(valor)
+  if (valor !== valorPrevio) {
+    setValorPrevio(valor)
+    setTexto(String(valor))
+  }
+
+  function esBueno(t: string): boolean {
+    if (t.trim() === '') return false
+    const n = Number(t)
+    return Number.isFinite(n) && aceptar(n)
+  }
+
+  return (
+    <Input
+      {...resto}
+      type="number"
+      value={texto}
+      onChange={(e) => {
+        setTexto(e.target.value)
+        if (esBueno(e.target.value)) onValor(Number(e.target.value))
+      }}
+      onBlur={(e) => {
+        if (!esBueno(texto)) setTexto(String(valor))
+        resto.onBlur?.(e)
+      }}
+      className={cn('tabular', className)}
+    />
+  )
+}
+
+/**
  * Día del renglón en la lista rápida. La planilla es de un mes, así que alcanza con el
  * número de día; al costado se anota el día de la semana, que es el dato que hace falta
  * para saber si ese día genera boletos adicionales (§6.5).
+ *
+ * El input lleva ancho y padding propios: con el `px-3` del original, los 56px no alcanzaban
+ * para dos dígitos —medido, «11» y «31» desbordaban— porque las flechas del spinner se comen
+ * unos 20px por dentro de la caja. Con 64px y `px-2` entran los dos dígitos y sobra.
  */
 export function CampoDia({
   valor,
@@ -101,20 +173,16 @@ export function CampoDia({
 
   return (
     <div className="flex items-center gap-2">
-      <Input
-        type="number"
+      <CampoNumero
+        valor={dia(f)}
+        // El ISO es AAAA-MM-DD: se reemplaza solo el día para no salir del mes.
+        onValor={(n) => onChange(`${valor.slice(0, 8)}${String(n).padStart(2, '0')}`)}
+        aceptar={(n) => Number.isInteger(n) && n >= 1 && n <= ultimo}
         min={1}
         max={ultimo}
         step={1}
-        value={dia(f)}
         disabled={soloLectura}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          if (!Number.isInteger(n) || n < 1 || n > ultimo) return
-          // El ISO es AAAA-MM-DD: se reemplaza solo el día para no salir del mes.
-          onChange(`${valor.slice(0, 8)}${String(n).padStart(2, '0')}`)
-        }}
-        className="w-14 tabular"
+        className="w-16 px-2"
         aria-label="Día"
       />
       <span className={cn('shrink-0 text-sm text-muted-foreground', COL_NOMBRE_DIA)}>
@@ -202,6 +270,46 @@ function nuevaClave(): string {
   return `r${contador}`
 }
 
+/**
+ * Firma del contenido editable de un renglón, para detectar si se editó uno ya guardado.
+ *
+ * Las claves de `extra` se ordenan porque el objeto se arma en varios lugares —la carga
+ * inicial, el popover, cada control de la fila— y el orden de inserción no es el mismo en
+ * todos. Sin ordenar, dos renglones idénticos podrían dar firmas distintas y la planilla
+ * quedaría avisando de cambios que no existen.
+ */
+/**
+ * Salida que quedó esperando confirmación porque hay renglones en borrador.
+ *
+ * `vista` es el cambio entre calendario y lista rápida, que **no** pierde nada: los
+ * renglones son los mismos en las dos vistas. `salir` es todo lo demás —cambiar de mes, el
+ * menú, la migaja al empleado—, que sí se lleva el borrador. El texto del diálogo cambia
+ * según el caso para no avisar de una pérdida que no va a pasar.
+ */
+type SalidaPendiente = { motivo: 'vista' | 'salir'; accion: () => void }
+
+/**
+ * Recorte de la Navigation API, que es la única forma de interceptar el botón atrás.
+ * TypeScript todavía no la declara en `lib.dom`, así que se describe acá lo que se usa.
+ */
+type EventoNavegacion = Event & {
+  navigationType: string
+  destination?: { index: number }
+}
+type ApiNavegacion = {
+  currentEntry?: { index: number }
+  addEventListener: (tipo: 'navigate', manejador: (e: EventoNavegacion) => void) => void
+  removeEventListener: (tipo: 'navigate', manejador: (e: EventoNavegacion) => void) => void
+}
+
+function firma(renglon: Renglon): string {
+  const extra = Object.keys(renglon.extra)
+    .sort()
+    .map((k) => `${k}=${String(renglon.extra[k])}`)
+    .join('|')
+  return `${renglon.fecha}|${renglon.horas}|${renglon.nota ?? ''}|${extra}`
+}
+
 export function PlanillaMensual(props: PlanillaMensualProps) {
   const router = useRouter()
   const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
@@ -212,7 +320,11 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   const [modoLista, setModoLista] = useState(false)
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)
+  const [salida, setSalida] = useState<SalidaPendiente | null>(null)
   const grillaRef = useRef<HTMLDivElement>(null)
+  /** Se levanta justo antes de una navegación con carga completa ya confirmada, para que el
+   * aviso del navegador no vuelva a preguntar lo mismo. */
+  const saliendoRef = useRef(false)
 
   // Al cambiar de mes, o después de guardar, la planilla se recarga con lo guardado. Es
   // estado derivado de las props: se ajusta durante el render comparando contra el valor
@@ -225,21 +337,137 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     setDiaAbierto(null)
   }
 
+  // Hay cambios si se borró algo, si se agregó un renglón nuevo, o si se editó alguno de
+  // los que ya estaban guardados: la acción de guardado hace `update` de los que traen `id`,
+  // así que editar el día o las horas de un renglón guardado también se tiene que poder
+  // guardar. Comparar solo la cantidad dejaba «Guardar» deshabilitado en ese caso.
   const hayCambios = useMemo(() => {
     if (borrar.length > 0) return true
     if (renglones.length !== props.guardados.length) return true
-    return renglones.some((r) => !r.id)
+    const previos = new Map(props.guardados.map((r) => [r.id, r]))
+    return renglones.some((r) => {
+      if (!r.id) return true
+      const previo = previos.get(r.id)
+      return !previo || firma(r) !== firma(previo)
+    })
   }, [renglones, borrar, props.guardados])
 
-  // §7.1 — cerrar con cambios sin guardar pide confirmación.
+  // §7.1 — cerrar o recargar con cambios sin guardar pide confirmación.
   useEffect(() => {
     if (!hayCambios) return
     function alSalir(e: BeforeUnloadEvent) {
+      // Si la salida ya se confirmó en nuestro diálogo, no se pregunta dos veces.
+      if (saliendoRef.current) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', alSalir)
     return () => window.removeEventListener('beforeunload', alSalir)
+  }, [hayCambios])
+
+  /**
+   * §7.1 — salir de la planilla por un link tampoco puede llevarse el borrador en silencio.
+   *
+   * `beforeunload` solo cubre recargar o cerrar la pestaña: las navegaciones del App Router
+   * no lo disparan, así que irse por el menú perdía los renglones sin avisar. Mientras haya
+   * cambios se interceptan los clics en cualquier `<a href>` en **fase de captura**, que es
+   * la que corre antes del handler del `Link` de Next.
+   *
+   * Se hace acá, con un listener propio, y no con el `onNavigate` de `Link`: si no, cada
+   * link de la aplicación —menú, drawer, migajas— tendría que conocer el estado de esta
+   * pantalla, y el bloqueo dejaría de ser auditable en un solo lugar.
+   */
+  useEffect(() => {
+    if (!hayCambios) return
+
+    function alClic(e: MouseEvent) {
+      if (e.defaultPrevented || e.button !== 0) return
+      // Con modificadores el navegador abre en otra pestaña o ventana: no se pierde nada.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+
+      if (!(e.target instanceof Element)) return
+      const ancla = e.target.closest('a[href]')
+      if (!(ancla instanceof HTMLAnchorElement)) return
+      if (ancla.target === '_blank' || ancla.hasAttribute('download')) return
+
+      const href = ancla.getAttribute('href') ?? ''
+      // Un ancla interna, o un link a donde ya estamos, no se lleva nada.
+      if (href.startsWith('#') || ancla.href === window.location.href) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      // `/oauth2/*` lo atiende el proxy, no el App Router (§3.5): necesita carga completa.
+      const porElRouter = ancla.origin === window.location.origin && !href.startsWith('/oauth2')
+
+      setSalida({
+        motivo: 'salir',
+        accion: () => {
+          if (porElRouter) {
+            router.push(href)
+          } else {
+            saliendoRef.current = true
+            window.location.assign(ancla.href)
+          }
+        },
+      })
+    }
+
+    document.addEventListener('click', alClic, true)
+    return () => document.removeEventListener('click', alClic, true)
+  }, [hayCambios, router])
+
+  /**
+   * §7.1 — el botón atrás del navegador.
+   *
+   * El aviso nativo no se puede usar acá: **está verificado que `beforeunload` no se
+   * dispara** al volver atrás dentro de la aplicación. Es una travesía del historial en el
+   * mismo documento, no una descarga, así que el navegador no tiene nada que avisar; el
+   * aviso nativo sale solo al recargar o cerrar la pestaña.
+   *
+   * Lo que sí permite cancelar una travesía es la Navigation API, y con ella se muestra el
+   * mismo diálogo que las demás salidas.
+   *
+   * Soporte: **verificado en Chromium y en Firefox**. En Firefox se confirmó que el atrás
+   * abre *este* diálogo y no el aviso nativo, que es la forma de saber que la API está
+   * interceptando y no que se colgó de un `beforeunload` entre documentos.
+   * Safari quedó sin probar. El guardia se monta solo si `window.navigation` existe, así
+   * que en un navegador que no la tenga no rompe nada: simplemente el atrás se lleva el
+   * borrador sin aviso. Si hay que verificarlo en otro navegador, `typeof window.navigation`
+   * en la consola dice si está.
+   */
+  useEffect(() => {
+    if (!hayCambios) return
+
+    const navegacion = (window as unknown as { navigation?: ApiNavegacion }).navigation
+    if (!navegacion) return
+
+    function alNavegar(e: EventoNavegacion) {
+      // Solo el atrás y el adelante: los `push` del router ya pasaron por el diálogo.
+      if (e.navigationType !== 'traverse' || !e.cancelable) return
+      if (saliendoRef.current) return
+
+      const destino = e.destination?.index
+      e.preventDefault()
+
+      setSalida({
+        motivo: 'salir',
+        accion: () => {
+          saliendoRef.current = true
+          // Se repite el salto real, que puede ser adelante o de más de un paso: el atrás
+          // sostenido del navegador permite volver varias entradas de una vez.
+          const actual = navegacion?.currentEntry?.index ?? -1
+          if (destino !== undefined && destino >= 0 && actual >= 0) {
+            window.history.go(destino - actual)
+          } else {
+            window.history.back()
+          }
+        },
+      })
+    }
+
+    navegacion.addEventListener('navigate', alNavegar)
+    return () => navegacion.removeEventListener('navigate', alNavegar)
   }, [hayCambios])
 
   const porDia = useMemo(() => {
@@ -310,9 +538,19 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     )
   }, [])
 
+  /** Corre `accion`, o la deja esperando confirmación si hay renglones en borrador. */
+  function pedirSalida(motivo: SalidaPendiente['motivo'], accion: () => void) {
+    if (!hayCambios) {
+      accion()
+      return
+    }
+    setSalida({ motivo, accion })
+  }
+
   function irAMes(delta: number) {
-    if (hayCambios && !confirm('Tenés cambios sin guardar. ¿Salir igual?')) return
-    router.push(`${props.ruta}?periodo=${aPeriodoISO(sumarMeses(periodo, delta))}`)
+    pedirSalida('salir', () =>
+      router.push(`${props.ruta}?periodo=${aPeriodoISO(sumarMeses(periodo, delta))}`),
+    )
   }
 
   function guardar() {
@@ -357,8 +595,13 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     <div className="space-y-4 pb-48 sm:pb-32">
       {/* Encabezado */}
       <div className="space-y-3">
+        {/*
+          Sin `className="mb-0"`: el encabezado conserva los 24px que el diseño deja después
+          de un título de página. En Tailwind 4 `space-y-3` pone `margin-bottom` en todos los
+          hijos menos el último, y el `mb-*` del elemento lo sobrescribe: con `mb-0` el
+          margen quedaba en cero y la fila de controles se pegaba a la bajada.
+        */}
         <EncabezadoPagina
-          className="mb-0"
           rotulo="Planilla mensual"
           titulo={props.titulo}
           bajada={
@@ -397,7 +640,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setModoLista((v) => !v)}
+            onClick={() => pedirSalida('vista', () => setModoLista((v) => !v))}
             className="ml-auto"
           >
             {modoLista ? (
@@ -565,6 +808,45 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           </div>
         </div>
       )}
+
+      {/* §7.1 — confirmación única para todas las salidas con borrador. */}
+      <AlertDialog open={salida !== null} onOpenChange={(v) => !v && setSalida(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {salida?.motivo === 'vista'
+                ? '¿Cambiar de vista con renglones sin guardar?'
+                : 'Tenés renglones sin guardar'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {salida?.motivo === 'vista'
+                ? 'Los renglones en borrador no se pierden: son los mismos en las dos vistas y en el calendario se ven en amarillo. Pero siguen sin guardarse.'
+                : 'Si salís de la planilla se pierden los renglones en borrador. Guardalos o descartalos para conservarlos.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {/*
+            El énfasis va siempre en la opción que no pierde nada. Cambiar de vista no pierde
+            el borrador, así que ahí el acento se queda en la acción; salir sí lo pierde, y
+            entonces el acento pasa a «Seguir editando» y la salida queda en rojo.
+            El foco inicial lo pone Radix en el botón de cancelar en los dos casos.
+          */}
+          <AlertDialogFooter>
+            <AlertDialogCancel variant={salida?.motivo === 'salir' ? 'default' : 'outline'}>
+              Seguir editando
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant={salida?.motivo === 'salir' ? 'destructive' : 'default'}
+              onClick={() => {
+                const accion = salida?.accion
+                setSalida(null)
+                accion?.()
+              }}
+            >
+              {salida?.motivo === 'vista' ? 'Cambiar de vista' : 'Salir sin guardar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Pie fijo (§7.1) */}
       {!props.soloLectura ? (

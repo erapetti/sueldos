@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  CampoNumero,
   COL_ANGOSTA,
   COL_HORAS,
   COL_INTERRUPTOR,
@@ -100,11 +101,19 @@ export function PlanillaFaltas(props: {
           distinguir a simple vista si la falta es total o parcial.
         </span>
       }
+      /*
+        La celda muestra las horas y el punto de color. El «completa / parcial» salió del
+        texto: la celda ya trae arriba las horas que corresponden al día según el régimen, que
+        es la comparación que el §7.2 pide poder hacer de un pantallazo. Queda en el `title`.
+      */
       renderEtiqueta={(renglon) => {
         const contexto = props.dias.find((d) => d.fecha === renglon.fecha)
         const completa = contexto ? renglon.horas >= contexto.horasRegimen : false
         return (
           <span
+            title={`${renglon.horas} h · jornada ${completa ? 'completa' : 'parcial'}${
+              extra(renglon).descuenta ? '' : ' · no se descuenta del sueldo'
+            }`}
             className={cn(
               'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
               renglon.id ? 'bg-primary/10 text-primary' : 'bg-warn-soft text-warn-ink',
@@ -119,7 +128,7 @@ export function PlanillaFaltas(props: {
               )}
               aria-hidden
             />
-            {renglon.horas} h {completa ? '· completa' : '· parcial'}
+            {renglon.horas} h
           </span>
         )
       }}
@@ -148,18 +157,16 @@ export function PlanillaFaltas(props: {
             </span>
           </CampoLista>
           <CampoLista etiqueta="Horas falta">
-            <Input
-              type="number"
+            <CampoNumero
+              valor={renglon.horas}
+              onValor={(n) => actualizar({ horas: n })}
+              // El tope contra el régimen no se exige acá: lo valida el servidor (§4.6), y
+              // exigirlo mientras se tipea bloquearía el primer dígito de un valor de dos.
+              aceptar={(n) => n > 0}
               step={0.5}
               min={0}
               max={contexto?.horasRegimen || undefined}
-              value={renglon.horas}
-              onChange={(e) => {
-                // No se aceptan negativos ni vacío: el campo cae a 0, que es el valor inicial.
-                const valor = Number(e.target.value)
-                actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
-              }}
-              className={cn('w-full tabular', COL_HORAS)}
+              className={cn('w-full', COL_HORAS)}
               aria-label="Horas"
             />
           </CampoLista>

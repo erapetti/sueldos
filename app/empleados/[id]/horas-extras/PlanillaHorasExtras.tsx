@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import {
   CampoDia,
   CampoLista,
+  CampoNumero,
   COL_ANGOSTA,
   COL_INTERRUPTOR,
   COL_HORAS,
@@ -106,8 +107,17 @@ export function PlanillaHorasExtras(props: {
           <strong>{props.valorHoraNegro ? formatearImporte(props.valorHoraNegro) : '—'}</strong>
         </span>
       }
+      /*
+        La celda muestra las horas y el punto de color, que es lo que pide el §7.1. El
+        recargo salió del texto: en una celda de 10px competía con las horas, que son el
+        dato que se lee de un pantallazo. Queda en el `title` y en la lista rápida, donde se
+        edita.
+      */
       renderEtiqueta={(renglon) => (
         <span
+          title={`${renglon.horas} h al ${extra(renglon).recargoPct} %${
+            extra(renglon).conBps ? '' : ' · sin descuento de BPS'
+          }`}
           className={cn(
             'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
             renglon.id ? 'bg-primary/10 text-primary' : 'bg-warn-soft text-warn-ink',
@@ -120,7 +130,7 @@ export function PlanillaHorasExtras(props: {
             )}
             aria-hidden
           />
-          {renglon.horas} h · {extra(renglon).recargoPct} %
+          {renglon.horas} h
         </span>
       )}
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (
@@ -148,17 +158,13 @@ export function PlanillaHorasExtras(props: {
             </span>
           </CampoLista>
           <CampoLista etiqueta="Horas extra">
-            <Input
-              type="number"
+            <CampoNumero
+              valor={renglon.horas}
+              onValor={(n) => actualizar({ horas: n })}
+              aceptar={(n) => n > 0}
               step={0.5}
               min={0}
-              value={renglon.horas}
-              onChange={(e) => {
-                // No se aceptan negativos ni vacío: el campo cae a 0, que es el valor inicial.
-                const valor = Number(e.target.value)
-                actualizar({ horas: Number.isFinite(valor) && valor > 0 ? valor : 0 })
-              }}
-              className={cn('w-full tabular', COL_HORAS)}
+              className={cn('w-full', COL_HORAS)}
               aria-label="Horas"
             />
           </CampoLista>

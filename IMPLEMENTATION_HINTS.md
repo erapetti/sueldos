@@ -301,5 +301,7 @@ del flex y el layout de escritorio no cambia.
 No lo «simplifiques» sacando el envoltorio: es lo que permite tener las dos vistas sin duplicar
 el markup. Y los anchos de columna son las constantes `COL_*` exportadas por
 `PlanillaMensual`, compartidas por el encabezado y por los campos justamente para que no se
-puedan desincronizar. Las cinco columnas entran con unos 22px de holgura a 640px, así que
-agregar una más obliga a recortar otra.
+puedan desincronizar. Las cinco columnas entran con **14px de holgura a 640px** —medidos: la
+fila usa 544 de 558px—, así que agregar una más obliga a recortar otra. Eran 22px hasta que la
+columna del día pasó de 100 a 108px, porque con 56px el input no mostraba los días de dos
+dígitos: las flechas del spinner se comen unos 20px por dentro de la caja.

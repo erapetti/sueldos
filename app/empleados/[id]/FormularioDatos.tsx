@@ -294,9 +294,13 @@ export function FormularioDatos({
             ) : null}
           </div>
 
+          {/* La baja cierra el vínculo laboral: el acento va en «Cancelar». */}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={baja.enviando}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel variant="default" disabled={baja.enviando}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={(e) => {
                 e.preventDefault()
                 baja.ejecutar(() => darDeBajaEmpleado({ empleadoId, fechaEgreso }), {

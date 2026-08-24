@@ -268,8 +268,11 @@ export function PantallaUsuarios({
             </div>
           ) : null}
 
+          {/* Borrar es irreversible: el acento va en «Cancelar». */}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={enviando}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel variant="default" disabled={enviando}>
+              Cancelar
+            </AlertDialogCancel>
             <Button
               variant="destructive"
               onClick={borrar}
