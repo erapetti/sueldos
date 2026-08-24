@@ -314,8 +314,13 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
     expect(r.subtotal.toFixed(2)).toBe('65000.00')
   })
 
-  it('muestra la leyenda "Empleado sin aportes al BPS"', () => {
-    expect(calcularLiquidacionMensual(sinBps()).avisos).toContain('Empleado sin aportes al BPS')
+  // Divergencia deliberada con el §6.3, que pide la leyenda en el encabezado: se saca porque
+  // se deduce de las líneas —sin materia gravada y sin ningún descuento— y la pantalla la
+  // mostraba dos veces. El test queda para que no vuelva sin que se note.
+  it('no emite la leyenda "Empleado sin aportes al BPS"', () => {
+    expect(calcularLiquidacionMensual(sinBps()).avisos).not.toContain(
+      'Empleado sin aportes al BPS',
+    )
   })
 
   it('las horas extras con con_bps = true se pagan al valor hora calculado, enteras', () => {

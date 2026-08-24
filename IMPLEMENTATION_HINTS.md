@@ -72,7 +72,23 @@ No se migraron los datos anteriores al cambio. Por eso la pestaña de cuenta cor
 sola si muestra centavos: si **todos** los importes de la pantalla son enteros los oculta, y
 si alguno los tiene los muestra en toda la columna. Ver `todosEnteros`.
 
-### 1.4 El loopback del cron no se puede implementar como está escrito
+### 1.4 No se muestra la leyenda «Empleado sin aportes al BPS»
+
+El §6.3 pide que, con `aporta_bps = false`, «el encabezado de la liquidación muestra la leyenda
+*"Empleado sin aportes al BPS"*». **No se muestra**, por decisión del usuario: el dato se deduce
+de las propias líneas —no hay línea `MATERIA GRAVADA` ni ningún descuento de BPS, que es lo
+mismo que el §6.3 manda hacer— y en la pantalla aparecía dos veces, en el cuadro de datos y en
+la lista de avisos.
+
+Se sacó **en el motor** (`lib/calculo/liquidacion.ts`, paso 5) y no filtrando el aviso en la
+pantalla, para que no haya dos comportamientos posibles según quién consuma `avisos`. El test
+del §12 quedó invertido —verifica que el aviso **no** se emita— para que no vuelva sin que
+nadie lo note.
+
+La ficha del empleado **sí** conserva el chip «Sin aportes al BPS» (`FichaEmpleado`): ahí no
+hay liquidación de la cual deducirlo.
+
+### 1.5 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -86,7 +102,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.5 Funcionalidad pendiente de definición (§13)
+### 1.6 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

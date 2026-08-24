@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db/prisma'
 import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer } from '@/lib/auth/guards'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
-import { aPeriodoISO, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
+import { aISO, aPeriodoISO, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
 import { PantallaLiquidacion, type LineaVista } from './PantallaLiquidacion'
 import { AvisoDatosFaltantes } from './AvisoDatosFaltantes'
 
@@ -95,6 +95,8 @@ export default async function PaginaLiquidacion({
       totalAPagar={resultado.totalAPagar.toFixed(2)}
       avisos={resultado.avisos}
       aportaBps={acceso.empleado.aportaBps}
+      cedula={acceso.empleado.cedula}
+      fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       previas={previas}
       lineasPersistidas={
         ultimaConfirmada

@@ -235,9 +235,11 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
         signo: -1,
       })
     }
-  } else {
-    avisos.push('Empleado sin aportes al BPS')
   }
+  // El §6.3 pide además la leyenda «Empleado sin aportes al BPS» en el encabezado. No se
+  // emite, por decisión del usuario: se deduce de las líneas —no hay materia gravada ni
+  // ningún descuento de BPS— y aparecía dos veces en la misma pantalla. Divergencia
+  // registrada en IMPLEMENTATION_HINTS.
 
   // ── Paso 6: subtotal = 4 − 5 ─────────────────────────────────────────────────────────
   const subtotal = materiaGravada.minus(totalDescuentosBps)

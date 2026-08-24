@@ -61,6 +61,7 @@ export type EmpleadoConAcceso = {
     duenoId: string
     alias: string
     nombreCompleto: string
+    cedula: string | null
     activo: boolean
     visible: boolean
     fechaIngreso: Date
@@ -84,6 +85,7 @@ export async function accesoAEmpleado(
       duenoId: true,
       alias: true,
       nombreCompleto: true,
+      cedula: true,
       activo: true,
       visible: true,
       fechaIngreso: true,

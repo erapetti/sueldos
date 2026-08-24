@@ -27,6 +27,7 @@ import {
   formatearFecha,
   formatearPeriodoCapitalizado,
   hoy,
+  parseFechaISO,
   parsePeriodo,
   primerDiaDelMes,
   sumarMeses,
@@ -67,6 +68,9 @@ export function PantallaLiquidacion(props: {
   totalAPagar: string
   avisos: string[]
   aportaBps: boolean
+  cedula: string | null
+  /** ISO `AAAA-MM-DD`. */
+  fechaIngreso: string
   previas: Previa[]
   lineasPersistidas: LineaVista[] | null
 }) {
@@ -195,14 +199,35 @@ export function PantallaLiquidacion(props: {
 
       {/* Encabezado de la liquidación */}
       <div className="overflow-hidden rounded-card border bg-card shadow-soft">
+        {/*
+          Identifica al empleado y a la liquidación en la hoja impresa. El encabezado de la
+          página es `no-print`, así que esta tarjeta es lo único que sale impreso: si el mes
+          no está acá, la hoja no dice de qué liquidación se trata. Por eso «Fecha» va en el
+          bloque, y en negrita.
+
+          La cédula es opcional (§4.2): sin ella el renglón no se muestra, en vez de dejar un
+          hueco o un «sin cédula».
+        */}
         <div className="border-b px-[22px] pt-4 pb-3">
-          <h2 className="text-[20px]">
-            {props.alias} — {formatearPeriodoCapitalizado(periodo)}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Valor hora calculado: {formatearImporteEntero(props.valorHoraCalculado)}
-            {!props.aportaBps ? ' · Empleado sin aportes al BPS' : ''}
-          </p>
+          <h2 className="text-[32px] leading-tight">{props.nombreCompleto}</h2>
+
+          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+            {props.cedula ? (
+              <>
+                <dt className="text-muted-foreground">CI</dt>
+                <dd className="tabular">{props.cedula}</dd>
+              </>
+            ) : null}
+
+            <dt className="text-muted-foreground">Ingreso</dt>
+            <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
+
+            <dt className="text-muted-foreground">Valor hora calculado</dt>
+            <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
+
+            <dt className="text-muted-foreground">Fecha</dt>
+            <dd className="font-semibold">{formatearPeriodoCapitalizado(periodo)}</dd>
+          </dl>
         </div>
 
         <table
