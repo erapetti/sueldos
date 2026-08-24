@@ -41,6 +41,15 @@ export const horasMultiploMedio = z
   .positive('Tiene que ser mayor que cero')
   .refine((v) => Number.isInteger(v * 2), 'Las horas se cargan de a media hora')
 
+/**
+ * §6.5 — las horas extras admiten el cero. Un renglón en cero no paga nada: marca que ese día
+ * fue a trabajar, que es lo que hace que el día entre en el cálculo de boletos.
+ */
+export const horasCeroOMultiploMedio = z
+  .number()
+  .min(0, 'No puede ser negativo')
+  .refine((v) => Number.isInteger(v * 2), 'Las horas se cargan de a media hora')
+
 export const idUuid = z.string().min(1, 'Falta el identificador')
 
 /** No posterior a hoy (§6.11). */
@@ -174,7 +183,7 @@ export const nuevoRegimen = z.object({
 export const renglonHoraExtra = z.object({
   id: idUuid.optional(),
   fecha: fechaISO,
-  horas: horasMultiploMedio,
+  horas: horasCeroOMultiploMedio,
   conBps: z.boolean(),
   recargoPct: z.union(
     RECARGOS.map((r) => z.literal(r)) as unknown as [z.ZodLiteral<number>, z.ZodLiteral<number>],
@@ -190,7 +199,13 @@ export const loteHorasExtras = z.object({
   borrar: z.array(idUuid).default([]),
 })
 
-export const CAUSALES = ['CON_AVISO', 'SIN_AVISO', 'ENFERMEDAD', 'MATERNIDAD'] as const
+export const CAUSALES = [
+  'CON_AVISO',
+  'SIN_AVISO',
+  'ENFERMEDAD',
+  'MATERNIDAD',
+  'RECUPERA_OTRO_DIA',
+] as const
 
 export const renglonFalta = z.object({
   id: idUuid.optional(),

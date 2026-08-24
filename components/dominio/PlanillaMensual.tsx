@@ -200,9 +200,10 @@ export function CampoDia({
  * No usa `parsearNumero` de `lib/format/money`: ese trata el punto como separador de miles y
  * convertiría «2.5» en 25, que acá sería un error de carga silencioso.
  */
-export function horasTipeadas(texto: string): number | null {
+export function horasTipeadas(texto: string, admiteCero = false): number | null {
   const valor = Number(texto.trim().replace(',', '.'))
-  return Number.isFinite(valor) && valor > 0 ? valor : null
+  if (!Number.isFinite(valor)) return null
+  return valor > 0 || (admiteCero && valor === 0) ? valor : null
 }
 
 /**
@@ -242,7 +243,9 @@ export type DiaContexto = {
 function agrupar(marcas: MarcaDia[]): MarcaDia[] {
   const grupos = new Map<string, MarcaDia>()
   for (const m of marcas) {
-    if (!(m.horas > 0)) continue
+    // El cero se muestra: es la marca de §6.5 que incluye el día en el pago de boletos, y si
+    // no se viera no habría forma de saber que está ni de abrirla para borrarla.
+    if (!(m.horas >= 0)) continue
     const clave = `${m.signo}|${m.plena}|${m.guardada}`
     const previo = grupos.get(clave)
     if (previo) previo.horas += m.horas
@@ -285,6 +288,13 @@ export type PlanillaMensualProps = {
   }) => React.ReactNode
   /** Signo con el que esta planilla suma en la celda: `+` extras, `−` inasistencias. */
   signo: MarcaDia['signo']
+  /**
+   * §6.5 — las horas extras admiten renglones en cero: no pagan nada, marcan que ese día fue
+   * a trabajar para que entre en el cálculo de boletos. Las inasistencias no.
+   */
+  admiteCero?: boolean
+  /** Confirmación antes de guardar, o `null` si el lote no la necesita. */
+  confirmacionAlGuardar?: (renglones: Renglon[]) => string | null
   /** Si el renglón lleva el tratamiento normal de su tipo (con BPS / se descuenta). */
   esPlena: (renglon: Renglon) => boolean
   /** Fila del modo lista rápida. */
@@ -381,6 +391,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)
   const [salida, setSalida] = useState<SalidaPendiente | null>(null)
+  const [confirmacion, setConfirmacion] = useState<string | null>(null)
   const grillaRef = useRef<HTMLDivElement>(null)
   /** Se levanta justo antes de una navegación con carga completa ya confirmada, para que el
    * aviso del navegador no vuelva a preguntar lo mismo. */
@@ -576,8 +587,14 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
     return primerLibre
   }, [props.dias, renglones])
 
-  /** No se agrega otro renglón mientras haya uno sin horas cargadas. */
-  const hayRenglonSinHoras = useMemo(() => renglones.some((r) => !(r.horas > 0)), [renglones])
+  /**
+   * No se agrega otro renglón mientras haya uno sin horas cargadas. Donde el cero es un valor
+   * legítimo —las horas extras, §6.5— el renglón en cero no bloquea nada.
+   */
+  const hayRenglonSinHoras = useMemo(
+    () => renglones.some((r) => (props.admiteCero ? !(r.horas >= 0) : !(r.horas > 0))),
+    [renglones, props.admiteCero],
+  )
 
   const agregar = useCallback((fecha: string, datos: Omit<Renglon, 'clave' | 'fecha'>) => {
     setRenglones((previos) => [...previos, { ...datos, clave: nuevaClave(), fecha }])
@@ -614,6 +631,11 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   }
 
   function guardar() {
+    const aviso = props.confirmacionAlGuardar?.(renglones) ?? null
+    if (aviso) {
+      setConfirmacion(aviso)
+      return
+    }
     props.onGuardar(renglones, borrar)
   }
 
@@ -938,6 +960,28 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               }}
             >
               {salida?.motivo === 'vista' ? 'Cambiar de vista' : 'Salir sin guardar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmación de lo que el lote tiene de inhabitual, antes de guardarlo. */}
+      <AlertDialog open={confirmacion !== null} onOpenChange={(v) => !v && setConfirmacion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Antes de guardar</AlertDialogTitle>
+            <AlertDialogDescription>{confirmacion}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Descartar</AlertDialogCancel>
+            {/* Guardar no destruye nada, así que el acento se queda en la acción. */}
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmacion(null)
+                props.onGuardar(renglones, borrar)
+              }}
+            >
+              Continuar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -810,3 +810,51 @@ describe('régimenes atípicos', () => {
     expect(r.boletos!.diasATrabajar).toBe(30)
   })
 })
+
+describe('§4.6 causal «recupera otro día» y §6.5 horas extras en cero', () => {
+  // Abril de 2026: el 1° es miércoles y el régimen base es de lunes a viernes, 6 h.
+  it('la falta que se recupera no descuenta sueldo: no hay línea de faltas', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({ faltas: [falta('2026-04-08', 6, 'RECUPERA_OTRO_DIA', false)] }),
+    )
+    expect(lineasCon(r.lineas, CODIGOS.FALTAS)).toBe(0)
+    expect(r.materiaGravada.toFixed(2)).toBe('65000.00')
+  })
+
+  it('pero el día no paga boletos: la jornada completa lo saca del conteo', () => {
+    const sinFalta = calcularLiquidacionMensual(entradaBase())
+    const conFalta = calcularLiquidacionMensual(
+      entradaBase({ faltas: [falta('2026-04-08', 6, 'RECUPERA_OTRO_DIA', false)] }),
+    )
+    expect(conFalta.boletos!.boletos).toBe(sinFalta.boletos!.boletos - 2)
+  })
+
+  it('media jornada recuperada no toca el boleto, igual que cualquier falta parcial', () => {
+    const sinFalta = calcularLiquidacionMensual(entradaBase())
+    const parcial = calcularLiquidacionMensual(
+      entradaBase({ faltas: [falta('2026-04-08', 3, 'RECUPERA_OTRO_DIA', false)] }),
+    )
+    expect(parcial.boletos!.boletos).toBe(sinFalta.boletos!.boletos)
+    expect(lineasCon(parcial.lineas, CODIGOS.FALTAS)).toBe(0)
+  })
+
+  it('§6.5 — la hora extra en cero de un sábado agrega el boleto de ese día', () => {
+    const sinNada = calcularLiquidacionMensual(entradaBase())
+    // 2026-04-11 es sábado: el régimen le da 0 horas, así que el día no se cuenta solo.
+    const conMarca = calcularLiquidacionMensual(
+      entradaBase({ horasExtras: [horaExtra('2026-04-11', 0, true, 100)] }),
+    )
+    expect(conMarca.boletos!.boletos).toBe(sinNada.boletos!.boletos + 2)
+  })
+
+  it('y no genera ninguna línea ni suma importe: el renglón en cero no paga nada', () => {
+    const sinNada = calcularLiquidacionMensual(entradaBase())
+    const conMarca = calcularLiquidacionMensual(
+      entradaBase({ horasExtras: [horaExtra('2026-04-11', 0, true, 100)] }),
+    )
+    expect(lineasCon(conMarca.lineas, CODIGOS.HORAS_EXTRAS_CON_BPS)).toBe(0)
+    expect(conMarca.materiaGravada.toFixed(2)).toBe(sinNada.materiaGravada.toFixed(2))
+    // Lo único que cambia es el boleto.
+    expect(conMarca.totalAPagar.minus(sinNada.totalAPagar).toFixed(2)).toBe('100.00')
+  })
+})

@@ -111,6 +111,13 @@ export function PlanillaHorasExtras(props: {
       signo="+"
       // La excepción es la hora extra que no lleva descuento de BPS.
       esPlena={(renglon) => extra(renglon).conBps}
+      // §6.5 — el renglón en cero no paga nada: incluye el día en el pago de boletos.
+      admiteCero
+      confirmacionAlGuardar={(renglones) =>
+        renglones.some((r) => r.horas === 0)
+          ? 'Los registros de cero horas extra se usan solo para incluir el día en el pago de boletos.'
+          : null
+      }
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (
         <PopoverHoras
           fecha={fecha}
@@ -139,7 +146,8 @@ export function PlanillaHorasExtras(props: {
             <CampoNumero
               valor={renglon.horas}
               onValor={(n) => actualizar({ horas: n })}
-              aceptar={(n) => n > 0}
+              // §6.5 — el cero es válido acá: marca el día para el boleto.
+              aceptar={(n) => n >= 0}
               step={0.5}
               min={0}
               className={cn('w-full', COL_HORAS)}
@@ -283,8 +291,8 @@ function PopoverHoras({
   const [nota, setNota] = useState('')
 
   // Mientras no haya horas válidas el «Agregar» queda deshabilitado, en vez de habilitado
-  // y sin efecto: acá el campo arranca vacío siempre.
-  const horasValidas = horasTipeadas(horas)
+  // y sin efecto: acá el campo arranca vacío siempre. El cero sí es válido (§6.5).
+  const horasValidas = horasTipeadas(horas, true)
 
   function confirmar() {
     if (horasValidas === null) return

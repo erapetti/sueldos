@@ -31,7 +31,13 @@ import {
 } from '@/components/dominio/PlanillaMensual'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarFaltas } from '@/actions/novedades'
-import { CAUSALES_FALTA, descuentaEsEditable, etiquetaCausal, type CausalFaltaValor } from '@/constants/causales'
+import {
+  CAUSALES_FALTA,
+  descuentaEsEditable,
+  etiquetaCausal,
+  normalizarDescuenta,
+  type CausalFaltaValor,
+} from '@/constants/causales'
 import { formatearHoras } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
 
@@ -154,8 +160,8 @@ export function PlanillaFaltas(props: {
                 actualizar({
                   extra: {
                     causal: nueva,
-                    // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.
-                    descuenta: descuentaEsEditable(nueva) ? extra(renglon).descuenta : true,
+                    // §4.6.1 — fuera de ENFERMEDAD lo fija la causal, no el cliente.
+                    descuenta: normalizarDescuenta(nueva, extra(renglon).descuenta),
                   },
                 })
               }}
@@ -208,8 +214,8 @@ export function PlanillaFaltas(props: {
       etiquetaInterruptor="Descontar días"
       extraNuevoRenglon={() => ({
         causal,
-        // §4.6.1 — fuera de ENFERMEDAD el campo se fuerza a true.
-        descuenta: descuentaEsEditable(causal) ? descuenta : true,
+        // §4.6.1 — fuera de ENFERMEDAD lo fija la causal, no el cliente.
+        descuenta: normalizarDescuenta(causal, descuenta),
       })}
       renderResumen={(renglones) => {
         const total = renglones.reduce((a, r) => a.plus(r.horas), new Decimal(0))
@@ -289,7 +295,7 @@ function PopoverFalta({
       horas: horasValidas,
       nota,
       // §4.6.1 — el servidor vuelve a forzarlo; acá se refleja para que la UI no mienta.
-      extra: { causal, descuenta: descuentaEsEditable(causal) ? descuenta : true },
+      extra: { causal, descuenta: normalizarDescuenta(causal, descuenta) },
     })
     setHoras('')
     setNota('')

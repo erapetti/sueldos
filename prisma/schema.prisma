@@ -30,6 +30,8 @@ enum CausalFalta {
   SIN_AVISO
   ENFERMEDAD
   MATERNIDAD
+  /// El día no paga boletos, pero las horas no se descuentan: se recuperan otro día.
+  RECUPERA_OTRO_DIA
 }
 
 enum EstadoCuota {

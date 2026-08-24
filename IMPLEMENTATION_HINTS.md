@@ -36,6 +36,9 @@ Las migraciones son cuatro y hay una escrita a mano:
 - `20260818000100_restricciones` — **a mano**: los `CHECK` de §5.1 y las validaciones de §4.x
 - `20260818000200_cuota_liquidacion` — `liquidacion_aplicada_id`
 - `20260818000300_bps_clave_seguro` — `seguro_salud_clave`
+- `20260823000000_cuenta_opcional` y `20260823000100_banco_opcional`
+- `20260824000000_recupera_otro_dia` — **a mano**: la quinta causal y el CHECK de horas
+  extras relajado a `>= 0` (§1.6)
 
 `prisma migrate dev` no conoce los `CHECK` y los reporta como drift. Para cambiar el modelo:
 `prisma migrate dev --create-only` y volver a agregarlos si la migración generada recrea
@@ -105,7 +108,34 @@ hecho consumado, no algo que se anticipe, y su selector de fecha tampoco ofrece 
 Lo mismo vale para los movimientos de cuenta corriente (§7.4 y §7.5), que validan con
 `fechaNoFutura` en el esquema zod.
 
-### 1.6 El loopback del cron no se puede implementar como está escrito
+### 1.6 Hay una causal de falta más, y las horas extras admiten el cero
+
+Dos agregados pedidos por el usuario que el SPECS no contempla. Van juntos porque resuelven
+el mismo caso: **el día que se recupera trabajando otro día**.
+
+**Causal `RECUPERA_OTRO_DIA`.** El Anexo B lista cuatro causales —Con aviso, Sin aviso,
+Enfermedad, Maternidad— y el §7.2 habla de «los cuatro valores del Anexo B». La quinta se
+llama «Recupera otro día» y es la única que **nunca descuenta**: las horas se trabajan otro
+día, así que el sueldo no se toca. El día sí pierde el boleto, y eso no hizo falta
+programarlo: la regla del §6.4 saca del conteo cualquier día con falta de jornada completa y
+no mira `descuenta`. Una falta *parcial* con esta causal conserva el boleto, que es lo
+correcto: si estuvo medio día, viajó.
+
+`normalizarDescuenta` es el único lugar que decide el valor, y el cliente lo usa en vez de
+repetir la regla. La migración `20260824000000_recupera_otro_dia` agrega el valor al enum.
+
+**Horas extras en cero.** El §4.5 pide `horas > 0`, y había un CHECK que lo hacía cumplir. Se
+relajó a `>= 0` porque un renglón en cero es la forma de decir «ese día fue a trabajar»
+cuando no le corresponde por régimen —va especialmente a recuperar—, y así el §6.5 le paga el
+boleto. No paga nada más: `agruparPorRecargo` descarta los grupos en cero, así que no genera
+línea de liquidación. Las **inasistencias** siguen exigiendo `> 0`: una falta de cero horas no
+significa nada.
+
+Al guardar un lote con renglones en cero la planilla pide confirmación, porque es una carga
+que de otro modo parece un error de tipeo. En el calendario el renglón se ve como `+0 h`: si
+no se mostrara no habría manera de saber que está ni de abrirlo para borrarlo.
+
+### 1.7 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -119,7 +149,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.7 Funcionalidad pendiente de definición (§13)
+### 1.8 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

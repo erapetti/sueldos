@@ -124,6 +124,8 @@ function agruparPorRecargo(
   }
   return [...porRecargo.entries()]
     .map(([recargoPct, horas]) => ({ recargoPct, horas }))
+    // §6.5 — un renglón en cero existe solo para el boleto: no genera línea de liquidación.
+    .filter((g) => g.horas.greaterThan(0))
     .sort((a, b) => a.recargoPct - b.recargoPct)
 }
 
