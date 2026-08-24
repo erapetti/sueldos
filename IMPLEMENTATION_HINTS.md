@@ -172,7 +172,10 @@ archivo no sirve: nadie lee un archivo que está por sobrescribir.
 | Warning de `package-lock.json` ignorado al arrancar | Next sube por el árbol buscando lockfiles | `outputFileTracingRoot` fijo en `next.config.ts` |
 | `npm audit` en rojo por `deepmerge-ts` | Llega por el CLI de Prisma, que es devDependency | `overrides` en `package.json`. **Nunca `npm audit fix --force`**: baja a Prisma 6 y rompe todo |
 | ESLint: `set-state-in-effect` | Estado derivado sincronizado con un efecto | Patrón «comparar contra el valor anterior durante el render», o montar el componente solo cuando hace falta. Los diálogos usan lo segundo |
-| Un test de integración deja la base vacía | `limpiarBase()` **borra todas las tablas** de `DATABASE_URL` | Nunca apuntar los tests a una base con datos reales. Si desarrollás y corrés tests, tenés que volver a sembrar |
+| Un test de integración deja la base vacía | `limpiarBase()` **borra todas las tablas** de `DATABASE_URL` | Hoy hay una guarda: `tests/apoyo/base.ts` exige `DELETE_ALL_DATA=1`, que solo pone `npm run delete_all_data_and_test`. Con `npm test` las tres suites que borran fallan al cargar y las unitarias pasan. Después de correr la versión destructiva hay que volver a sembrar |
+| Un error de Prisma que no se corresponde con el código —`Argument 'dueno' is missing` con `duenoId` presente, o tipos `string` donde el schema dice `String?`— | El cliente generado quedó viejo respecto del schema | `lib/db/generated/` está en `.gitignore`. **En desarrollo**, después de `db:generate` hay que reiniciar el dev server: el proceso tiene el cliente anterior en memoria. **En el deploy**, ese directorio sobrevive de una vez a la siguiente y `git pull` no lo actualiza, así que `npm run build` corre `prisma generate` antes de compilar |
+| Una sombra o cualquier token de `@theme` no se aplica, sin error | En `@theme inline` la variable se definió apuntándose a sí misma | `--shadow-soft: var(--shadow-soft)` es circular y el valor queda inválido en silencio. Las variables de `:root` que alimentan el tema tienen que llamarse distinto: en `globals.css` son `--sombra-*` |
+| Un `<input type="number">` acepta valores fuera de `min`/`max` | Esos atributos solo limitan las flechas del spinner y la validación nativa, no lo que se tipea | Las planillas mensuales clampean en el `onChange`. El tope real de horas de falta contra el régimen lo valida el servidor (§4.6), que es donde tiene que estar |
 | Un archivo de tests rompe el build de producción | `tsconfig.json` incluía `**/*.ts`, así que `next build` typechequeaba `tests/` | Resuelto: ver abajo |
 
 ### Los tests están fuera del typecheck de producción
@@ -205,17 +208,23 @@ declarado explícitamente en `vitest.config.mts` en vez de deducirse del tsconfi
 
 ## 4. Cómo están armados los tests
 
-226 tests en 8 archivos. La división importa:
+245 tests en 10 archivos. La división importa:
 
 - **Puros** (`liquidacion`, `licencias`, `estado`, `cuentaCorriente`, `formato`) — no tocan la
   base, corren en milisegundos. Acá va todo lo que se pueda.
-- **De integración** (`integracion`, `cron-aumento`, `listados`) — contra la base real.
+- **De integración** (`integracion`, `cron-aumento`, `listados`) — contra la base real, y
+  **solo se corren con `npm run delete_all_data_and_test`**, porque vacían la base.
   Cubren lo que solo se puede verificar con transacciones: complementarias, idempotencia del
   cron, permisos, y el conteo de queries del §11.
 
 Los de integración mockean `@/lib/auth/currentUser` y usan `actuarComo()` para cambiar de
 usuario. El stub de `server-only` y los mocks de `next/cache` están en `tests/setup.ts` y
 `tests/stubs/`.
+
+La guarda de los destructivos es una variable de entorno que pone un script con nombre
+explícito, y no un `--delete-all-data`, porque Vitest rechaza cualquier flag que no conozca
+(`CACError: Unknown option`) y el passthrough de npm como `npm_config_*` está deprecado. El
+nombre del script es la advertencia.
 
 **Los casos del §12 están numerados en los `describe`.** Si agregás un caso del SPECS, seguí
 la numeración: hace que se pueda auditar la cobertura contra la especificación.
@@ -257,3 +266,40 @@ dependen de que `--set-xauthrequest=true` esté puesto.
   agregás una acción, seguí ese contrato: la UI ya sabe qué hacer con él.
 - **Los avisos del §5.3 y del §6.11** viajan en el campo `aviso` del resultado, no como
   excepción. Son informativos: la operación se guardó igual.
+
+### La estética viene de un proyecto de Claude Design
+
+El lenguaje visual —paleta cálida, Instrument Sans e Instrument Serif, geometría de píldora,
+radios de 28px, sombras largas y la textura del lienzo— sale del componente **App Shell** del
+proyecto «webapp» en claude.ai/design, no de decisiones tomadas acá. Los valores están en hex
+en `app/globals.css` a propósito, para poder auditarlos contra el original.
+
+Si algo se ve distinto del diseño, revisá primero esta lista antes de «corregirlo»: son
+desvíos deliberados.
+
+| Desvío | Por qué |
+|---|---|
+| El documento scrollea, no el panel `main` | El diseño scrollea dentro de `main`. Contenedores de scroll independientes rompen la impresión, que acá es una función real (§7.6) |
+| No hay campana de notificaciones, badge «Beta» ni dashboard de ejemplo | Son relleno del mock. Serían UI sin función detrás |
+| El modo oscuro no es del diseño | El diseño solo entrega la variante clara; la oscura se derivó conservando la temperatura cálida. Hoy no hay `ThemeProvider`, así que no se puede activar |
+| El nombre del feriado no se muestra en la celda del calendario | §7.1 pide mostrarlo. Se decidió marcarlo con fondo y borde; el nombre quedó en el `title` y en el `aria-label`. **Divergencia abierta con el SPECS** |
+| El padding del header derecho sale de un `calc()` | El diseño lo calcula midiendo `main` con un `ResizeObserver`. La misma cuenta en CSS evita convertir el layout raíz en componente cliente y un salto de layout |
+
+Ese `calc()` del header —`app/globals.css`, clase `.header-app`— es el que mantiene el bloque
+de usuario alineado con el borde derecho del contenido cuando la pantalla es más ancha que el
+techo de contenido. Depende de dos valores que tienen que decir lo mismo en dos archivos: el
+breakpoint y el ancho del menú lateral (`--ancho-sidebar` en `globals.css` contra `lg:block` y
+`w-64` en `Menu.tsx`). Si se mueve el sidebar, hay que tocar los dos lados.
+
+### Las filas de la lista rápida usan `display: contents`
+
+En las planillas mensuales, abajo de `sm` cada campo ocupa su renglón con su etiqueta al lado;
+desde `sm` la fila es horizontal con un encabezado de columnas. Eso se logra con un envoltorio
+por campo que en desktop **desaparece** (`sm:contents`), así el campo vuelve a ser hijo directo
+del flex y el layout de escritorio no cambia.
+
+No lo «simplifiques» sacando el envoltorio: es lo que permite tener las dos vistas sin duplicar
+el markup. Y los anchos de columna son las constantes `COL_*` exportadas por
+`PlanillaMensual`, compartidas por el encabezado y por los campos justamente para que no se
+puedan desincronizar. Las cinco columnas entran con unos 22px de holgura a 640px, así que
+agregar una más obliga a recortar otra.
