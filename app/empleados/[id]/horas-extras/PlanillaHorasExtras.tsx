@@ -108,32 +108,9 @@ export function PlanillaHorasExtras(props: {
           <strong>{props.valorHoraNegro ? formatearImporte(props.valorHoraNegro) : '—'}</strong>
         </span>
       }
-      /*
-        La celda muestra las horas y el punto de color, que es lo que pide el §7.1. El
-        recargo salió del texto: en una celda de 10px competía con las horas, que son el
-        dato que se lee de un pantallazo. Queda en el `title` y en la lista rápida, donde se
-        edita.
-      */
-      renderEtiqueta={(renglon) => (
-        <span
-          title={`${renglon.horas} h al ${extra(renglon).recargoPct} %${
-            extra(renglon).conBps ? '' : ' · sin descuento de BPS'
-          }`}
-          className={cn(
-            'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
-            renglon.id ? 'bg-primary/10 text-primary' : 'bg-warn-soft text-warn-ink',
-          )}
-        >
-          <span
-            className={cn(
-              'size-1.5 rounded-full',
-              extra(renglon).conBps ? 'bg-primary' : 'bg-warn',
-            )}
-            aria-hidden
-          />
-          {renglon.horas} h
-        </span>
-      )}
+      signo="+"
+      // La excepción es la hora extra que no lleva descuento de BPS.
+      esPlena={(renglon) => extra(renglon).conBps}
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (
         <PopoverHoras
           fecha={fecha}

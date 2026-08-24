@@ -41,6 +41,7 @@ import {
   parsePeriodo,
   sumarMeses,
 } from '@/lib/format/dates'
+import { formatearHoras } from '@/lib/format/money'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export type Renglon = {
@@ -204,12 +205,57 @@ export function horasTipeadas(texto: string): number | null {
   return Number.isFinite(valor) && valor > 0 ? valor : null
 }
 
+/**
+ * Horas de un día, ya sumadas, tal como se muestran en la celda del calendario.
+ *
+ * Las dos planillas muestran **lo mismo**: las horas extras con `+` y las inasistencias con
+ * `−`, vengan de la planilla que se está editando o de la otra. Lo único que cambia entre
+ * pantallas es el popover de carga.
+ */
+export type MarcaDia = {
+  /** `+` horas extras, `−` inasistencias. */
+  signo: '+' | '−'
+  horas: number
+  /**
+   * El tratamiento normal del tipo: con descuento de BPS en las extras, y que se descuenta
+   * del sueldo en las inasistencias. La excepción es la que se resalta.
+   */
+  plena: boolean
+  /** false para los renglones de la sesión que todavía no se guardaron. */
+  guardada: boolean
+}
+
 export type DiaContexto = {
   fecha: string
   /** Horas que le corresponden al día según el régimen vigente. */
   horasRegimen: number
   feriado: string | null
   feriadoNoLaborable: boolean
+  /**
+   * Novedades **guardadas** del día, de los dos tipos. La planilla descarta las de su propio
+   * signo y las reemplaza por sus renglones en vivo, que incluyen lo que todavía no se guardó.
+   */
+  marcas: MarcaDia[]
+}
+
+/** Agrupa por color —signo, tratamiento y si está guardada— y suma las horas de cada grupo. */
+function agrupar(marcas: MarcaDia[]): MarcaDia[] {
+  const grupos = new Map<string, MarcaDia>()
+  for (const m of marcas) {
+    if (!(m.horas > 0)) continue
+    const clave = `${m.signo}|${m.plena}|${m.guardada}`
+    const previo = grupos.get(clave)
+    if (previo) previo.horas += m.horas
+    else grupos.set(clave, { ...m })
+  }
+  // Orden estable: primero las extras, después las inasistencias; dentro, lo guardado antes
+  // que el borrador, y el tratamiento normal antes que la excepción.
+  return [...grupos.values()].sort(
+    (a, b) =>
+      Number(a.signo === '−') - Number(b.signo === '−') ||
+      Number(b.guardada) - Number(a.guardada) ||
+      Number(b.plena) - Number(a.plena),
+  )
 }
 
 export type PlanillaMensualProps = {
@@ -237,8 +283,10 @@ export type PlanillaMensualProps = {
     quitar: (clave: string) => void
     cerrar: () => void
   }) => React.ReactNode
-  /** Etiqueta corta de un renglón dentro de la celda del calendario. */
-  renderEtiqueta: (renglon: Renglon) => React.ReactNode
+  /** Signo con el que esta planilla suma en la celda: `+` extras, `−` inasistencias. */
+  signo: MarcaDia['signo']
+  /** Si el renglón lleva el tratamiento normal de su tipo (con BPS / se descuenta). */
+  esPlena: (renglon: Renglon) => boolean
   /** Fila del modo lista rápida. */
   renderFilaLista: (props: {
     renglon: Renglon
@@ -742,6 +790,17 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               const fecha = aISO(fechaDia)
               const contexto = contextoPorDia.get(fecha)
               const delDia = porDia.get(fecha) ?? []
+              // Las del propio signo salen de `renglones`, que ya incluye lo guardado y lo
+              // que se está editando; del contexto solo se toman las del otro tipo.
+              const marcas = agrupar([
+                ...(contexto?.marcas ?? []).filter((m) => m.signo !== props.signo),
+                ...delDia.map((r) => ({
+                  signo: props.signo,
+                  horas: r.horas,
+                  plena: props.esPlena(r),
+                  guardada: Boolean(r.id),
+                })),
+              ])
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
               // El fondo marca los días en los que no se trabaja: domingos y feriados
@@ -768,7 +827,9 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                       disabled={props.soloLectura}
                       title={contexto?.feriado ?? undefined}
                       aria-label={`${fechaDia.getUTCDate()} — ${contexto?.feriado ?? ''} ${
-                        delDia.length > 0 ? `${delDia.length} renglones` : 'sin cargas'
+                        marcas.length > 0
+                          ? marcas.map((m) => `${m.signo}${m.horas} h`).join(' ')
+                          : 'sin cargas'
                       }`}
                       className={cn(
                         'flex min-h-20 flex-col items-start gap-1 rounded-md border p-1.5 text-left text-xs transition-colors',
@@ -792,8 +853,29 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                       </span>
 
                       <span className="flex w-full flex-col gap-0.5">
-                        {delDia.map((r) => (
-                          <span key={r.clave}>{props.renderEtiqueta(r)}</span>
+                        {marcas.map((m) => (
+                          <span
+                            key={`${m.signo}${m.plena}${m.guardada}`}
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
+                              m.guardada
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-warn-soft text-warn-ink',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'size-1.5 shrink-0 rounded-full',
+                                // El rojo quedó reservado al fondo de domingos y feriados, así
+                                // que acá lo distintivo es la excepción: la hora extra sin BPS
+                                // y la falta que no se descuenta (§4.6.1).
+                                m.plena ? 'bg-foreground/55' : 'bg-warn',
+                              )}
+                              aria-hidden
+                            />
+                            {m.signo}
+                            {formatearHoras(m.horas)}
+                          </span>
                         ))}
                       </span>
                     </button>
@@ -807,6 +889,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                         horasRegimen: 0,
                         feriado: null,
                         feriadoNoLaborable: false,
+                        marcas: [],
                       },
                       renglones: delDia,
                       agregar: (datos) => agregar(fecha, datos),

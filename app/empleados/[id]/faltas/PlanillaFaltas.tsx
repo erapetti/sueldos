@@ -102,37 +102,9 @@ export function PlanillaFaltas(props: {
           distinguir a simple vista si la falta es total o parcial.
         </span>
       }
-      /*
-        La celda muestra las horas y el punto de color. El «completa / parcial» salió del
-        texto: la celda ya trae arriba las horas que corresponden al día según el régimen, que
-        es la comparación que el §7.2 pide poder hacer de un pantallazo. Queda en el `title`.
-      */
-      renderEtiqueta={(renglon) => {
-        const contexto = props.dias.find((d) => d.fecha === renglon.fecha)
-        const completa = contexto ? renglon.horas >= contexto.horasRegimen : false
-        return (
-          <span
-            title={`${renglon.horas} h · jornada ${completa ? 'completa' : 'parcial'}${
-              extra(renglon).descuenta ? '' : ' · no se descuenta del sueldo'
-            }`}
-            className={cn(
-              'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
-              renglon.id ? 'bg-primary/10 text-primary' : 'bg-warn-soft text-warn-ink',
-            )}
-          >
-            <span
-              className={cn(
-                'size-1.5 rounded-full',
-                // El rojo quedó reservado al fondo de domingos y feriados, así que acá
-                // lo distintivo es la excepción: el día que se paga (§4.6.1).
-                extra(renglon).descuenta ? 'bg-foreground/55' : 'bg-warn',
-              )}
-              aria-hidden
-            />
-            {renglon.horas} h
-          </span>
-        )
-      }}
+      signo="−"
+      // §4.6.1 — la excepción es la falta que NO se descuenta del sueldo.
+      esPlena={(renglon) => extra(renglon).descuenta}
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (
         <PopoverFalta
           fecha={fecha}

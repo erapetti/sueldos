@@ -8,7 +8,7 @@ import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { aISO, diasDelPeriodo, primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
-import type { DiaContexto } from '@/components/dominio/PlanillaMensual'
+import type { DiaContexto, MarcaDia } from '@/components/dominio/PlanillaMensual'
 
 export type ContextoPlanilla = {
   dias: DiaContexto[]
@@ -26,7 +26,8 @@ export async function contextoDePlanilla(
   const desde = primerDiaDelMes(periodo)
   const hasta = ultimoDiaDelMes(periodo)
 
-  const [regimenFila, salario, valorHoraNegro, feriados, liquidacion] = await Promise.all([
+  const [regimenFila, salario, valorHoraNegro, feriados, liquidacion, extras, faltas] =
+    await Promise.all([
     prisma.empleadoRegimen.findFirst({
       where: { empleadoId, fechaVigencia: { lte: desde } },
       orderBy: { fechaVigencia: 'desc' },
@@ -45,10 +46,46 @@ export async function contextoDePlanilla(
       include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
       orderBy: { secuencia: 'desc' },
     }),
+    // §7.1 y §7.2 — las dos planillas muestran la misma celda, así que las dos necesitan las
+    // novedades de los dos tipos. Cada página vuelve a leer las suyas para armar los renglones
+    // editables; son dos consultas chicas sobre el mismo índice y evitan mezclar acá el
+    // modelo de edición con el de presentación.
+    prisma.horaExtra.findMany({
+      where: { empleadoId, fecha: { gte: desde, lte: hasta } },
+      select: { fecha: true, horas: true, conBps: true },
+    }),
+    prisma.falta.findMany({
+      where: { empleadoId, fecha: { gte: desde, lte: hasta } },
+      select: { fecha: true, horas: true, descuenta: true },
+    }),
   ])
 
   const regimen = regimenFila ? aRegimenHoras(regimenFila) : null
   const porFecha = new Map(feriados.map((f) => [aISO(f.fecha), f]))
+
+  const marcasPorFecha = new Map<string, MarcaDia[]>()
+  function agregarMarca(fecha: Date, marca: MarcaDia) {
+    const clave = aISO(fecha)
+    const lista = marcasPorFecha.get(clave) ?? []
+    lista.push(marca)
+    marcasPorFecha.set(clave, lista)
+  }
+  for (const e of extras) {
+    agregarMarca(e.fecha, {
+      signo: '+',
+      horas: aDecimal(e.horas).toNumber(),
+      plena: e.conBps,
+      guardada: true,
+    })
+  }
+  for (const f of faltas) {
+    agregarMarca(f.fecha, {
+      signo: '−',
+      horas: aDecimal(f.horas).toNumber(),
+      plena: f.descuenta,
+      guardada: true,
+    })
+  }
 
   const dias: DiaContexto[] = diasDelPeriodo(periodo).map((f) => {
     const clave = aISO(f)
@@ -58,6 +95,7 @@ export async function contextoDePlanilla(
       horasRegimen: regimen ? aDecimal(horasDelDia(regimen, f)).toNumber() : 0,
       feriado: feriado?.descripcion ?? null,
       feriadoNoLaborable: feriado?.noLaborable ?? false,
+      marcas: marcasPorFecha.get(clave) ?? [],
     }
   })
 
