@@ -85,8 +85,10 @@ export function calcularBoletos(entrada: EntradaBoletos): DetalleBoletos {
     diasATrabajar += 1
   }
 
-  // §6.5 — fechas distintas del mes con horas extras, cuyo día de la semana tiene 0 horas en
-  // el régimen y que no estén ya contadas en días a trabajar.
+  // §6.5 — fechas distintas del mes con horas extras que no estén ya contadas en días a
+  // trabajar, y cuyo día no era de trabajo: o el régimen le da 0 horas, o es feriado no
+  // laborable. El criterio es «fue a trabajar, viajó», así que no mira ni `con_bps` ni el
+  // recargo; alcanza con que haya un registro de horas extras, aunque sea de cero horas.
   const desdeMes = primerDiaDelMes(periodo).getTime()
   const hastaMes = ultimoDiaDelMes(periodo).getTime()
   const diasExtra = new Set<string>()
@@ -94,8 +96,10 @@ export function calcularBoletos(entrada: EntradaBoletos): DetalleBoletos {
   for (const he of horasExtras) {
     const t = he.fecha.getTime()
     if (t < desdeMes || t > hastaMes) continue
-    if (horasDelDia(regimen, he.fecha).greaterThan(0)) continue
     const clave = aISO(he.fecha)
+    const noEraDiaDeTrabajo =
+      horasDelDia(regimen, he.fecha).lessThanOrEqualTo(0) || feriadosNoLaborables.has(clave)
+    if (!noEraDiaDeTrabajo) continue
     if (contados.has(clave)) continue
     diasExtra.add(clave)
   }

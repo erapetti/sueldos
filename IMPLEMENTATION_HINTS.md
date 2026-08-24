@@ -135,7 +135,38 @@ Al guardar un lote con renglones en cero la planilla pide confirmación, porque 
 que de otro modo parece un error de tipeo. En el calendario el renglón se ve como `+0 h`: si
 no se mostrara no habría manera de saber que está ni de abrirlo para borrarlo.
 
-### 1.7 El loopback del cron no se puede implementar como está escrito
+### 1.7 El feriado no laborable trabajado: línea propia y boleto
+
+Dos cambios pedidos por el usuario. El **doble pago no es uno de ellos**: trabajar un feriado
+se carga como hora extra con recargo de 100 %, y eso ya lo pagaba al doble.
+
+**La línea «Horas en feriados no laborables»**, entre las horas extras con BPS y la materia
+gravada. Lleva las horas con `con_bps = true` **y** recargo de 100 % que caen en un feriado no
+laborable, valorizadas al doble del valor hora calculado.
+
+Es **solo presentación**: esas horas se **sacan** de la línea genérica en vez de sumarse
+aparte. Si se sumaran, se pagarían dos veces. La materia gravada y el total no cambian, y la
+regla de cálculo del §6.2 sigue siendo la misma; lo único que cambia es que la hoja informa
+que el mes incluyó un feriado trabajado. Hay un test que fija justamente eso: mismo total con
+y sin desglose.
+
+**El boleto del feriado trabajado.** Antes no se pagaba: el §6.4 saltea el día por ser
+feriado, y la regla del §6.5 que recupera días solo miraba los que tienen 0 horas en el
+régimen —un feriado en día hábil tiene las del régimen—, así que el día no volvía nunca.
+Ahora un feriado no laborable con horas extras registradas cuenta como día con boleto.
+
+El criterio del boleto es **«fue a trabajar, viajó»**: no mira `con_bps` ni el recargo, y le
+alcanza con que haya un registro de horas extras, aunque sea de cero horas (§1.6). Es a
+propósito más amplio que el del desglose.
+
+**Lo que quedó afuera.** Al pedir esto el usuario dijo que los feriados «tienen 0 horas en
+régimen». Tomado al pie de la letra eso valdría para todo —el tope de horas de una falta
+(§4.6), lo que muestra la celda del calendario— y no solo para el boleto. Se implementó
+**solo dentro del cálculo de boletos**, que es lo que cubren los dos casos de uso que pidió.
+Si alguna vez se quiere la lectura amplia, hay que pasarle los feriados a `horasDelDia` y
+revisar sus tres usos.
+
+### 1.8 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -149,7 +180,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.8 Funcionalidad pendiente de definición (§13)
+### 1.9 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

@@ -858,3 +858,83 @@ describe('§4.6 causal «recupera otro día» y §6.5 horas extras en cero', () 
     expect(conMarca.totalAPagar.minus(sinNada.totalAPagar).toFixed(2)).toBe('100.00')
   })
 })
+
+describe('§6.5 y §6.6 — feriados no laborables', () => {
+  // 2026-04-08 es miércoles, con 6 h en el régimen base. Se lo marca feriado no laborable.
+  const feriado = [{ fecha: f('2026-04-08'), noLaborable: true }]
+  const enElFeriado = (horas: number, conBps: boolean, recargo: number) =>
+    horaExtra('2026-04-08', horas, conBps, recargo)
+
+  it('no trabajado: el salario base no se toca y el día no paga boleto', () => {
+    const sinFeriado = calcularLiquidacionMensual(entradaBase())
+    const r = calcularLiquidacionMensual(entradaBase({ feriados: feriado }))
+
+    // El salario es mensual: el feriado ya viene pago adentro del salario base.
+    expect(r.lineas[0].codigo).toBe(CODIGOS.SALARIO_BASE)
+    expect(r.lineas[0].importe.toFixed(2)).toBe(sinFeriado.lineas[0].importe.toFixed(2))
+    expect(r.boletos!.boletos).toBe(sinFeriado.boletos!.boletos - 2)
+    expect(lineasCon(r.lineas, CODIGOS.HORAS_EN_FERIADOS)).toBe(0)
+  })
+
+  it('trabajado: vuelven los boletos del día', () => {
+    const sinFeriado = calcularLiquidacionMensual(entradaBase())
+    const r = calcularLiquidacionMensual(
+      entradaBase({ feriados: feriado, horasExtras: [enElFeriado(6, true, 100)] }),
+    )
+    // El día no se cuenta como día a trabajar —es feriado— pero sí como día con boleto.
+    expect(r.boletos!.diasATrabajar).toBe(sinFeriado.boletos!.diasATrabajar - 1)
+    expect(r.boletos!.diasExtraConBoleto).toBe(1)
+    expect(r.boletos!.boletos).toBe(sinFeriado.boletos!.boletos)
+  })
+
+  it('trabajado: las horas con BPS al 100 % salen en su propia línea, al doble del valor hora', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({ feriados: feriado, horasExtras: [enElFeriado(6, true, 100)] }),
+    )
+    const linea = r.lineas.find((l) => l.codigo === CODIGOS.HORAS_EN_FERIADOS)!
+    expect(linea.descripcion).toBe('Horas en feriados no laborables')
+    expect(linea.cantidad!.toFixed(2)).toBe('6.00')
+    expect(linea.valorUnitario!.toFixed(2)).toBe('1000.00') // $500 × 2
+    expect(linea.importe.toFixed(2)).toBe('6000.00')
+    // Y no quedan duplicadas en la línea genérica.
+    expect(lineasCon(r.lineas, CODIGOS.HORAS_EXTRAS_CON_BPS)).toBe(0)
+  })
+
+  it('el desglose es estético: no cambia la materia gravada ni el total (§6.2)', () => {
+    const extras = [enElFeriado(6, true, 100)]
+    const sinDesglose = calcularLiquidacionMensual(entradaBase({ horasExtras: extras }))
+    const conDesglose = calcularLiquidacionMensual(
+      entradaBase({ feriados: feriado, horasExtras: extras }),
+    )
+    expect(conDesglose.materiaGravada.toFixed(2)).toBe(sinDesglose.materiaGravada.toFixed(2))
+    // El total sí cambia, pero solo por el boleto: sin feriado el día se trabaja igual.
+    expect(conDesglose.totalAPagar.toFixed(2)).toBe(sinDesglose.totalAPagar.toFixed(2))
+  })
+
+  it('solo se desglosan las de 100 % con BPS: el resto queda en su línea de siempre', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        feriados: feriado,
+        horasExtras: [enElFeriado(2, true, 100), enElFeriado(3, true, 20), enElFeriado(4, false, 100)],
+      }),
+    )
+    expect(r.lineas.find((l) => l.codigo === CODIGOS.HORAS_EN_FERIADOS)!.cantidad!.toFixed(2)).toBe('2.00')
+    // Las de 20 % con BPS siguen en la línea genérica.
+    const generica = r.lineas.find((l) => l.codigo === CODIGOS.HORAS_EXTRAS_CON_BPS)!
+    expect(generica.descripcion).toBe('Horas extras con BPS (recargo 20 %)')
+    expect(generica.cantidad!.toFixed(2)).toBe('3.00')
+    // Las que no llevan BPS se pagan al valor hora «sin aportes», después del subtotal.
+    expect(lineasCon(r.lineas, CODIGOS.HORAS_EXTRAS_SIN_BPS)).toBe(1)
+  })
+
+  it('el boleto no depende del recargo ni del BPS: alcanza con haber ido', () => {
+    const sinFeriado = calcularLiquidacionMensual(entradaBase())
+    for (const extra of [enElFeriado(4, false, 0), enElFeriado(0, true, 100)]) {
+      const r = calcularLiquidacionMensual(
+        entradaBase({ feriados: feriado, horasExtras: [extra] }),
+      )
+      expect(r.boletos!.diasExtraConBoleto).toBe(1)
+      expect(r.boletos!.boletos).toBe(sinFeriado.boletos!.boletos)
+    }
+  })
+})

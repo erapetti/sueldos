@@ -183,7 +183,19 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   }
 
   // ── Paso 3: horas extras con descuento BPS, al valor hora calculado (§6.6) ───────────
-  const extrasConBps = agruparPorRecargo(entrada.horasExtras.filter((h) => h.conBps))
+  //
+  // Las que caen en un feriado no laborable con recargo de 100 % se muestran aparte, en el
+  // paso 3 bis. Es **solo presentación**: se valorizan igual y suman a la misma materia
+  // gravada, así que la regla de cálculo del §6.2 no cambia. El desglose existe para que la
+  // hoja informe que el mes incluyó un feriado trabajado.
+  const feriadosNoLaborables = new Set(
+    entrada.feriados.filter((f) => f.noLaborable).map((f) => aISO(f.fecha)),
+  )
+  const esFeriadoPago = (h: { fecha: Date; recargoPct: number }) =>
+    h.recargoPct === 100 && feriadosNoLaborables.has(aISO(h.fecha))
+
+  const conBps = entrada.horasExtras.filter((h) => h.conBps)
+  const extrasConBps = agruparPorRecargo(conBps.filter((h) => !esFeriadoPago(h)))
   let totalExtrasConBps = new Decimal(0)
 
   for (const grupo of extrasConBps) {
@@ -195,6 +207,26 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
       codigo: CODIGOS.HORAS_EXTRAS_CON_BPS,
       descripcion: `Horas extras con BPS (recargo ${grupo.recargoPct} %)`,
       cantidad: grupo.horas,
+      valorUnitario: unitario,
+      importe,
+      signo: 1,
+    })
+  }
+
+  // ── Paso 3 bis: horas trabajadas en un feriado no laborable, al doble del valor hora ──
+  const horasEnFeriados = conBps
+    .filter(esFeriadoPago)
+    .reduce((acc, h) => acc.plus(h.horas), new Decimal(0))
+
+  if (horasEnFeriados.greaterThan(0)) {
+    const unitario = vhc.times(2)
+    const importe = redondearPesos(horasEnFeriados.times(unitario))
+    totalExtrasConBps = totalExtrasConBps.plus(importe)
+    lineas.push({
+      orden: (orden += 1),
+      codigo: CODIGOS.HORAS_EN_FERIADOS,
+      descripcion: 'Horas en feriados no laborables',
+      cantidad: horasEnFeriados,
       valorUnitario: unitario,
       importe,
       signo: 1,
