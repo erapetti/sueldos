@@ -199,7 +199,35 @@ La tabla vive en `constants/causales.ts`, en dos funciones —`descuentaInicial`
 `descuentaEsEditable`— que usan la UI y el servidor. `tests/causales.test.ts` la fija fila por
 fila: si se agrega una causal, ese test falla hasta que se decida su comportamiento.
 
-### 1.9 El loopback del cron no se puede implementar como está escrito
+### 1.9 El aguinaldo es un período más, no una pantalla aparte
+
+El §7.7 lo trata como un cálculo propio y el §8.4 lo dejaba fuera de las secciones de la
+ficha; estaba como una acción suelta —«Aguinaldo»— que abría `/empleados/[id]/aguinaldo`. Por
+pedido del usuario pasa a ser **un período de la secuencia de Liquidaciones**, así que el año
+tiene catorce paradas en vez de doce:
+
+    … Mayo · Junio · ½ Aguinaldo Junio · Julio … Diciembre · ½ Aguinaldo Diciembre · Enero …
+
+La secuencia vive en `lib/calculo/periodos.ts`, con `siguientePeriodo` y `anteriorPeriodo` como
+única fuente: las flechas de la pantalla no saben de meses, solo piden el que sigue. El tipo
+viaja en la URL como `?tipo=aguinaldo`, y `MENSUAL` no viaja porque es el valor por defecto.
+`tests/periodos.test.ts` fija el recorrido completo del año y la simetría ir/volver en los seis
+bordes.
+
+La ruta `/empleados/[id]/aguinaldo` y `lib/format/aguinaldo.ts` se borraron: la primera solo se
+alcanzaba desde la acción que ya no existe, y el segundo solo servía para habilitarla.
+
+**El cuerpo de la pantalla sigue pendiente** (§13.3): el ½ aguinaldo muestra qué falta definir
+—si la base es el promedio del semestre, qué conceptos la integran, si lleva descuentos de
+BPS— con el mismo encabezado y el mismo navegador que la liquidación mensual.
+
+**La flecha de atrás pide historia.** Se habilita solo si existe una liquidación no anulada en
+un período anterior, por pedido del usuario. Tiene una consecuencia que conviene tener
+presente: si un mes quedó sin liquidar y no hay ninguna liquidación anterior, a ese mes no se
+llega con las flechas —hay que escribir el `?periodo=` a mano—. La vista «Lista» tampoco lo
+muestra, porque solo lista las confirmadas.
+
+### 1.10 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -213,7 +241,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.10 Funcionalidad pendiente de definición (§13)
+### 1.11 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

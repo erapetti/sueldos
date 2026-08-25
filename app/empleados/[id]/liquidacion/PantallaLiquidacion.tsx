@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, FileText, List, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -22,17 +22,14 @@ import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
 import { formatearImporteEntero, formatearCantidad, formatearHoras } from '@/lib/format/money'
 import {
-  aPeriodoISO,
   formatearFecha,
   formatearPeriodoCapitalizado,
-  hoy,
   parseFechaISO,
   parsePeriodo,
-  primerDiaDelMes,
-  sumarMeses,
 } from '@/lib/format/dates'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
+import { NavegadorDePeriodo } from './NavegadorDePeriodo'
 
 export type LineaVista = {
   orden: number
@@ -71,6 +68,10 @@ export function PantallaLiquidacion(props: {
   avisos: string[]
   aportaBps: boolean
   liquidaciones: FilaLiquidacion[]
+  /** §7.6 — solo se puede ir atrás si hay algo antes que mirar. */
+  puedeRetroceder: boolean
+  /** §6.10 — no se ofrecen períodos futuros. */
+  puedeAvanzar: boolean
   totalesPorPeriodo: Record<string, string>
   cedula: string | null
   /** ISO `AAAA-MM-DD`. */
@@ -93,7 +94,6 @@ export function PantallaLiquidacion(props: {
   const [modoLista, setModoLista] = useState(false)
 
   const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
-  const noPuedeAvanzar = periodo.getTime() >= primerDiaDelMes(hoy()).getTime()
 
   const ultima = props.previas.at(-1) ?? null
   const hayPagada = props.previas.some((p) => p.pagada)
@@ -113,12 +113,6 @@ export function PantallaLiquidacion(props: {
    */
   const parametrosCambiaron =
     enModoLectura && Number(props.totalRecalculado) !== Number(props.totalYaLiquidado)
-
-  function irAMes(delta: number) {
-    router.push(
-      `/empleados/${props.empleadoId}/liquidacion?periodo=${aPeriodoISO(sumarMeses(periodo, delta))}`,
-    )
-  }
 
   function confirmar(aceptaComplementaria: boolean) {
     confirmacion.ejecutar(
@@ -158,45 +152,20 @@ export function PantallaLiquidacion(props: {
           activa="liquidaciones"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => irAMes(-1)} aria-label="Mes anterior">
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="min-w-40 text-center font-medium">
-            {formatearPeriodoCapitalizado(periodo)}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => irAMes(1)}
-            disabled={noPuedeAvanzar}
-            aria-label="Mes siguiente"
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setModoLista((v) => !v)}
-            className="ml-auto"
-          >
-            {modoLista ? (
-              <>
-                <FileText className="size-4" aria-hidden /> Detalle
-              </>
-            ) : (
-              <>
-                <List className="size-4" aria-hidden /> Lista
-              </>
-            )}
-          </Button>
-
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="size-4" aria-hidden />
-            Imprimir
-          </Button>
-        </div>
+        <NavegadorDePeriodo
+          empleadoId={props.empleadoId}
+          actual={{ periodo, tipo: 'MENSUAL' }}
+          puedeRetroceder={props.puedeRetroceder}
+          puedeAvanzar={props.puedeAvanzar}
+          modoLista={modoLista}
+          onModoLista={setModoLista}
+          acciones={
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="size-4" aria-hidden />
+              Imprimir
+            </Button>
+          }
+        />
       </div>
 
       {modoLista ? (

@@ -14,7 +14,6 @@ import {
   Calculator,
   Eye,
   EyeOff,
-  Gift,
   HandCoins,
   Landmark,
   MoreVertical,
@@ -36,7 +35,6 @@ import { DialogoPagoBancario } from './DialogoPagoBancario'
 import { DialogoLicencia } from './DialogoLicencia'
 import { DialogoOcultar } from './DialogoOcultar'
 import { cn } from '@/lib/utils'
-import { mesDeAguinaldo } from '@/lib/format/aguinaldo'
 
 export type AccionesEmpleadoProps = {
   empleadoId: string
@@ -66,7 +64,6 @@ const CLAVES_DE_MOVIMIENTO = new Set([
   'prestamo',
   'licencia',
   'pago-bancario',
-  'aguinaldo',
   'visibilidad',
 ])
 
@@ -75,9 +72,6 @@ type Dialogo = 'PRESTAMO' | 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'V
 export function AccionesEmpleado(props: AccionesEmpleadoProps) {
   const [dialogo, setDialogo] = useState<Dialogo>(null)
   const { empleadoId, alias, puedeEditar, dadoDeBaja } = props
-
-  // §7.7 — el aguinaldo solo se habilita en junio y diciembre.
-  const habilitaAguinaldo = mesDeAguinaldo()
 
   type Accion = {
     clave: string
@@ -148,16 +142,6 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
       icono: Landmark,
       dialogo: 'PAGO_BANCARIO',
       habilitada: puedeEditar,
-    },
-    {
-      clave: 'aguinaldo',
-      etiqueta: 'Aguinaldo',
-      // El motivo no va en la etiqueta —quedaba un botón de 362px que no envolvía— sino en
-      // el `title`, que es donde se lee al pasar por encima de un botón deshabilitado.
-      motivo: habilitaAguinaldo ? undefined : 'Solo disponible en junio y diciembre (§7.7)',
-      icono: Gift,
-      href: `/empleados/${empleadoId}/aguinaldo`,
-      habilitada: habilitaAguinaldo,
     },
   ]
 

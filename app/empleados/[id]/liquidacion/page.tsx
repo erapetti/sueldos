@@ -9,7 +9,15 @@ import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
 import { aISO, aPeriodoISO, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
+import {
+  anteriorPeriodo,
+  periodoValido,
+  siguientePeriodo,
+  tipoDesdeUrl,
+  type PeriodoLiquidable,
+} from '@/lib/calculo/periodos'
 import { PantallaLiquidacion, type LineaVista } from './PantallaLiquidacion'
+import { PantallaAguinaldo } from './PantallaAguinaldo'
 import { AvisoDatosFaltantes } from './AvisoDatosFaltantes'
 
 export const dynamic = 'force-dynamic'
@@ -19,10 +27,10 @@ export default async function PaginaLiquidacion({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ periodo?: string }>
+  searchParams: Promise<{ periodo?: string; tipo?: string }>
 }) {
   const { id } = await params
-  const { periodo: periodoTexto } = await searchParams
+  const { periodo: periodoTexto, tipo: tipoTexto } = await searchParams
 
   const usuario = await exigirUsuario()
   const acceso = await accesoAEmpleado(id, usuario)
@@ -36,6 +44,48 @@ export default async function PaginaLiquidacion({
   const mesActual = primerDiaDelMes(hoy())
   const pedido = periodoTexto ? parsePeriodo(periodoTexto) : mesActual
   const periodo = pedido.getTime() > mesActual.getTime() ? mesActual : pedido
+
+  // §7.7 — el aguinaldo es un período más de la secuencia, no una pantalla aparte. Una URL
+  // armada a mano con un aguinaldo fuera de junio o diciembre cae al mensual de ese mes.
+  const pedidoTipo = tipoDesdeUrl(tipoTexto)
+  const actual: PeriodoLiquidable = periodoValido({ periodo, tipo: pedidoTipo })
+    ? { periodo, tipo: pedidoTipo }
+    : { periodo, tipo: 'MENSUAL' }
+
+  /**
+   * §7.6 — la flecha de atrás se habilita solo si hay alguna liquidación en un período
+   * anterior. Sin liquidaciones no hay historia para recorrer, así que las dos flechas quedan
+   * deshabilitadas y la pantalla se queda en el período en curso.
+   */
+  const anterior = anteriorPeriodo(actual)
+  const puedeRetroceder = liquidacionesDeLaEmpleada.some(
+    (l) => l.estado !== 'ANULADA' && l.periodoISO <= aISO(anterior.periodo),
+  )
+
+  /**
+   * §6.10 — no se ofrecen períodos futuros. La regla es una sola para las dos pantallas y
+   * mira el **período siguiente de la secuencia**: desde el mensual de junio se avanza a su
+   * aguinaldo —el mes es el mismo— y desde el aguinaldo de diciembre no, porque el que sigue
+   * es enero del año que viene.
+   */
+  const puedeAvanzar = siguientePeriodo(actual).periodo.getTime() <= mesActual.getTime()
+
+  // El aguinaldo tiene otro formato y su fórmula está pendiente (§13.3): por ahora la pantalla
+  // informa eso, con el mismo encabezado y el mismo navegador que el resto.
+  if (actual.tipo === 'AGUINALDO') {
+    return (
+      <PantallaAguinaldo
+        empleadoId={id}
+        alias={acceso.empleado.alias}
+        nombreCompleto={acceso.empleado.nombreCompleto}
+        periodo={aPeriodoISO(periodo)}
+        puedeRetroceder={puedeRetroceder}
+        puedeAvanzar={puedeAvanzar}
+        liquidaciones={liquidacionesDeLaEmpleada}
+        totalesPorPeriodo={totalesPorPeriodo}
+      />
+    )
+  }
 
   const comunes = {
     empleadoId: id,
@@ -104,6 +154,8 @@ export default async function PaginaLiquidacion({
       aportaBps={acceso.empleado.aportaBps}
       liquidaciones={liquidacionesDeLaEmpleada}
       totalesPorPeriodo={totalesPorPeriodo}
+      puedeRetroceder={puedeRetroceder}
+      puedeAvanzar={puedeAvanzar}
       cedula={acceso.empleado.cedula}
       fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       previas={previas}
