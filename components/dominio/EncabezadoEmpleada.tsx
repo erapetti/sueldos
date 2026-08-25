@@ -110,21 +110,16 @@ export function EncabezadoEmpleada({
   )
 }
 
-/** Chip de estado, para que las cinco pantallas los muestren iguales. */
-export function EstadosEmpleada({
-  activo,
-  visible,
-  aportaBps,
-}: {
-  activo: boolean
-  visible: boolean
-  aportaBps: boolean
-}) {
+/**
+ * Chips de estado. El §8.4 no pide ninguno —solo título y subtítulo— así que acá van los dos
+ * que cambian lo que se puede hacer con la empleada y no se ven en ninguna otra parte de la
+ * pantalla. «Sin aportes al BPS» se sacó: es un dato de Datos/Generales, no un estado.
+ */
+export function EstadosEmpleada({ activo, visible }: { activo: boolean; visible: boolean }) {
   return (
     <>
       {!activo ? <Badge variant="secondary">Dado de baja</Badge> : null}
       {!visible ? <Badge variant="outline">Oculto del listado</Badge> : null}
-      {!aportaBps ? <Badge variant="outline">Sin aportes al BPS</Badge> : null}
     </>
   )
 }

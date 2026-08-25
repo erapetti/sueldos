@@ -7,7 +7,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { DatoFaltante } from '@/lib/calculo/errores'
 import { formatearPeriodoCapitalizado, parsePeriodo } from '@/lib/format/dates'
-import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 
 export function AvisoDatosFaltantes({
   empleadoId,
@@ -24,19 +24,17 @@ export function AvisoDatosFaltantes({
 }) {
   return (
     <div className="space-y-5">
-      <EncabezadoPagina
-        className="mb-0"
-        rotulo="Liquidación"
-        titulo="Cálculo de sueldo"
-        bajada={
-          <>
-            <Link href={`/empleados/${empleadoId}`} className="hover:underline">
-              {alias}
-            </Link>{' '}
-            — {nombreCompleto} · {formatearPeriodoCapitalizado(parsePeriodo(periodo))}
-          </>
-        }
+      {/* El mismo encabezado y menú que el resto de las pantallas de la empleada. */}
+      <EncabezadoEmpleada
+        empleadoId={empleadoId}
+        alias={alias}
+        nombreCompleto={nombreCompleto}
+        activa="liquidaciones"
       />
+
+      <p className="text-sm text-muted-foreground">
+        {formatearPeriodoCapitalizado(parsePeriodo(periodo))}
+      </p>
 
       <div className="rounded-card border border-destructive/40 bg-destructive/5 px-[22px] py-5">
         <div className="flex items-start gap-3">

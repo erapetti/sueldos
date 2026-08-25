@@ -204,6 +204,30 @@ export async function datosDeFicha(empleadoId: string) {
 
 export type DatosFicha = Awaited<ReturnType<typeof datosDeFicha>>
 
+/**
+ * Liquidaciones de una empleada, para la vista «Lista» de §7.6. Es la misma forma que arma
+ * `datosDeFicha`, aparte, para que la pantalla de liquidación no tenga que traerse la ficha
+ * entera —diez consultas— cuando solo necesita esta.
+ */
+export async function listarLiquidaciones(empleadoId: string): Promise<DatosFicha['liquidaciones']> {
+  const liquidaciones = await prisma.liquidacion.findMany({
+    where: { empleadoId },
+    include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+    orderBy: [{ periodo: 'desc' }, { tipo: 'asc' }, { secuencia: 'asc' }],
+  })
+
+  return liquidaciones.map((l) => ({
+    id: l.id,
+    periodo: formatearPeriodo(l.periodo),
+    periodoISO: aISO(l.periodo),
+    tipo: l.tipo,
+    secuencia: l.secuencia,
+    estado: l.estado,
+    totalAPagar: aDecimal(l.totalAPagar).toFixed(2),
+    pagada: l.movimientos.length > 0,
+  }))
+}
+
 /** Total del período agrupando las secuencias, para la pestaña de liquidaciones (§7.6.1). */
 export function totalPorPeriodo(
   liquidaciones: DatosFicha['liquidaciones'],

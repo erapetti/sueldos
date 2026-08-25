@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Printer } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, List, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -32,6 +32,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
 
 export type LineaVista = {
   orden: number
@@ -69,6 +70,8 @@ export function PantallaLiquidacion(props: {
   totalAPagar: string
   avisos: string[]
   aportaBps: boolean
+  liquidaciones: FilaLiquidacion[]
+  totalesPorPeriodo: Record<string, string>
   cedula: string | null
   /** ISO `AAAA-MM-DD`. */
   fechaIngreso: string
@@ -80,6 +83,14 @@ export function PantallaLiquidacion(props: {
   const anulacion = useAccion<undefined>()
   const enviando = confirmacion.enviando || anulacion.enviando
   const [dialogo, setDialogo] = useState<'COMPLEMENTARIA' | 'ANULAR' | null>(null)
+  /**
+   * §7.6 — las dos caras de la pantalla. Abre en el detalle del mes en curso, que es a lo que
+   * se viene la mayoría de las veces; la lista dice qué meses están cerrados.
+   *
+   * Es estado local y no `?vista=` en la URL, igual que el conmutador de las planillas: así
+   * las tres pantallas con vistas se manejan igual.
+   */
+  const [modoLista, setModoLista] = useState(false)
 
   const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
   const noPuedeAvanzar = periodo.getTime() >= primerDiaDelMes(hoy()).getTime()
@@ -164,185 +175,213 @@ export function PantallaLiquidacion(props: {
             <ChevronRight className="size-4" />
           </Button>
 
-          <Button variant="outline" onClick={() => window.print()} className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setModoLista((v) => !v)}
+            className="ml-auto"
+          >
+            {modoLista ? (
+              <>
+                <FileText className="size-4" aria-hidden /> Detalle
+              </>
+            ) : (
+              <>
+                <List className="size-4" aria-hidden /> Lista
+              </>
+            )}
+          </Button>
+
+          <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4" aria-hidden />
             Imprimir
           </Button>
         </div>
       </div>
 
-      {props.avisos.map((aviso) => (
-        <p
-          key={aviso}
-          className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink"
-        >
-          {aviso}
-        </p>
-      ))}
+      {modoLista ? (
+        <ListaLiquidaciones
+          empleadoId={props.empleadoId}
+          liquidaciones={props.liquidaciones}
+          totalesPorPeriodo={props.totalesPorPeriodo}
+        />
+      ) : (
+        <>
+        {props.avisos.map((aviso) => (
+          <p
+            key={aviso}
+            className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink"
+          >
+            {aviso}
+          </p>
+        ))}
 
-      {enModoLectura ? (
-        <p className="rounded-md border bg-muted px-3 py-2 text-sm">
-          {esComplementaria && props.previas.length > 1
-            ? `Este período tiene ${props.previas.length} liquidaciones confirmadas.`
-            : 'Este período ya tiene una liquidación confirmada.'}{' '}
-          {hayPagada ? 'Ya fue pagada.' : 'Todavía no está pagada.'}
-          {parametrosCambiaron
-            ? ' Los parámetros actuales darían un resultado distinto: para aplicarlo hay que recalcular el período.'
-            : ''}
-        </p>
-      ) : null}
+        {enModoLectura ? (
+          <p className="rounded-md border bg-muted px-3 py-2 text-sm">
+            {esComplementaria && props.previas.length > 1
+              ? `Este período tiene ${props.previas.length} liquidaciones confirmadas.`
+              : 'Este período ya tiene una liquidación confirmada.'}{' '}
+            {hayPagada ? 'Ya fue pagada.' : 'Todavía no está pagada.'}
+            {parametrosCambiaron
+              ? ' Los parámetros actuales darían un resultado distinto: para aplicarlo hay que recalcular el período.'
+              : ''}
+          </p>
+        ) : null}
 
-      {/* Encabezado de la liquidación */}
-      <div className="overflow-hidden rounded-card border bg-card shadow-soft">
-        {/*
-          Identifica al empleado y a la liquidación en la hoja impresa. El encabezado de la
-          página es `no-print`, así que esta tarjeta es lo único que sale impreso: si el mes
-          no está acá, la hoja no dice de qué liquidación se trata. Por eso «Fecha» va en el
-          bloque, y en negrita.
+        {/* Encabezado de la liquidación */}
+        <div className="overflow-hidden rounded-card border bg-card shadow-soft">
+          {/*
+            Identifica al empleado y a la liquidación en la hoja impresa. El encabezado de la
+            página es `no-print`, así que esta tarjeta es lo único que sale impreso: si el mes
+            no está acá, la hoja no dice de qué liquidación se trata. Por eso «Fecha» va en el
+            bloque, y en negrita.
 
-          La cédula es opcional (§4.2): sin ella el renglón no se muestra, en vez de dejar un
-          hueco o un «sin cédula».
-        */}
-        <div className="border-b px-[22px] pt-4 pb-3">
-          <h2 className="text-[32px] leading-tight">{props.nombreCompleto}</h2>
+            La cédula es opcional (§4.2): sin ella el renglón no se muestra, en vez de dejar un
+            hueco o un «sin cédula».
+          */}
+          <div className="border-b px-[22px] pt-4 pb-3">
+            <h2 className="text-[32px] leading-tight">{props.nombreCompleto}</h2>
 
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-            {props.cedula ? (
-              <>
-                <dt className="text-muted-foreground">CI</dt>
-                <dd className="tabular">{props.cedula}</dd>
-              </>
-            ) : null}
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+              {props.cedula ? (
+                <>
+                  <dt className="text-muted-foreground">CI</dt>
+                  <dd className="tabular">{props.cedula}</dd>
+                </>
+              ) : null}
 
-            <dt className="text-muted-foreground">Ingreso</dt>
-            <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
+              <dt className="text-muted-foreground">Ingreso</dt>
+              <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
 
-            {props.horasSemanales !== null ? (
-              <>
-                <dt className="text-muted-foreground">Horas semanales</dt>
-                <dd className="tabular">{formatearHoras(props.horasSemanales)}</dd>
-              </>
-            ) : null}
+              {props.horasSemanales !== null ? (
+                <>
+                  <dt className="text-muted-foreground">Horas semanales</dt>
+                  <dd className="tabular">{formatearHoras(props.horasSemanales)}</dd>
+                </>
+              ) : null}
 
-            <dt className="text-muted-foreground">Valor hora calculado</dt>
-            <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
+              <dt className="text-muted-foreground">Valor hora calculado</dt>
+              <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
 
-            <dt className="text-muted-foreground">Fecha</dt>
-            <dd className="font-semibold">{formatearPeriodoCapitalizado(periodo)}</dd>
-          </dl>
-        </div>
+              <dt className="text-muted-foreground">Fecha</dt>
+              <dd className="font-semibold">{formatearPeriodoCapitalizado(periodo)}</dd>
+            </dl>
+          </div>
 
-        <table
-          className={cn(
-            'w-full text-sm',
-            '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
-          )}
-        >
-          <caption className="sr-only">Desglose de la liquidación</caption>
-          <thead className="sr-only">
-            <tr>
-              <th scope="col">Concepto</th>
-              <th scope="col">Cantidad</th>
-              <th scope="col">Valor unitario</th>
-              <th scope="col">Importe</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lineasAMostrar.map((linea) => {
-              const negativa = linea.signo === -1
-              return (
-                <tr
-                  key={`${linea.orden}-${linea.codigo}`}
-                  className={cn(
-                    'border-b last:border-0',
-                    linea.destacada && 'bg-muted/60 font-semibold',
-                    linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
-                  )}
-                >
-                  <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
-                  <td className="px-2 py-3 text-right tabular text-muted-foreground">
-                    {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
-                  </td>
-                  <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
-                    {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
-                  </td>
-                  <td
+          <table
+            className={cn(
+              'w-full text-sm',
+              '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
+            )}
+          >
+            <caption className="sr-only">Desglose de la liquidación</caption>
+            <thead className="sr-only">
+              <tr>
+                <th scope="col">Concepto</th>
+                <th scope="col">Cantidad</th>
+                <th scope="col">Valor unitario</th>
+                <th scope="col">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineasAMostrar.map((linea) => {
+                const negativa = linea.signo === -1
+                return (
+                  <tr
+                    key={`${linea.orden}-${linea.codigo}`}
                     className={cn(
-                      'py-3 pr-[22px] pl-2 text-right tabular',
-                      // §8.5 — los importes negativos van en rojo y con signo menos.
-                      negativa && 'text-destructive',
+                      'border-b last:border-0',
+                      linea.destacada && 'bg-muted/60 font-semibold',
+                      linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
                     )}
                   >
-                    {negativa
-                      ? `−${formatearImporteEntero(linea.importe)}`
-                      : formatearImporteEntero(linea.importe)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* §7.6.1 — bloque de cierre de la complementaria */}
-      {esComplementaria ? (
-        <div className="rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
-          <dl className="space-y-1 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt>Total recalculado del período</dt>
-              <dd className="tabular">{formatearImporteEntero(props.totalRecalculado)}</dd>
-            </div>
-            <div className="flex justify-between gap-4 text-muted-foreground">
-              <dt>
-                − Ya liquidado{' '}
-                {props.previas.length === 1
-                  ? '(liquidación #1)'
-                  : `(${props.previas.length} liquidaciones)`}
-              </dt>
-              <dd className="tabular">{formatearImporteEntero(props.totalYaLiquidado)}</dd>
-            </div>
-            <div className="mt-2 flex justify-between gap-4 border-t pt-2 text-base font-semibold">
-              <dt>{diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}</dt>
-              <dd className={cn('tabular', diferencia < 0 && 'text-destructive')}>
-                {formatearImporteEntero(props.totalAPagar)}
-              </dd>
-            </div>
-          </dl>
-
-          {diferencia < 0 ? (
-            <p className="mt-2 text-sm text-destructive">
-              Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta
-              que se compense.
-            </p>
-          ) : null}
+                    <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
+                    <td className="px-2 py-3 text-right tabular text-muted-foreground">
+                      {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
+                    </td>
+                    <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
+                      {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
+                    </td>
+                    <td
+                      className={cn(
+                        'py-3 pr-[22px] pl-2 text-right tabular',
+                        // §8.5 — los importes negativos van en rojo y con signo menos.
+                        negativa && 'text-destructive',
+                      )}
+                    >
+                      {negativa
+                        ? `−${formatearImporteEntero(linea.importe)}`
+                        : formatearImporteEntero(linea.importe)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-      ) : null}
 
-      {/* Acciones */}
-      {props.puedeEditar ? (
-        <div className="no-print flex flex-wrap gap-2">
-          {hayPagada ? (
-            <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
-              Generar liquidación complementaria
-            </Button>
-          ) : esComplementaria ? (
-            <>
-              <Button variant="outline" onClick={() => setDialogo('ANULAR')} disabled={enviando}>
-                Anular la liquidación #{ultima!.secuencia}
-              </Button>
+        {/* §7.6.1 — bloque de cierre de la complementaria */}
+        {esComplementaria ? (
+          <div className="rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt>Total recalculado del período</dt>
+                <dd className="tabular">{formatearImporteEntero(props.totalRecalculado)}</dd>
+              </div>
+              <div className="flex justify-between gap-4 text-muted-foreground">
+                <dt>
+                  − Ya liquidado{' '}
+                  {props.previas.length === 1
+                    ? '(liquidación #1)'
+                    : `(${props.previas.length} liquidaciones)`}
+                </dt>
+                <dd className="tabular">{formatearImporteEntero(props.totalYaLiquidado)}</dd>
+              </div>
+              <div className="mt-2 flex justify-between gap-4 border-t pt-2 text-base font-semibold">
+                <dt>{diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}</dt>
+                <dd className={cn('tabular', diferencia < 0 && 'text-destructive')}>
+                  {formatearImporteEntero(props.totalAPagar)}
+                </dd>
+              </div>
+            </dl>
+
+            {diferencia < 0 ? (
+              <p className="mt-2 text-sm text-destructive">
+                Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta
+                que se compense.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Acciones */}
+        {props.puedeEditar ? (
+          <div className="no-print flex flex-wrap gap-2">
+            {hayPagada ? (
               <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
-                Generar complementaria
+                Generar liquidación complementaria
               </Button>
-            </>
-          ) : (
-            <Button onClick={() => confirmar(false)} disabled={enviando}>
-              {enviando ? 'Confirmando…' : 'Confirmar liquidación'}
-            </Button>
-          )}
-        </div>
-      ) : null}
+            ) : esComplementaria ? (
+              <>
+                <Button variant="outline" onClick={() => setDialogo('ANULAR')} disabled={enviando}>
+                  Anular la liquidación #{ultima!.secuencia}
+                </Button>
+                <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
+                  Generar complementaria
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => confirmar(false)} disabled={enviando}>
+                {enviando ? 'Confirmando…' : 'Confirmar liquidación'}
+              </Button>
+            )}
+          </div>
+        ) : null}
 
-      {/* §7.6.1 — confirmación obligatoria antes de generar una complementaria */}
+        {/* §7.6.1 — confirmación obligatoria antes de generar una complementaria */}
+        </>
+      )}
+
       <AlertDialog open={dialogo === 'COMPLEMENTARIA'} onOpenChange={(v) => !v && setDialogo(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

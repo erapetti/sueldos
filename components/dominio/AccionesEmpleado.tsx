@@ -88,7 +88,9 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
       clave: 'ver',
       etiqueta: 'Ver hoja de detalles',
       icono: Eye,
-      href: `/empleados/${empleadoId}`,
+      // Con `?seccion=datos` explícito: entrar sin sección redirige a Inasistencias, y esta
+      // acción dice «ver los detalles», así que tiene que abrir los datos.
+      href: `/empleados/${empleadoId}?seccion=datos`,
       habilitada: true,
     },
     {

@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
 import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer } from '@/lib/auth/guards'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
+import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
 import { aISO, aPeriodoISO, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
 import { PantallaLiquidacion, type LineaVista } from './PantallaLiquidacion'
@@ -26,6 +27,10 @@ export default async function PaginaLiquidacion({
   const usuario = await exigirUsuario()
   const acceso = await accesoAEmpleado(id, usuario)
   if (!acceso || !puedeVer(acceso.nivel)) notFound()
+
+  // §7.6 — la vista «Lista» de esta misma pantalla.
+  const liquidacionesDeLaEmpleada = await listarLiquidaciones(id)
+  const totalesPorPeriodo = Object.fromEntries(totalPorPeriodo(liquidacionesDeLaEmpleada))
 
   // §6.10 — la pantalla abre por defecto en el mes en curso y no ofrece meses futuros.
   const mesActual = primerDiaDelMes(hoy())
@@ -97,6 +102,8 @@ export default async function PaginaLiquidacion({
       totalAPagar={resultado.totalAPagar.toFixed(2)}
       avisos={resultado.avisos}
       aportaBps={acceso.empleado.aportaBps}
+      liquidaciones={liquidacionesDeLaEmpleada}
+      totalesPorPeriodo={totalesPorPeriodo}
       cedula={acceso.empleado.cedula}
       fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       previas={previas}

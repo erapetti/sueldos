@@ -126,16 +126,19 @@ export type FichaProps = {
   permisos: { usuarioId: string; nombre: string; email: string; permiso: string }[]
 }
 
-const ETIQUETA_TIPO: Record<string, string> = {
-  MENSUAL: 'Mensual',
-  AGUINALDO: 'Aguinaldo',
-  SALARIO_VACACIONAL: 'Salario vacacional',
-}
+/** Las cuatro secciones que cuelgan de «Datos», en el orden en que se muestran. */
+const SUBMENU_DATOS = [
+  { clave: 'datos', etiqueta: 'Generales' },
+  { clave: 'salario', etiqueta: 'Salario' },
+  { clave: 'regimen', etiqueta: 'Régimen' },
+  { clave: 'compartido', etiqueta: 'Compartido con' },
+] as const
 
 export function FichaEmpleado(props: FichaProps) {
   const router = useRouter()
   // La sección viene de la URL: el menú son links, no pestañas con estado.
   const seccion = props.seccionInicial
+  const esDeDatos = SUBMENU_DATOS.some((sub) => sub.clave === seccion)
 
   /**
    * Los importes que se mueven se registran en pesos enteros, así que el `,00` sobra. Pero
@@ -162,7 +165,6 @@ export function FichaEmpleado(props: FichaProps) {
           <EstadosEmpleada
             activo={props.empleado.activo}
             visible={props.empleado.visible}
-            aportaBps={props.empleado.aportaBps}
           />
         }
         aviso={
@@ -178,28 +180,35 @@ export function FichaEmpleado(props: FichaProps) {
       <div>
 
         {/* 1 — Datos */}
-        {seccion === 'datos' ? (
-          <div className="space-y-4 pt-4">
-            {/*
-              Las otras tres secciones de datos se abren desde acá y no desde el menú, para no
-              llenar la barra. El menú marca «Datos» mientras se está en cualquiera de ellas.
-            */}
-            <div className="flex flex-wrap gap-2 rounded-card border bg-card px-[22px] py-4 shadow-soft">
-              <Button asChild variant="outline">
-                <Link href={`/empleados/${props.empleadoId}?seccion=salario`}>Salario</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href={`/empleados/${props.empleadoId}?seccion=regimen`}>Régimen</Link>
-              </Button>
-              {props.esDueno ? (
-                <Button asChild variant="outline">
-                  <Link href={`/empleados/${props.empleadoId}?seccion=compartido`}>
-                    Compartido con
+        {/*
+          Submenú de Datos. Se muestra en las cuatro secciones y no solo en «Generales», así
+          se puede saltar entre ellas sin volver atrás; el botón de la sección actual queda
+          marcado. Estas cuatro no están en el menú de arriba para no dejarlo con diez ítems.
+        */}
+        {esDeDatos ? (
+          <div className="flex flex-wrap gap-2 pt-4">
+            {SUBMENU_DATOS.filter((sub) => sub.clave !== 'compartido' || props.esDueno).map(
+              (sub) => (
+                <Button
+                  key={sub.clave}
+                  asChild
+                  variant={seccion === sub.clave ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  <Link
+                    href={`/empleados/${props.empleadoId}?seccion=${sub.clave}`}
+                    aria-current={seccion === sub.clave ? 'page' : undefined}
+                  >
+                    {sub.etiqueta}
                   </Link>
                 </Button>
-              ) : null}
-            </div>
+              ),
+            )}
+          </div>
+        ) : null}
 
+        {seccion === 'datos' ? (
+          <div className="pt-4">
             <div className="rounded-card border bg-card px-[22px] py-5 shadow-soft">
               <FormularioDatos
                 empleadoId={props.empleadoId}
@@ -564,60 +573,6 @@ export function FichaEmpleado(props: FichaProps) {
               </div>
             </section>
           ) : null}
-          </div>
-        ) : null}
-
-        {/* 7 — Liquidaciones */}
-        {seccion === 'liquidaciones' ? (
-          <div className="space-y-3 pt-4">
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Secuencia</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Total del período</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.liquidaciones.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                      Todavía no hay liquidaciones confirmadas.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  props.liquidaciones.map((l) => (
-                    <TableRow key={l.id} className={cn(l.estado === 'ANULADA' && 'opacity-60')}>
-                      <TableCell className="capitalize">{l.periodo}</TableCell>
-                      <TableCell>{ETIQUETA_TIPO[l.tipo] ?? l.tipo}</TableCell>
-                      <TableCell className="text-right tabular">#{l.secuencia}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatearImporte(l.totalAPagar)}
-                      </TableCell>
-                      <TableCell className="text-right tabular text-muted-foreground">
-                        {formatearImporte(
-                          props.totalesPorPeriodo[`${l.periodoISO}|${l.tipo}`] ?? '0',
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {l.estado === 'ANULADA' ? (
-                          <Badge variant="outline">Anulada</Badge>
-                        ) : l.pagada ? (
-                          <Badge variant="secondary">Pagada</Badge>
-                        ) : (
-                          <Badge variant="outline">Sin pagar</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
           </div>
         ) : null}
 

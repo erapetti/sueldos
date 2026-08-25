@@ -1,7 +1,7 @@
 /**
  * §8.4 — ficha del empleado. Título = alias, subtítulo = nombre completo.
  */
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer, esDueno } from '@/lib/auth/guards'
 import { datosDeFicha, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { descripcionSeguroSalud } from '@/constants/segurosSalud'
@@ -19,6 +19,11 @@ export default async function PaginaFicha({
   const { id } = await params
   const { seccion } = await searchParams
 
+  // Sin sección pedida se va derecho a Inasistencias, que es la pantalla que más se usa: la
+  // ficha entera es un clic de más para lo habitual. Con `?seccion=` se respeta lo pedido, así
+  // los enlaces que apuntan a una sección concreta siguen funcionando.
+  if (!seccion) redirect(`/empleados/${id}/faltas`)
+
   const usuario = await exigirUsuario()
   const acceso = await accesoAEmpleado(id, usuario)
   if (!acceso || !puedeVer(acceso.nivel)) notFound()
@@ -29,9 +34,7 @@ export default async function PaginaFicha({
   return (
     <FichaEmpleado
       empleadoId={id}
-      // Novedades dejó de existir como sección —horas extras e inasistencias son ítems
-      // propios del menú— así que la ficha abre en Datos, que es el primero.
-      seccionInicial={seccion ?? 'datos'}
+      seccionInicial={seccion}
       // §8.7 — el administrador ve la ficha de un empleado ajeno en modo lectura.
       soloLectura={!puedeEditar(acceso.nivel)}
       esDueno={esDueno(acceso.nivel)}
