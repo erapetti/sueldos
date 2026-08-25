@@ -766,14 +766,31 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               .map((renglon) => (
                 <div
                   key={renglon.clave}
-                  className="flex flex-col gap-2 border-b pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:border-0 sm:pb-0"
+                  className="space-y-1 border-b pb-3 last:border-0 last:pb-0"
                 >
-                  {props.renderFilaLista({
-                    renglon,
-                    contexto: contextoPorDia.get(renglon.fecha),
-                    actualizar: (cambios) => actualizar(renglon.clave, cambios),
-                    quitar: () => quitar(renglon.clave),
-                  })}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    {props.renderFilaLista({
+                      renglon,
+                      contexto: contextoPorDia.get(renglon.fecha),
+                      actualizar: (cambios) => actualizar(renglon.clave, cambios),
+                      quitar: () => quitar(renglon.clave),
+                    })}
+                  </div>
+
+                  {/*
+                    La nota se cargaba en el popover del calendario y no se veía en ningún
+                    lado. Va en su propio renglón —no como una columna más— porque es texto
+                    libre: en la fila no habría entrado sin recortar los otros campos, que ya
+                    tienen 14px de holgura a 640px.
+                  */}
+                  <Input
+                    value={renglon.nota ?? ''}
+                    onChange={(e) => actualizar(renglon.clave, { nota: e.target.value })}
+                    disabled={props.soloLectura}
+                    placeholder="Nota (opcional)"
+                    aria-label={`Nota del ${renglon.fecha}`}
+                    className="h-8 border-dashed bg-transparent text-xs shadow-none"
+                  />
                 </div>
               ))
           )}
