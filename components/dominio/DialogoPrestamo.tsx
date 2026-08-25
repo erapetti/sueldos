@@ -27,10 +27,32 @@ import type { DialogoNovedadProps } from './DialogoPagoAdicional'
 import { useAccion } from '@/hooks/useAccion'
 import { registrarPrestamo } from '@/actions/prestamos'
 import { repartirEnCuotas } from '@/lib/calculo/cuentaCorriente'
-import { aISO, formatearPeriodoCapitalizado, hoy, parseFechaISO, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
+import {
+  aISO,
+  aPeriodoISO,
+  formatearPeriodoCapitalizado,
+  hoy,
+  parseFechaISO,
+  primerDiaDelMes,
+  sumarMeses,
+} from '@/lib/format/dates'
 import { parsearNumero } from '@/lib/format/money'
 
 type Cuota = { fecha: string; monto: string }
+
+/**
+ * Convierte `AAAA-MM` a `AAAA-MM-01`, o null si todavía no está completo o no es un mes real.
+ * El campo se tipea a mano, así que nunca se le pasa el texto crudo a `parseFechaISO`: mientras
+ * se escribe pasa por estados incompletos como `2026-0`, y una excepción durante el render
+ * tumba el árbol entero.
+ */
+function desdePeriodoTexto(texto: string): string | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(texto.trim())
+  if (!m) return null
+  const mesP = Number(m[2])
+  if (mesP < 1 || mesP > 12) return null
+  return `${m[1]}-${m[2]}-01`
+}
 
 /**
  * El cuerpo se monta solo mientras el diálogo está abierto: así el formulario arranca limpio
@@ -50,14 +72,16 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<{ id: string }>()
 
-  const mesSiguiente = useMemo(() => aISO(sumarMeses(primerDiaDelMes(hoy()), 1)), [])
+  const mesActual = useMemo(() => aISO(primerDiaDelMes(hoy())), [])
 
   const [fecha, setFecha] = useState<string | null>(aISO(hoy()))
   const [monto, setMonto] = useState('')
   const [concepto, setConcepto] = useState('')
   const [conPlan, setConPlan] = useState(true)
   const [cantidadCuotas, setCantidadCuotas] = useState('3')
-  const [primerMes, setPrimerMes] = useState(mesSiguiente)
+  const [primerMes, setPrimerMes] = useState(mesActual)
+  /** Lo tipeado en el campo del mes, que pasa por estados incompletos antes de ser un período. */
+  const [textoPrimerMes, setTextoPrimerMes] = useState(() => mesActual.slice(0, 7))
   /**
    * Las cuotas se autocalculan a partir del monto, la cantidad y el mes de la primera, y se
    * dejan de recalcular en cuanto el usuario las edita. Se modela como derivado con una
@@ -74,12 +98,12 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
       return []
     }
 
-    const inicio = parseFechaISO(primerMes || mesSiguiente)
+    const inicio = parseFechaISO(primerMes)
     return repartirEnCuotas(total, cantidad).map((m, i) => ({
       fecha: aISO(sumarMeses(inicio, i)),
       monto: m.toFixed(2),
     }))
-  }, [conPlan, monto, cantidadCuotas, primerMes, mesSiguiente])
+  }, [conPlan, monto, cantidadCuotas, primerMes])
 
   const cuotas = cuotasManuales ?? cuotasCalculadas
 
@@ -200,15 +224,29 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
 
                 <div className="space-y-1.5">
                   <Label htmlFor="prestamo-primer-mes">Mes de la primera cuota</Label>
+                  {/*
+                    Campo de texto y no `type="month"`: Firefox no lo soporta y lo degrada a un
+                    input común, con lo cual el mismo formulario se veía distinto según el
+                    navegador. Acá siempre es `aaaa-mm`, en todos lados.
+                  */}
                   <Input
                     id="prestamo-primer-mes"
-                    type="month"
-                    value={primerMes.slice(0, 7)}
+                    value={textoPrimerMes}
                     onChange={(e) => {
-                      setPrimerMes(e.target.value ? `${e.target.value}-01` : mesSiguiente)
-                      setCuotasManuales(null)
+                      setTextoPrimerMes(e.target.value)
+                      const iso = desdePeriodoTexto(e.target.value)
+                      if (iso) {
+                        setPrimerMes(iso)
+                        setCuotasManuales(null)
+                      }
                     }}
+                    onBlur={() => setTextoPrimerMes(aPeriodoISO(parseFechaISO(primerMes)))}
                     disabled={enviando}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="aaaa-mm"
+                    maxLength={7}
+                    className="tabular"
                   />
                 </div>
               </div>
