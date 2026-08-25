@@ -29,9 +29,9 @@ export default async function PaginaFicha({
   return (
     <FichaEmpleado
       empleadoId={id}
-      // La ficha abre en Novedades: es la sección que se usa mes a mes. Los datos del
-      // §4.2 se tocan al dar de alta y casi nunca después.
-      seccionInicial={seccion ?? 'novedades'}
+      // Novedades dejó de existir como sección —horas extras e inasistencias son ítems
+      // propios del menú— así que la ficha abre en Datos, que es el primero.
+      seccionInicial={seccion ?? 'datos'}
       // §8.7 — el administrador ve la ficha de un empleado ajeno en modo lectura.
       soloLectura={!puedeEditar(acceso.nivel)}
       esDueno={esDueno(acceso.nivel)}

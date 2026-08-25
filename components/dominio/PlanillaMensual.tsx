@@ -9,7 +9,6 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,7 +41,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { formatearHoras } from '@/lib/format/money'
-import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 
 export type Renglon = {
   /** Clave local; los ya guardados traen además `id`. */
@@ -269,6 +268,8 @@ export type PlanillaMensualProps = {
   /** Ruta base de la planilla, para navegar entre meses. */
   ruta: string
   titulo: string
+  /** Ítem del menú de la empleada que queda marcado. */
+  claveMenu: 'horas-extras' | 'faltas'
   /** Datos por día del período: horas del régimen y feriados. */
   dias: DiaContexto[]
   /** Renglones ya guardados. */
@@ -678,22 +679,15 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
       {/* Encabezado */}
       <div className="space-y-3">
         {/*
-          Sin `className="mb-0"`: el encabezado conserva los 24px que el diseño deja después
-          de un título de página. En Tailwind 4 `space-y-3` pone `margin-bottom` en todos los
-          hijos menos el último, y el `mb-*` del elemento lo sobrescribe: con `mb-0` el
-          margen quedaba en cero y la fila de controles se pegaba a la bajada.
+          El encabezado y el menú son los mismos de la ficha: la planilla es una página aparte
+          pero se ve adentro de la misma empleada. El título propio de la planilla no hace
+          falta —el menú ya marca dónde estás— y repetirlo dejaba dos títulos en la pantalla.
         */}
-        <EncabezadoPagina
-          rotulo="Planilla mensual"
-          titulo={props.titulo}
-          bajada={
-            <>
-              <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
-                {props.alias}
-              </Link>{' '}
-              — {props.nombreCompleto}
-            </>
-          }
+        <EncabezadoEmpleada
+          empleadoId={props.empleadoId}
+          alias={props.alias}
+          nombreCompleto={props.nombreCompleto}
+          activa={props.claveMenu}
         />
 
         <div className="flex flex-wrap items-center gap-3">

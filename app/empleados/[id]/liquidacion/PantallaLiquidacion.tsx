@@ -4,7 +4,6 @@
  * §7.6 y §7.6.1 — desglose de la liquidación, con el bloque de cierre de la complementaria.
  */
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -32,7 +31,7 @@ import {
   primerDiaDelMes,
   sumarMeses,
 } from '@/lib/format/dates'
-import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 
 export type LineaVista = {
   orden: number
@@ -140,18 +139,12 @@ export function PantallaLiquidacion(props: {
   return (
     <div className="space-y-5">
       <div className="no-print space-y-3">
-        <EncabezadoPagina
-          className="mb-0"
-          rotulo="Liquidación"
-          titulo="Cálculo de sueldo"
-          bajada={
-            <>
-              <Link href={`/empleados/${props.empleadoId}`} className="hover:underline">
-                {props.alias}
-              </Link>{' '}
-              — {props.nombreCompleto}
-            </>
-          }
+        {/* El mismo encabezado y menú que la ficha: esto es una pantalla más de la empleada. */}
+        <EncabezadoEmpleada
+          empleadoId={props.empleadoId}
+          alias={props.alias}
+          nombreCompleto={props.nombreCompleto}
+          activa="liquidaciones"
         />
 
         <div className="flex flex-wrap items-center gap-2">

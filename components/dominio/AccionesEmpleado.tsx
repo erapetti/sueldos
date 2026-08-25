@@ -35,6 +35,7 @@ import { DialogoPrestamo } from './DialogoPrestamo'
 import { DialogoPagoBancario } from './DialogoPagoBancario'
 import { DialogoLicencia } from './DialogoLicencia'
 import { DialogoOcultar } from './DialogoOcultar'
+import { cn } from '@/lib/utils'
 import { mesDeAguinaldo } from '@/lib/format/aguinaldo'
 
 export type AccionesEmpleadoProps = {
@@ -47,7 +48,22 @@ export type AccionesEmpleadoProps = {
   /** §8.7 — en el listado de todos, además se puede volver a mostrar. */
   mostrarVisibilidad?: boolean
   visible?: boolean
+  /**
+   * `iconos` es la fila de acciones del listado. `tarjeta` es la hoja «Acciones» de la ficha:
+   * botones con etiqueta, y solo los movimientos que se cargan de a uno. Los diálogos son los
+   * mismos, así que viven en un solo lugar y no en dos copias.
+   */
+  variante?: 'iconos' | 'tarjeta'
 }
+
+/** Lo que muestra la variante `tarjeta`: movimientos sueltos, sin la navegación. */
+const CLAVES_DE_MOVIMIENTO = new Set([
+  'pago-adicional',
+  'prestamo',
+  'licencia',
+  'pago-bancario',
+  'aguinaldo',
+])
 
 type Dialogo = 'PRESTAMO' | 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
 
@@ -152,10 +168,41 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
 
   const visibles = acciones.filter((a) => a.href || a.dialogo)
 
+  const enTarjeta = props.variante === 'tarjeta'
+  const paraTarjeta = visibles.filter((a) => CLAVES_DE_MOVIMIENTO.has(a.clave))
+
   return (
     <>
+      {enTarjeta ? (
+        <div className="flex flex-wrap gap-2">
+          {paraTarjeta.map((accion) => {
+            const Icono = accion.icono
+            const contenido = (
+              <>
+                <Icono className="size-4" aria-hidden />
+                {accion.etiqueta}
+              </>
+            )
+            return accion.href ? (
+              <Button key={accion.clave} asChild variant="outline" disabled={!accion.habilitada}>
+                <Link href={accion.href}>{contenido}</Link>
+              </Button>
+            ) : (
+              <Button
+                key={accion.clave}
+                variant="outline"
+                disabled={!accion.habilitada}
+                onClick={() => setDialogo(accion.dialogo!)}
+              >
+                {contenido}
+              </Button>
+            )
+          })}
+        </div>
+      ) : null}
+
       {/* Desktop: iconos con tooltip */}
-      <div className="hidden items-center gap-0.5 sm:flex">
+      <div className={cn('hidden items-center gap-0.5', !enTarjeta && 'sm:flex')}>
         {visibles.map((accion) => {
           const Icono = accion.icono
           const contenido = (
@@ -203,7 +250,7 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
       </div>
 
       {/* Mobile: menú de tres puntos */}
-      <div className="sm:hidden">
+      <div className={enTarjeta ? 'hidden' : 'sm:hidden'}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={`Acciones de ${alias}`}>

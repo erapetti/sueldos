@@ -3,12 +3,10 @@
 /**
  * §8.4 — ficha del empleado, con sus ocho secciones.
  */
-import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -19,11 +17,15 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { FormularioSeries } from './FormularioSeries'
+import { AccionesEmpleado } from '@/components/dominio/AccionesEmpleado'
 import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
 import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
-import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import {
+  EncabezadoEmpleada,
+  EstadosEmpleada,
+} from '@/components/dominio/EncabezadoEmpleada'
 
 type Salario = {
   id: string
@@ -132,7 +134,8 @@ const ETIQUETA_TIPO: Record<string, string> = {
 
 export function FichaEmpleado(props: FichaProps) {
   const router = useRouter()
-  const [seccion, setSeccion] = useState(props.seccionInicial)
+  // La sección viene de la URL: el menú son links, no pestañas con estado.
+  const seccion = props.seccionInicial
 
   /**
    * Los importes que se mueven se registran en pesos enteros, así que el `,00` sobra. Pero
@@ -150,53 +153,67 @@ export function FichaEmpleado(props: FichaProps) {
 
   return (
     <div className="space-y-5">
-      {props.comoAdministrador ? (
-        <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
-          Estás viendo una empleada de {props.duenoNombre} como administradora. Para operarla tenés
-          que compartírtelo desde «Todos los empleados».
-        </p>
-      ) : null}
+      <EncabezadoEmpleada
+        empleadoId={props.empleadoId}
+        alias={props.empleado.alias}
+        nombreCompleto={props.empleado.nombreCompleto}
+        activa={seccion}
+        estados={
+          <EstadosEmpleada
+            activo={props.empleado.activo}
+            visible={props.empleado.visible}
+            aportaBps={props.empleado.aportaBps}
+          />
+        }
+        aviso={
+          props.comoAdministrador ? (
+            <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
+              Estás viendo una empleada de {props.duenoNombre} como administradora. Para operarla
+              tenés que compartírtelo desde «Todos los empleados».
+            </p>
+          ) : null
+        }
+      />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <EncabezadoPagina
-          className="mb-0 flex-1"
-          rotulo="Empleada"
-          titulo={props.empleado.alias}
-          bajada={props.empleado.nombreCompleto}
-        />
-        <div className="flex flex-wrap gap-2">
-          {!props.empleado.activo ? <Badge variant="secondary">Dado de baja</Badge> : null}
-          {!props.empleado.visible ? <Badge variant="outline">Oculto del listado</Badge> : null}
-          {!props.empleado.aportaBps ? <Badge variant="outline">Sin aportes al BPS</Badge> : null}
-        </div>
-      </div>
-
-      <Tabs value={seccion} onValueChange={setSeccion}>
-        <TabsList className="flex w-full flex-wrap justify-start">
-          <TabsTrigger value="datos">Datos</TabsTrigger>
-          <TabsTrigger value="salario">Salario</TabsTrigger>
-          <TabsTrigger value="regimen">Régimen</TabsTrigger>
-          <TabsTrigger value="novedades">Novedades</TabsTrigger>
-          <TabsTrigger value="cuenta">Cuenta corriente</TabsTrigger>
-          <TabsTrigger value="licencia">Licencia</TabsTrigger>
-          <TabsTrigger value="liquidaciones">Liquidaciones</TabsTrigger>
-          {props.esDueno ? <TabsTrigger value="compartido">Compartido con</TabsTrigger> : null}
-        </TabsList>
+      <div>
 
         {/* 1 — Datos */}
-        <TabsContent value="datos" className="pt-4">
-          <div className="rounded-card border bg-card px-[22px] py-5 shadow-soft">
-            <FormularioDatos
-              empleadoId={props.empleadoId}
-              valores={props.empleado}
-              soloLectura={props.soloLectura}
-              esDueno={props.esDueno}
-            />
+        {seccion === 'datos' ? (
+          <div className="space-y-4 pt-4">
+            {/*
+              Las otras tres secciones de datos se abren desde acá y no desde el menú, para no
+              llenar la barra. El menú marca «Datos» mientras se está en cualquiera de ellas.
+            */}
+            <div className="flex flex-wrap gap-2 rounded-card border bg-card px-[22px] py-4 shadow-soft">
+              <Button asChild variant="outline">
+                <Link href={`/empleados/${props.empleadoId}?seccion=salario`}>Salario</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/empleados/${props.empleadoId}?seccion=regimen`}>Régimen</Link>
+              </Button>
+              {props.esDueno ? (
+                <Button asChild variant="outline">
+                  <Link href={`/empleados/${props.empleadoId}?seccion=compartido`}>
+                    Compartido con
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="rounded-card border bg-card px-[22px] py-5 shadow-soft">
+              <FormularioDatos
+                empleadoId={props.empleadoId}
+                valores={props.empleado}
+                soloLectura={props.soloLectura}
+                esDueno={props.esDueno}
+              />
+            </div>
           </div>
-        </TabsContent>
+        ) : null}
 
         {/* 2 — Salario */}
-        <TabsContent value="salario" className="space-y-6 pt-4">
+        {seccion === 'salario' ? (
+          <div className="space-y-6 pt-4">
           <section className="space-y-3">
             <h2 className="text-[20px]">Salario y horas semanales</h2>
             <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
@@ -287,10 +304,12 @@ export function FichaEmpleado(props: FichaProps) {
               />
             ) : null}
           </section>
-        </TabsContent>
+          </div>
+        ) : null}
 
         {/* 3 — Régimen */}
-        <TabsContent value="regimen" className="space-y-4 pt-4">
+        {seccion === 'regimen' ? (
+          <div className="space-y-4 pt-4">
           <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
@@ -327,31 +346,32 @@ export function FichaEmpleado(props: FichaProps) {
               onGuardado={() => router.refresh()}
             />
           ) : null}
-        </TabsContent>
+          </div>
+        ) : null}
 
         {/* 4 — Novedades */}
-        <TabsContent value="novedades" className="pt-4">
-          <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
-          <p className="text-sm text-muted-foreground">
-            Las horas extras y las inasistencias se cargan en su planilla mensual, que permite
-            cargar un mes entero de una sola vez.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href={`/empleados/${props.empleadoId}/horas-extras`}>Horas extras</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/empleados/${props.empleadoId}/faltas`}>Inasistencias</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/empleados/${props.empleadoId}/liquidacion`}>Cálculo de sueldo</Link>
-            </Button>
+        {/* 4 — Acciones: los diálogos que antes solo estaban en el menú del listado. */}
+        {seccion === 'acciones' ? (
+          <div className="pt-4">
+            <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
+              <p className="text-sm text-muted-foreground">
+                Movimientos que no se cargan en planilla: se registran de a uno, con su fecha.
+              </p>
+              <AccionesEmpleado
+                empleadoId={props.empleadoId}
+                alias={props.empleado.alias}
+                fechaIngreso={props.empleado.fechaIngreso}
+                puedeEditar={!props.soloLectura}
+                dadoDeBaja={!props.empleado.activo}
+                variante="tarjeta"
+              />
+            </div>
           </div>
-          </div>
-        </TabsContent>
+        ) : null}
 
         {/* 5 — Cuenta corriente */}
-        <TabsContent value="cuenta" className="space-y-4 pt-4">
+        {seccion === 'cuenta' ? (
+          <div className="space-y-4 pt-4">
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-sm text-muted-foreground">Saldo</span>
             <span
@@ -457,10 +477,12 @@ export function FichaEmpleado(props: FichaProps) {
               </div>
             </section>
           ) : null}
-        </TabsContent>
+          </div>
+        ) : null}
 
         {/* 6 — Licencia */}
-        <TabsContent value="licencia" className="space-y-4 pt-4">
+        {seccion === 'licencia' ? (
+          <div className="space-y-4 pt-4">
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-sm text-muted-foreground">Saldo de días</span>
             <span
@@ -542,10 +564,12 @@ export function FichaEmpleado(props: FichaProps) {
               </div>
             </section>
           ) : null}
-        </TabsContent>
+          </div>
+        ) : null}
 
         {/* 7 — Liquidaciones */}
-        <TabsContent value="liquidaciones" className="space-y-3 pt-4">
+        {seccion === 'liquidaciones' ? (
+          <div className="space-y-3 pt-4">
           <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
@@ -594,19 +618,20 @@ export function FichaEmpleado(props: FichaProps) {
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
+          </div>
+        ) : null}
 
         {/* 8 — Compartido con */}
-        {props.esDueno ? (
-          <TabsContent value="compartido" className="pt-4">
+        {props.esDueno && seccion === 'compartido' ? (
+          <div className="pt-4">
             <PanelCompartir
               empleadoId={props.empleadoId}
               permisos={props.permisos}
               onCambio={() => router.refresh()}
             />
-          </TabsContent>
+          </div>
         ) : null}
-      </Tabs>
+      </div>
     </div>
   )
 }

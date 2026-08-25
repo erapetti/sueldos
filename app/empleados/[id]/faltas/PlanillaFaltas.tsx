@@ -97,6 +97,7 @@ export function PlanillaFaltas(props: {
       nombreCompleto={props.nombreCompleto}
       periodo={props.periodo}
       ruta={`/empleados/${props.empleadoId}/faltas`}
+      claveMenu="faltas"
       titulo="Inasistencias"
       dias={props.dias}
       guardados={props.guardados}

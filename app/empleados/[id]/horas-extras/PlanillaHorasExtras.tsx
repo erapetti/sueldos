@@ -92,6 +92,7 @@ export function PlanillaHorasExtras(props: {
       nombreCompleto={props.nombreCompleto}
       periodo={props.periodo}
       ruta={`/empleados/${props.empleadoId}/horas-extras`}
+      claveMenu="horas-extras"
       titulo="Horas extras"
       dias={props.dias}
       guardados={props.guardados}
