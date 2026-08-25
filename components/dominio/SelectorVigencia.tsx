@@ -99,24 +99,33 @@ export function SelectorVigencia({
         disabled={disabled}
         className="gap-2"
       >
-        <div className="flex items-center gap-2">
+        {/*
+          Cada opción es una fila de 44px con la etiqueta ocupando el resto del ancho. Antes el
+          blanco donde tocar era el radio de 16px más un texto de 14 que no lo cubría, que era
+          el control más chico de la aplicación; el radio sigue del mismo tamaño, lo que crece
+          es dónde se puede tocar.
+        */}
+        <div className="flex min-h-11 items-center gap-3">
           <RadioGroupItem value="ESTE_MES" id="vigencia-este-mes" />
-          <Label htmlFor="vigencia-este-mes" className="font-normal">
+          <Label htmlFor="vigencia-este-mes" className="flex-1 cursor-pointer py-2.5 font-normal">
             Este mes ({formatearPeriodoCapitalizado(parseFechaISO(esteMes))})
             <span className="ml-1 text-muted-foreground">— impacta la liquidación de este mes</span>
           </Label>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-11 items-center gap-3">
           <RadioGroupItem value="MES_SIGUIENTE" id="vigencia-mes-siguiente" />
-          <Label htmlFor="vigencia-mes-siguiente" className="font-normal">
+          <Label
+            htmlFor="vigencia-mes-siguiente"
+            className="flex-1 cursor-pointer py-2.5 font-normal"
+          >
             Mes siguiente ({formatearPeriodoCapitalizado(parseFechaISO(mesSiguiente))})
           </Label>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-11 items-center gap-3">
           <RadioGroupItem value="OTRO" id="vigencia-otro" />
-          <Label htmlFor="vigencia-otro" className="font-normal">
+          <Label htmlFor="vigencia-otro" className="flex-1 cursor-pointer py-2.5 font-normal">
             Otro mes
           </Label>
         </div>

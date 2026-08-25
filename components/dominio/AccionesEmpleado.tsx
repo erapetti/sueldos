@@ -56,13 +56,18 @@ export type AccionesEmpleadoProps = {
   variante?: 'iconos' | 'tarjeta'
 }
 
-/** Lo que muestra la variante `tarjeta`: movimientos sueltos, sin la navegación. */
+/**
+ * Lo que muestra la variante `tarjeta`: los movimientos que se cargan de a uno, sin la
+ * navegación —que ahora es el menú de la empleada— y con la visibilidad, que desde que los
+ * listados no tienen fila de acciones no se podía cambiar en ningún otro lado.
+ */
 const CLAVES_DE_MOVIMIENTO = new Set([
   'pago-adicional',
   'prestamo',
   'licencia',
   'pago-bancario',
   'aguinaldo',
+  'visibilidad',
 ])
 
 type Dialogo = 'PRESTAMO' | 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
@@ -185,8 +190,23 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
                 {accion.etiqueta}
               </>
             )
+            /*
+              Abajo de `sm` cada acción ocupa el ancho completo y su etiqueta envuelve: los
+              botones vienen con `whitespace-nowrap` y `shrink-0`, y «Aguinaldo (solo
+              disponible en junio y diciembre)» se iba 28px afuera de la pantalla y hacía
+              scrollear la página en horizontal. De paso, apilados son más fáciles de tocar.
+            */
+            const clases =
+              'h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:w-auto'
+
             return accion.href ? (
-              <Button key={accion.clave} asChild variant="outline" disabled={!accion.habilitada}>
+              <Button
+                key={accion.clave}
+                asChild
+                variant="outline"
+                disabled={!accion.habilitada}
+                className={clases}
+              >
                 <Link href={accion.href}>{contenido}</Link>
               </Button>
             ) : (
@@ -195,6 +215,7 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
                 variant="outline"
                 disabled={!accion.habilitada}
                 onClick={() => setDialogo(accion.dialogo!)}
+                className={clases}
               >
                 {contenido}
               </Button>

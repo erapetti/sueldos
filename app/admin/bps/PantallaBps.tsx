@@ -182,9 +182,10 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
           </p>
         ) : null}
 
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input
             type="checkbox"
+            className="size-5"
             checked={formulario.darDeBaja}
             onChange={(e) => setFormulario((f) => ({ ...f, darDeBaja: e.target.checked }))}
             disabled={enviando}
@@ -194,9 +195,10 @@ export function PantallaBps({ grupos }: { grupos: GrupoBps[]; mesActual: string 
 
         <SelectorVigencia valor={fechaVigencia} onChange={setFechaVigencia} disabled={enviando} />
 
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input
             type="checkbox"
+            className="size-5"
             checked={reemplazar}
             onChange={(e) => setReemplazar(e.target.checked)}
             disabled={enviando}

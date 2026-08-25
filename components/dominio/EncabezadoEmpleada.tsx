@@ -87,9 +87,20 @@ export function EncabezadoEmpleada({
         Se dibuja como la barra de pestañas de shadcn pero con links, así el aspecto no cambia
         y la navegación es real. `aria-current` es lo que le dice al lector de pantalla dónde
         está parado; `role="tab"` sería mentira en un link.
+
+        Abajo de `sm` los siete ítems envuelven en tres renglones y la píldora quedaba como
+        una elipse enorme. Ahí se convierte en un listón recto de borde a borde de la pantalla:
+        los márgenes negativos compensan el padding del contenido, y el padding propio devuelve
+        los ítems a la misma alineación que el resto de la página.
       */}
       <nav aria-label={`Secciones de ${alias}`}>
-        <ul className="flex w-full flex-wrap items-center justify-start gap-1 rounded-full bg-muted p-1">
+        <ul
+          className={cn(
+            'flex w-full flex-wrap items-center justify-start gap-1 bg-muted',
+            '-mx-[var(--padding-contenido)] w-auto rounded-none px-[var(--padding-contenido)] py-1',
+            'sm:mx-0 sm:w-full sm:rounded-full sm:p-1',
+          )}
+        >
           {items.map((item) => {
             const esActiva = item.clave === activaNormalizada
             return (
@@ -125,8 +136,7 @@ export function EncabezadoEmpleada({
  * pantalla. «Sin aportes al BPS» se sacó: es un dato de Datos/Generales, no un estado.
  *
  * Los dos son links a donde se cambia el dato: la baja sale de la fecha de egreso, en los
- * datos generales, y la visibilidad se maneja desde «Todo el Personal», que es el único
- * listado que muestra a las ocultas (§8.7).
+ * datos generales, y la visibilidad se cambia desde la hoja Acciones.
  */
 export function EstadosEmpleada({
   empleadoId,
@@ -146,7 +156,7 @@ export function EstadosEmpleada({
       ) : null}
       {!visible ? (
         <Badge asChild variant="outline" className="transition-opacity hover:opacity-80">
-          <Link href="/empleados/todos">Oculto del listado</Link>
+          <Link href={`/empleados/${empleadoId}?seccion=acciones`}>Oculto del listado</Link>
         </Badge>
       ) : null}
     </>

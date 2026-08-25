@@ -9,10 +9,8 @@ import { Eye, Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
-import { AccionesEmpleado } from '@/components/dominio/AccionesEmpleado'
 import { exigirUsuario } from '@/lib/auth/guards'
 import { listarEmpleadosVisibles } from '@/lib/consultas/empleados'
-import { aISO } from '@/lib/format/dates'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
 
 export const dynamic = 'force-dynamic'
@@ -62,7 +60,7 @@ export default async function PantallaEmpleados() {
               >
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={`/empleados/${empleado.id}`}
+                    href={`/empleados/${empleado.id}/faltas`}
                     className="text-lg font-medium hover:underline"
                   >
                     {empleado.alias}
@@ -85,14 +83,6 @@ export default async function PantallaEmpleados() {
                   ) : null}
                 </div>
 
-                <AccionesEmpleado
-                  empleadoId={empleado.id}
-                  alias={empleado.alias}
-                  fechaIngreso={aISO(empleado.fechaIngreso)}
-                  puedeEditar={empleado.nivel === 'DUENO' || empleado.nivel === 'EDITAR'}
-                  dadoDeBaja={!empleado.activo}
-                  visible={empleado.visible}
-                />
               </li>
             )
           })}

@@ -80,9 +80,10 @@ export function PantallaBoletos({ valores }: { valores: Valor[] }) {
 
         <SelectorVigencia valor={fechaVigencia} onChange={setFechaVigencia} disabled={enviando} />
 
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input
             type="checkbox"
+            className="size-5"
             checked={reemplazar}
             onChange={(e) => setReemplazar(e.target.checked)}
             disabled={enviando}

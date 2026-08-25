@@ -26,7 +26,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
-import { AccionesEmpleado } from '@/components/dominio/AccionesEmpleado'
 import { DialogoCambiarDueno } from '@/components/dominio/DialogoCambiarDueno'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
 import { formatearFecha } from '@/lib/format/dates'
@@ -184,7 +183,7 @@ export function TablaTodos({
                   <TableRow key={fila.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Link href={`/empleados/${fila.id}`} className="font-medium hover:underline">
+                        <Link href={`/empleados/${fila.id}/faltas`} className="font-medium hover:underline">
                           {fila.alias}
                         </Link>
                         {!fila.visible ? (
@@ -225,17 +224,7 @@ export function TablaTodos({
                             duenoActualId={fila.duenoId}
                             puedeAutocompartirse={esAdmin}
                           />
-                        ) : (
-                          <AccionesEmpleado
-                            empleadoId={fila.id}
-                            alias={fila.alias}
-                            fechaIngreso={fila.fechaIngreso}
-                            puedeEditar={fila.nivel === 'DUENO' || fila.nivel === 'EDITAR'}
-                            dadoDeBaja={!fila.activo}
-                            mostrarVisibilidad
-                            visible={fila.visible}
-                          />
-                        )}
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>

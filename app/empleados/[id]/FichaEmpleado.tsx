@@ -373,6 +373,10 @@ export function FichaEmpleado(props: FichaProps) {
                 fechaIngreso={props.empleado.fechaIngreso}
                 puedeEditar={!props.soloLectura}
                 dadoDeBaja={!props.empleado.activo}
+                // Oculta se puede volver a mostrar siempre; ocultar, solo si está de baja
+                // (§8.3), que es lo que resuelve el fallback a `dadoDeBaja`.
+                mostrarVisibilidad={!props.empleado.visible}
+                visible={props.empleado.visible}
                 variante="tarjeta"
               />
             </div>

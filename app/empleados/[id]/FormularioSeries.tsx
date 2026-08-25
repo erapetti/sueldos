@@ -167,9 +167,10 @@ export function FormularioSeries({
 
       {campos._ ? <p className="text-sm text-destructive">{campos._}</p> : null}
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
         <input
           type="checkbox"
+          className="size-5"
           checked={reemplazar}
           onChange={(e) => setReemplazar(e.target.checked)}
           disabled={enviando}
