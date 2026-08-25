@@ -215,14 +215,22 @@ export function TablaTodos({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        {ajeno ? (
-                          // §8.7 — sobre un empleado ajeno el administrador solo puede ver la
-                          // ficha, cambiar el dueño y compartírselo a sí mismo.
+                        {/*
+                          Transferir la propiedad lo puede hacer el dueño o un administrador
+                          (`exigirDuenoOAdmin`), así que el menú va en todas las filas donde
+                          alguna de las dos cosas se cumple —antes estaba solo en las ajenas y
+                          la columna quedaba vacía cuando eran todas propias—.
+
+                          «Compartírmelo a mí» solo tiene sentido sobre una ajena: sobre las
+                          propias ya tenés permiso total (§8.7).
+                        */}
+                        {fila.nivel === 'DUENO' || fila.nivel === 'ADMIN' ? (
                           <DialogoCambiarDueno
                             empleadoId={fila.id}
                             alias={fila.alias}
                             duenoActualId={fila.duenoId}
-                            puedeAutocompartirse={esAdmin}
+                            puedeAutocompartirse={ajeno && esAdmin}
+                            esAjena={ajeno}
                           />
                         ) : null}
                       </div>

@@ -46,11 +46,18 @@ export function DialogoCambiarDueno({
   alias,
   duenoActualId,
   puedeAutocompartirse,
+  esAjena,
 }: {
   empleadoId: string
   alias: string
   duenoActualId: string
   puedeAutocompartirse: boolean
+  /**
+   * Sobre una empleada ajena el administrador solo mira (§8.7). Sobre una propia el menú es
+   * el mismo pero las etiquetas cambian: decir «solo lectura» donde tenés permiso total, o
+   * «acciones de administrador» sobre la tuya, sería mentira.
+   */
+  esAjena: boolean
 }) {
   const router = useRouter()
   const { ejecutar, enviando } = useAccion<undefined>()
@@ -91,15 +98,21 @@ export function DialogoCambiarDueno({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label={`Acciones de administrador sobre ${alias}`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={
+              esAjena ? `Acciones de administrador sobre ${alias}` : `Acciones sobre ${alias}`
+            }
+          >
             <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
-            <Link href={`/empleados/${empleadoId}`}>
+            <Link href={`/empleados/${empleadoId}/faltas`}>
               <Eye className="size-4" aria-hidden />
-              Ver la ficha (solo lectura)
+              {esAjena ? 'Ver la ficha (solo lectura)' : 'Abrir la ficha'}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialogo('DUENO')}>

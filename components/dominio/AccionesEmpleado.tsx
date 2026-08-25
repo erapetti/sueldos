@@ -86,6 +86,8 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
     href?: string
     dialogo?: Exclude<Dialogo, null>
     habilitada: boolean
+    /** Por qué está deshabilitada, para el `title`. */
+    motivo?: string
   }
 
   const acciones: Accion[] = [
@@ -149,9 +151,10 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
     },
     {
       clave: 'aguinaldo',
-      etiqueta: habilitaAguinaldo
-        ? 'Aguinaldo'
-        : 'Aguinaldo (solo disponible en junio y diciembre)',
+      etiqueta: 'Aguinaldo',
+      // El motivo no va en la etiqueta —quedaba un botón de 362px que no envolvía— sino en
+      // el `title`, que es donde se lee al pasar por encima de un botón deshabilitado.
+      motivo: habilitaAguinaldo ? undefined : 'Solo disponible en junio y diciembre (§7.7)',
       icono: Gift,
       href: `/empleados/${empleadoId}/aguinaldo`,
       habilitada: habilitaAguinaldo,
@@ -199,15 +202,27 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
             const clases =
               'h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:w-auto'
 
-            return accion.href ? (
+            // Con `asChild` el `disabled` se pierde: un `<a>` no lo tiene. Cuando la acción
+            // no está habilitada se dibuja el botón sin link, igual que en la fila de iconos.
+            return accion.href && accion.habilitada ? (
               <Button
                 key={accion.clave}
                 asChild
                 variant="outline"
-                disabled={!accion.habilitada}
+                title={accion.motivo}
                 className={clases}
               >
                 <Link href={accion.href}>{contenido}</Link>
+              </Button>
+            ) : accion.href ? (
+              <Button
+                key={accion.clave}
+                variant="outline"
+                disabled
+                title={accion.motivo}
+                className={clases}
+              >
+                {contenido}
               </Button>
             ) : (
               <Button
@@ -215,6 +230,7 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
                 variant="outline"
                 disabled={!accion.habilitada}
                 onClick={() => setDialogo(accion.dialogo!)}
+                title={accion.motivo}
                 className={clases}
               >
                 {contenido}
@@ -266,7 +282,9 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
               <TooltipTrigger asChild>
                 <span className="inline-flex">{boton}</span>
               </TooltipTrigger>
-              <TooltipContent>{accion.etiqueta}</TooltipContent>
+              <TooltipContent>
+                {accion.motivo ? `${accion.etiqueta} — ${accion.motivo}` : accion.etiqueta}
+              </TooltipContent>
             </Tooltip>
           )
         })}
