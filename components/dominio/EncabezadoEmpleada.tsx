@@ -98,7 +98,10 @@ export function EncabezadoEmpleada({
                   href={item.href}
                   aria-current={esActiva ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-8 items-center rounded-full px-3.5 text-sm whitespace-nowrap transition-colors',
+                    // 44px de alto: es el mínimo cómodo para tocar con el dedo sin acertarle
+                    // al ítem de al lado. El `px-4` acompaña para que la píldora no quede alta
+                    // y angosta.
+                    'inline-flex h-11 items-center rounded-full px-4 text-sm whitespace-nowrap transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     esActiva
                       ? 'bg-card text-foreground shadow-xs'
