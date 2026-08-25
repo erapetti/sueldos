@@ -184,50 +184,74 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   // ── Paso 3: horas extras con descuento BPS, al valor hora calculado (§6.6) ───────────
   //
-  // Las que caen en un feriado no laborable con recargo de 100 % se muestran aparte, en el
-  // paso 3 bis. Es **solo presentación**: se valorizan igual y suman a la misma materia
-  // gravada, así que la regla de cálculo del §6.2 no cambia. El desglose existe para que la
-  // hoja informe que el mes incluyó un feriado trabajado.
+  // Las horas trabajadas en un feriado no laborable se muestran aparte, en el paso 3 bis. Se
+  // identifican por llevar descuento de BPS y recargo **0 %**: el día ya viene pago adentro
+  // del salario base —es mensual y el feriado no se descuenta—, así que trabajarlo agrega
+  // otro valor hora por hora y termina pagándose doble sin necesidad de recargo.
+  //
+  // El desglose es **solo presentación**: se valorizan igual que en la línea genérica y
+  // suman a la misma materia gravada, así que la regla de cálculo del §6.2 no cambia. Lo que
+  // aporta es que la hoja informe que el mes incluyó un feriado trabajado.
   const feriadosNoLaborables = new Set(
     entrada.feriados.filter((f) => f.noLaborable).map((f) => aISO(f.fecha)),
   )
-  const esFeriadoPago = (h: { fecha: Date; recargoPct: number }) =>
-    h.recargoPct === 100 && feriadosNoLaborables.has(aISO(h.fecha))
 
   const conBps = entrada.horasExtras.filter((h) => h.conBps)
-  const extrasConBps = agruparPorRecargo(conBps.filter((h) => !esFeriadoPago(h)))
+
+  /**
+   * Horas a desglosar, por fecha de feriado: las cargadas al 0 %, **topeadas por las que el
+   * régimen le asigna a ese día**. Lo que exceda el régimen no es el feriado trabajado, es
+   * hora extra común, y se queda en la línea genérica.
+   *
+   * Si el régimen le da 0 horas a ese día —un feriado en domingo, por ejemplo— el tope es 0 y
+   * no se desglosa nada: no hay jornada ya pagada en el salario base que reflejar.
+   */
+  const porFechaFeriado = new Map<string, { fecha: Date; horas: Decimal }>()
+  for (const h of conBps) {
+    if (h.recargoPct !== 0) continue
+    const clave = aISO(h.fecha)
+    if (!feriadosNoLaborables.has(clave)) continue
+    const previo = porFechaFeriado.get(clave)
+    if (previo) previo.horas = previo.horas.plus(h.horas)
+    else porFechaFeriado.set(clave, { fecha: h.fecha, horas: h.horas })
+  }
+
+  let horasEnFeriados = new Decimal(0)
+  for (const { fecha, horas } of porFechaFeriado.values()) {
+    horasEnFeriados = horasEnFeriados.plus(Decimal.min(horas, horasDelDia(regimen, fecha)))
+  }
+
   let totalExtrasConBps = new Decimal(0)
 
-  for (const grupo of extrasConBps) {
+  for (const grupo of agruparPorRecargo(conBps)) {
+    // Al 0 % se descuenta lo que se llevó el desglose; el resto sigue siendo hora extra común.
+    const horas = grupo.recargoPct === 0 ? grupo.horas.minus(horasEnFeriados) : grupo.horas
+    if (horas.lessThanOrEqualTo(0)) continue
+
     const unitario = vhc.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
-    const importe = redondearPesos(grupo.horas.times(unitario))
+    const importe = redondearPesos(horas.times(unitario))
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
       orden: (orden += 1),
       codigo: CODIGOS.HORAS_EXTRAS_CON_BPS,
       descripcion: `Horas extras con BPS (recargo ${grupo.recargoPct} %)`,
-      cantidad: grupo.horas,
+      cantidad: horas,
       valorUnitario: unitario,
       importe,
       signo: 1,
     })
   }
 
-  // ── Paso 3 bis: horas trabajadas en un feriado no laborable, al doble del valor hora ──
-  const horasEnFeriados = conBps
-    .filter(esFeriadoPago)
-    .reduce((acc, h) => acc.plus(h.horas), new Decimal(0))
-
+  // ── Paso 3 bis: horas trabajadas en un feriado no laborable ──────────────────────────
   if (horasEnFeriados.greaterThan(0)) {
-    const unitario = vhc.times(2)
-    const importe = redondearPesos(horasEnFeriados.times(unitario))
+    const importe = redondearPesos(horasEnFeriados.times(vhc))
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
       orden: (orden += 1),
       codigo: CODIGOS.HORAS_EN_FERIADOS,
       descripcion: 'Horas en feriados no laborables',
       cantidad: horasEnFeriados,
-      valorUnitario: unitario,
+      valorUnitario: vhc,
       importe,
       signo: 1,
     })

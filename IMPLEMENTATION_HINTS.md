@@ -141,8 +141,18 @@ Dos cambios pedidos por el usuario. El **doble pago no es uno de ellos**: trabaj
 se carga como hora extra con recargo de 100 %, y eso ya lo pagaba al doble.
 
 **La línea «Horas en feriados no laborables»**, entre las horas extras con BPS y la materia
-gravada. Lleva las horas con `con_bps = true` **y** recargo de 100 % que caen en un feriado no
-laborable, valorizadas al doble del valor hora calculado.
+gravada. Lleva las horas con `con_bps = true` y recargo de **0 %** que caen en un feriado no
+laborable, **topeadas por las horas que el régimen le asigna a ese día**, valorizadas al valor
+hora calculado.
+
+El 0 % no es un descuido: el día ya viene pago adentro del salario base —es mensual y el
+feriado no se descuenta—, así que trabajarlo agrega otro valor hora por hora y termina
+pagándose doble sin necesidad de recargo.
+
+El tope **reparte, no recorta**. Con un régimen de 6 h y 8 h cargadas, 6 van a la línea del
+feriado y 2 quedan como hora extra común al 0 %: las 8 se pagan enteras. Y si el régimen le
+da 0 horas a ese día —un feriado en domingo— no se desglosa nada, porque no hay jornada ya
+pagada en el salario base que reflejar.
 
 Es **solo presentación**: esas horas se **sacan** de la línea genérica en vez de sumarse
 aparte. Si se sumaran, se pagarían dos veces. La materia gravada y el total no cambian, y la
