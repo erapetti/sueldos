@@ -36,7 +36,12 @@ import {
   primerDiaDelMes,
   sumarMeses,
 } from '@/lib/format/dates'
-import { parsearNumero } from '@/lib/format/money'
+import {
+  formatearImporte,
+  formatearImporteEntero,
+  parsearNumero,
+  todosEnteros,
+} from '@/lib/format/money'
 
 type Cuota = { fecha: string; monto: string }
 
@@ -99,9 +104,20 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
     }
 
     const inicio = parseFechaISO(primerMes)
-    return repartirEnCuotas(total, cantidad).map((m, i) => ({
+    const importes = repartirEnCuotas(total, cantidad)
+    /**
+     * §1.3 de las notas — los importes se mueven en pesos enteros, así que el `,00` sobra.
+     * `repartirEnCuotas` ya reparte entero; el único resto posible son los centavos del monto
+     * tipeado, que caen en la última cuota. Si aparecen se muestran en todas, para que la
+     * columna se lea pareja, con el mismo criterio que la cuenta corriente.
+     *
+     * El separador decimal es la **coma**: es lo que se tipea en estos campos y lo único que
+     * `parsearNumero` lee como decimal —el punto lo toma como separador de miles—.
+     */
+    const sinCentavos = todosEnteros(importes)
+    return importes.map((m, i) => ({
       fecha: aISO(sumarMeses(inicio, i)),
-      monto: m.toFixed(2),
+      monto: sinCentavos ? m.toFixed(0) : m.toFixed(2).replace('.', ','),
     }))
   }, [conPlan, monto, cantidadCuotas, primerMes])
 
@@ -114,6 +130,9 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   const totalPrestamo = parsearNumero(monto)
   const descuadre =
     conPlan && totalPrestamo && cuotas.length > 0 && !sumaCuotas.equals(totalPrestamo)
+  const importeDelAviso = todosEnteros([sumaCuotas, totalPrestamo])
+    ? formatearImporteEntero
+    : formatearImporte
 
   function cambiarCuota(indice: number, campo: keyof Cuota, valor: string) {
     setCuotasManuales(cuotas.map((c, i) => (i === indice ? { ...c, [campo]: valor } : c)))
@@ -274,8 +293,8 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
 
                   {descuadre ? (
                     <p className="text-sm text-warn-ink">
-                      Las cuotas suman ${sumaCuotas.toFixed(2)} y el préstamo es de $
-                      {totalPrestamo!.toFixed(2)}.
+                      Las cuotas suman {importeDelAviso(sumaCuotas)} y el préstamo es de{' '}
+                      {importeDelAviso(totalPrestamo)}.
                     </p>
                   ) : null}
                 </div>

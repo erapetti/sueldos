@@ -75,6 +75,13 @@ No se migraron los datos anteriores al cambio. Por eso la pestaña de cuenta cor
 sola si muestra centavos: si **todos** los importes de la pantalla son enteros los oculta, y
 si alguno los tiene los muestra en toda la columna. Ver `todosEnteros`.
 
+El mismo criterio rige las cuotas que genera «Registrar préstamo»: `repartirEnCuotas` reparte
+en enteros y el único resto posible son los centavos del monto tipeado, que caen en la última.
+**Cuando hay que escribir decimales en un campo de importe, el separador es la coma**, que es
+lo que se tipea y lo único que `parsearNumero` lee como decimal: el punto lo interpreta como
+separador de miles, al estilo es-UY. Generarlas con `toFixed(2)` hacía que `1000.00` se
+releyera como `100000` y el diálogo avisara de un descuadre en préstamos que cerraban bien.
+
 ### 1.4 No se muestra la leyenda «Empleado sin aportes al BPS»
 
 El §6.3 pide que, con `aporta_bps = false`, «el encabezado de la liquidación muestra la leyenda
