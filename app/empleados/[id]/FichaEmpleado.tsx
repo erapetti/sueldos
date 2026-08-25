@@ -177,7 +177,7 @@ export function FichaEmpleado(props: FichaProps) {
         }
       />
 
-      <div>
+      <div className="space-y-4">
 
         {/* 1 — Datos */}
         {/*
@@ -186,7 +186,7 @@ export function FichaEmpleado(props: FichaProps) {
           marcado. Estas cuatro no están en el menú de arriba para no dejarlo con diez ítems.
         */}
         {esDeDatos ? (
-          <div className="flex flex-wrap gap-2 pt-4">
+          <div className="flex flex-wrap gap-2">
             {SUBMENU_DATOS.filter((sub) => sub.clave !== 'compartido' || props.esDueno).map(
               (sub) => (
                 <Button
@@ -208,7 +208,7 @@ export function FichaEmpleado(props: FichaProps) {
         ) : null}
 
         {seccion === 'datos' ? (
-          <div className="pt-4">
+          <div>
             <div className="rounded-card border bg-card px-[22px] py-5 shadow-soft">
               <FormularioDatos
                 empleadoId={props.empleadoId}
@@ -222,7 +222,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 2 — Salario */}
         {seccion === 'salario' ? (
-          <div className="space-y-6 pt-4">
+          <div className="space-y-6">
           <section className="space-y-3">
             <h2 className="text-[20px]">Salario y horas semanales</h2>
             <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
@@ -318,7 +318,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 3 — Régimen */}
         {seccion === 'regimen' ? (
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4">
           <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
             <Table>
               <TableHeader>
@@ -361,7 +361,7 @@ export function FichaEmpleado(props: FichaProps) {
         {/* 4 — Novedades */}
         {/* 4 — Acciones: los diálogos que antes solo estaban en el menú del listado. */}
         {seccion === 'acciones' ? (
-          <div className="pt-4">
+          <div>
             <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
               <p className="text-sm text-muted-foreground">
                 Movimientos que no se cargan en planilla: se registran de a uno, con su fecha.
@@ -380,7 +380,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 5 — Cuenta corriente */}
         {seccion === 'cuenta' ? (
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4">
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-sm text-muted-foreground">Saldo</span>
             <span
@@ -491,7 +491,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 6 — Licencia */}
         {seccion === 'licencia' ? (
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4">
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-sm text-muted-foreground">Saldo de días</span>
             <span
@@ -578,7 +578,7 @@ export function FichaEmpleado(props: FichaProps) {
 
         {/* 8 — Compartido con */}
         {props.esDueno && seccion === 'compartido' ? (
-          <div className="pt-4">
+          <div>
             <PanelCompartir
               empleadoId={props.empleadoId}
               permisos={props.permisos}

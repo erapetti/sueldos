@@ -64,7 +64,13 @@ export function EncabezadoEmpleada({
     : activa
 
   return (
-    <div className="space-y-5">
+    /*
+      El `mb-6` fija el aire debajo del menú **acá y no en cada pantalla**: las cinco lo
+      envuelven con un `space-y-*` distinto y quedaban de 12px en las planillas contra 36 en
+      la ficha. Como el margen propio le gana al del `space-y` del contenedor, este es el
+      único lugar donde se decide, y 24px es cómodo para tocar sin acertarle al ítem de al lado.
+    */
+    <div className="mb-6 space-y-5">
       {aviso}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
