@@ -9,6 +9,7 @@ import { exigirEdicion } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
 import {
   ajusteCuentaCorriente,
+  edicionPrestamo,
   idUuid,
   pagoBancario,
   prestamo as esquemaPrestamo,
@@ -59,6 +60,7 @@ export async function registrarPrestamo(entrada: unknown) {
 
     log({ entidadId: movimiento.id })
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/prestamos`)
     revalidatePath('/empleados')
 
     return exito(
@@ -198,6 +200,37 @@ export async function anularMovimiento(movimientoId: string) {
   })
 }
 
+/**
+ * §7.4 — edita un préstamo ya registrado desde su pantalla de detalle.
+ *
+ * Solo el concepto. El monto y la fecha quedan fijos: el asiento `PRESTAMO` ya está en la
+ * cuenta corriente (§4.9) y cambiarlo movería un saldo que puede tener liquidaciones
+ * confirmadas encima. El camino para corregirlos es anular el movimiento —que deja su
+ * contra-asiento— y volver a registrarlo.
+ */
+export async function actualizarPrestamo(entrada: unknown) {
+  return ejecutar('prestamos.actualizar', async (log) => {
+    const datos = validar(edicionPrestamo, entrada)
+
+    const prestamo = await prisma.cuentaCorriente.findUnique({ where: { id: datos.id } })
+    if (!prestamo || prestamo.tipo !== 'PRESTAMO') {
+      throw new ErrorNegocio('No se encontró el préstamo.')
+    }
+
+    const { usuario, empleado } = await exigirEdicion(prestamo.empleadoId)
+    log({ usuarioId: usuario.id, entidad: 'cuenta_corriente', entidadId: prestamo.id })
+
+    await prisma.cuentaCorriente.update({
+      where: { id: prestamo.id },
+      data: { concepto: datos.concepto?.trim() || 'Préstamo', modificadoPor: usuario.id },
+    })
+
+    revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/prestamos`)
+    return exito(undefined, 'Préstamo actualizado.')
+  })
+}
+
 /** §4.8 — las cuotas pendientes se editan o cancelan mientras no estén aplicadas. */
 export async function actualizarCuota(cuotaId: string, monto: string, fechaISO: string) {
   return ejecutar('prestamos.actualizarCuota', async (log) => {
@@ -217,6 +250,7 @@ export async function actualizarCuota(cuotaId: string, monto: string, fechaISO: 
     })
 
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/prestamos`)
     return exito(undefined, 'Cuota actualizada.')
   })
 }
@@ -239,6 +273,7 @@ export async function cancelarCuota(cuotaId: string) {
     })
 
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/prestamos`)
     return exito(undefined, 'Cuota cancelada.')
   })
 }

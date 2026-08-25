@@ -47,6 +47,27 @@ export function todosEnteros(valores: readonly (Numerico | null | undefined)[]):
   return valores.every((v) => v === null || v === undefined || d(v).isInteger())
 }
 
+/**
+ * Cómo se escribe un importe **dentro de un campo editable**, que es distinto de cómo se
+ * muestra: acá no va el `$` ni el separador de miles, porque lo que quede en el campo tiene
+ * que poder volver a leerse con `parsearNumero` y pasar la validación del servidor.
+ *
+ * Dos reglas, y las dos importan:
+ *
+ * - Si ninguno de los importes del grupo tiene centavos se escriben sin decimales (§1.3 de las
+ *   notas de implementación); si alguno los tiene, se muestran en todos para que la columna se
+ *   lea pareja, igual que hace `todosEnteros` en la cuenta corriente.
+ * - El separador decimal es la **coma**. `parsearNumero` lee el punto como separador de miles
+ *   al estilo es-UY, así que un `1000.50` se releería como 100050.
+ */
+export function formatoDeCampo(
+  valores: readonly (Numerico | null | undefined)[],
+): (valor: Numerico) => string {
+  const sinCentavos = todosEnteros(valores)
+  return (valor) =>
+    sinCentavos ? d(valor).toFixed(0) : d(valor).toFixed(2).replace('.', ',')
+}
+
 /** Redondeo a 2 decimales devuelto como `string`, apto para columnas DECIMAL(14,2). */
 export function aDecimalSql(valor: Numerico): string {
   return redondear2(valor).toFixed(2)

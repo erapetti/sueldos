@@ -249,6 +249,16 @@ export const prestamo = z
     path: ['cuotas'],
   })
 
+/**
+ * §7.4 — lo editable de un préstamo ya registrado. El monto y la fecha no se tocan: el asiento
+ * de cuenta corriente ya está en el libro y corregirlo sería reescribir la historia. Para eso
+ * está anularlo con su contra-asiento y volver a registrarlo.
+ */
+export const edicionPrestamo = z.object({
+  id: idUuid,
+  concepto: z.string().trim().max(255).optional().or(z.literal('')),
+})
+
 export const pagoBancario = z.object({
   empleadoId: idUuid,
   fecha: fechaNoFutura,

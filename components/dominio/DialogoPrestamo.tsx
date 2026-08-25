@@ -39,6 +39,7 @@ import {
 import {
   formatearImporte,
   formatearImporteEntero,
+  formatoDeCampo,
   parsearNumero,
   todosEnteros,
 } from '@/lib/format/money'
@@ -106,18 +107,15 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
     const inicio = parseFechaISO(primerMes)
     const importes = repartirEnCuotas(total, cantidad)
     /**
-     * §1.3 de las notas — los importes se mueven en pesos enteros, así que el `,00` sobra.
-     * `repartirEnCuotas` ya reparte entero; el único resto posible son los centavos del monto
-     * tipeado, que caen en la última cuota. Si aparecen se muestran en todas, para que la
-     * columna se lea pareja, con el mismo criterio que la cuenta corriente.
-     *
-     * El separador decimal es la **coma**: es lo que se tipea en estos campos y lo único que
-     * `parsearNumero` lee como decimal —el punto lo toma como separador de miles—.
+     * §1.3 de las notas — los importes se mueven en pesos enteros. `repartirEnCuotas` ya
+     * reparte entero; el único resto posible son los centavos del monto tipeado, que caen en
+     * la última cuota. `formatoDeCampo` resuelve las dos reglas, y es el mismo que usa la
+     * pantalla de detalle del préstamo.
      */
-    const sinCentavos = todosEnteros(importes)
+    const escribir = formatoDeCampo(importes)
     return importes.map((m, i) => ({
       fecha: aISO(sumarMeses(inicio, i)),
-      monto: sinCentavos ? m.toFixed(0) : m.toFixed(2).replace('.', ','),
+      monto: escribir(m),
     }))
   }, [conPlan, monto, cantidadCuotas, primerMes])
 

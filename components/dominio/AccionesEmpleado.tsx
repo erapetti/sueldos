@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DialogoPagoAdicional } from './DialogoPagoAdicional'
-import { DialogoPrestamo } from './DialogoPrestamo'
 import { DialogoPagoBancario } from './DialogoPagoBancario'
 import { DialogoLicencia } from './DialogoLicencia'
 import { DialogoOcultar } from './DialogoOcultar'
@@ -67,7 +66,7 @@ const CLAVES_DE_MOVIMIENTO = new Set([
   'visibilidad',
 ])
 
-type Dialogo = 'PRESTAMO' | 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
+type Dialogo = 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
 
 export function AccionesEmpleado(props: AccionesEmpleadoProps) {
   const [dialogo, setDialogo] = useState<Dialogo>(null)
@@ -109,11 +108,17 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
       habilitada: puedeEditar,
     },
     {
+      /*
+        Préstamos ya tiene pantalla propia: el botón lleva al listado y el alta vive ahí. Las
+        otras tres siguen abriendo su diálogo hasta que tengan la suya, así que conservan el
+        «Registrar …» —prometer un listado que todavía no existe sería peor—.
+      */
       clave: 'prestamo',
-      etiqueta: 'Registrar préstamo',
+      etiqueta: 'Préstamos',
       icono: HandCoins,
-      dialogo: 'PRESTAMO',
-      habilitada: puedeEditar,
+      href: `/empleados/${empleadoId}/prestamos`,
+      // Mirar el listado no pide permiso de edición; el alta la esconde la propia pantalla.
+      habilitada: true,
     },
     {
       clave: 'pago-adicional',
@@ -310,13 +315,6 @@ export function AccionesEmpleado(props: AccionesEmpleadoProps) {
         </DropdownMenu>
       </div>
 
-      <DialogoPrestamo
-        abierto={dialogo === 'PRESTAMO'}
-        onCerrar={() => setDialogo(null)}
-        empleadoId={empleadoId}
-        alias={alias}
-        fechaIngreso={props.fechaIngreso}
-      />
       <DialogoPagoAdicional
         abierto={dialogo === 'PAGO_ADICIONAL'}
         onCerrar={() => setDialogo(null)}

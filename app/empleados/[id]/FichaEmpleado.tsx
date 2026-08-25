@@ -359,9 +359,12 @@ export function FichaEmpleado(props: FichaProps) {
           </div>
         ) : null}
 
-        {/* 4 — Novedades */}
-        {/* 4 — Acciones: los diálogos que antes solo estaban en el menú del listado. */}
-        {seccion === 'acciones' ? (
+        {/*
+          4 — Movimientos: el índice de las cuatro cosas que se cargan de a una. Se llamaba
+          «Acciones» y era solo botonera; ahora cada una lleva a su listado, donde además se
+          da de alta. `?seccion=acciones` se sigue aceptando para no romper enlaces viejos.
+        */}
+        {seccion === 'movimientos' || seccion === 'acciones' ? (
           <div>
             <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
               <p className="text-sm text-muted-foreground">

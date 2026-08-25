@@ -234,7 +234,43 @@ presente: si un mes quedó sin liquidar y no hay ninguna liquidación anterior, 
 llega con las flechas —hay que escribir el `?periodo=` a mano—. La vista «Lista» tampoco lo
 muestra, porque solo lista las confirmadas.
 
-### 1.10 El loopback del cron no se puede implementar como está escrito
+### 1.10 Los movimientos de a uno tienen listado y detalle, y no hay tabla de préstamos
+
+El §7.4 y el §7.5 describen las cuatro acciones que se cargan de a una —préstamo, pago
+adicional, licencia y pago bancario— **solo como diálogos de alta**. Con eso, lo registrado no
+se podía volver a mirar ni corregir: el préstamo quedaba como un asiento en la cuenta corriente
+y sus cuotas en el plan de pagos, sin ninguna pantalla que las juntara. Por pedido del usuario
+cada una pasa a tener **listado y detalle**, empezando por préstamos.
+
+**No se creó una tabla `prestamos`, y no hace falta.** Un préstamo *es* el asiento `PRESTAMO`
+de `cuenta_corriente` (§4.9): `plan_pagos.prestamo_id` ya es FK a esa tabla y el §4.8 la
+describe como «préstamo que originó el plan». Darle tabla propia duplicaría la identidad del
+movimiento y obligaría a migrar esa FK. El listado se arma leyendo el asiento con sus cuotas,
+en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado.
+
+**El ítem «Acciones» del menú se llama ahora «Movimientos»** y dejó de ser solo botonera: es el
+índice desde donde se entra a cada listado. `?seccion=acciones` se sigue aceptando para no
+romper enlaces viejos. Por ahora solo «Préstamos» lleva a su pantalla; las otras tres
+conservan el «Registrar …» y su diálogo hasta que tengan la suya.
+
+Dos reglas del detalle que son de negocio y conviene no aflojar:
+
+- **La fecha y el monto no se editan.** El asiento ya está en el libro y puede tener
+  liquidaciones confirmadas encima; corregirlo movería un saldo hacia atrás. El camino es
+  anular el movimiento —que deja su contra-asiento— y registrarlo de nuevo. Lo editable es el
+  concepto, en `actualizarPrestamo`.
+- **Una cuota se bloquea si su mes ya pasó o si dejó de estar `PENDIENTE`.** Las dos reglas
+  suman. La del mes es la que pidió el usuario; la del estado es la única que valida el
+  servidor (§4.8), así que sin ella la pantalla ofrecería editar cuotas que la acción rechaza.
+
+**El saldo de un préstamo es el monto menos las cuotas `APLICADA`.** Una `CANCELADA` no lo
+baja: cancelarla significa que ese mes no se descuenta, no que la plata se haya devuelto. Un
+préstamo sin plan muestra el monto entero, y uno anulado muestra cero.
+
+`actualizarCuota` y `cancelarCuota` ya existían en `actions/prestamos.ts` desde el §4.8 y no
+las llamaba nadie: esta pantalla es la que les da uso.
+
+### 1.11 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -248,7 +284,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.11 Funcionalidad pendiente de definición (§13)
+### 1.12 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:

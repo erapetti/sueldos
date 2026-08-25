@@ -30,7 +30,7 @@ export function itemsDeMenu(empleadoId: string): ItemMenu[] {
     { clave: 'liquidaciones', etiqueta: 'Liquidaciones', href: `${base}/liquidacion` },
     { clave: 'cuenta', etiqueta: 'Cuenta corriente', href: `${base}?seccion=cuenta` },
     { clave: 'licencia', etiqueta: 'Licencia', href: `${base}?seccion=licencia` },
-    { clave: 'acciones', etiqueta: 'Acciones', href: `${base}?seccion=acciones` },
+    { clave: 'movimientos', etiqueta: 'Movimientos', href: `${base}?seccion=movimientos` },
   ]
 }
 
@@ -156,7 +156,7 @@ export function EstadosEmpleada({
       ) : null}
       {!visible ? (
         <Badge asChild variant="outline" className="transition-opacity hover:opacity-80">
-          <Link href={`/empleados/${empleadoId}?seccion=acciones`}>Oculto del listado</Link>
+          <Link href={`/empleados/${empleadoId}?seccion=movimientos`}>Oculto del listado</Link>
         </Badge>
       ) : null}
     </>
