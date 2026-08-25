@@ -660,7 +660,7 @@ describe('§4.6 tope de horas de falta por día', () => {
     expect(segunda.ok).toBe(false)
   })
 
-  it('§4.6.1 fuerza descuenta = true en las causales que no son ENFERMEDAD', async () => {
+  it('§4.6.1 el servidor fuerza `descuenta` en las causales que lo fijan', async () => {
     const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
 
     await guardarFaltas({
@@ -669,6 +669,8 @@ describe('§4.6 tope de horas de falta por día', () => {
       renglones: [
         { fecha: '2026-05-06', horas: 6, causal: 'MATERNIDAD', descuenta: false },
         { fecha: '2026-05-07', horas: 6, causal: 'ENFERMEDAD', descuenta: false },
+        // CON_AVISO es editable, así que acá el cliente sí decide.
+        { fecha: '2026-05-08', horas: 6, causal: 'CON_AVISO', descuenta: false },
       ],
       borrar: [],
     })
@@ -680,6 +682,7 @@ describe('§4.6 tope de horas de falta por día', () => {
     expect(faltas.map((f) => [f.causal, f.descuenta])).toEqual([
       ['MATERNIDAD', true],
       ['ENFERMEDAD', false],
+      ['CON_AVISO', false],
     ])
   })
 })

@@ -4,8 +4,9 @@
  * §7.2 — planilla mensual de inasistencias.
  *
  * Misma base que §7.1. Cambia el popover del día: horas con el tope precargado y botón "día
- * completo", causal, y —solo con causal Enfermedad— el switch "Se descuenta del sueldo"
- * (§4.6.1). El calendario permite arrastrar o hacer shift+clic para cargar un rango.
+ * completo", causal y el interruptor "Descontar horas", que se muestra siempre y solo se
+ * puede mover en las causales que no lo fijan (§4.6.1). El calendario permite arrastrar o
+ * hacer shift+clic para cargar un rango.
  */
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -34,6 +35,7 @@ import { guardarFaltas } from '@/actions/novedades'
 import {
   CAUSALES_FALTA,
   descuentaEsEditable,
+  descuentaInicial,
   etiquetaCausal,
   normalizarDescuenta,
   type CausalFaltaValor,
@@ -157,13 +159,10 @@ export function PlanillaFaltas(props: {
                 // §7.1 — los opcionales son persistentes entre cargas: lo que se elige acá
                 // es con lo que nace el próximo «Agregar renglón».
                 setCausal(nueva)
-                actualizar({
-                  extra: {
-                    causal: nueva,
-                    // §4.6.1 — fuera de ENFERMEDAD lo fija la causal, no el cliente.
-                    descuenta: normalizarDescuenta(nueva, extra(renglon).descuenta),
-                  },
-                })
+                // Cambiar de causal reinicia el interruptor: cada causal tiene su valor de
+                // arranque y se pierde el que hubiera puesto a mano.
+                setDescuenta(descuentaInicial(nueva))
+                actualizar({ extra: { causal: nueva, descuenta: descuentaInicial(nueva) } })
               }}
               aria-label="Causal"
               className={cn('h-9 w-full rounded-md border bg-transparent px-2 text-sm', COL_OPCION)}
@@ -176,27 +175,22 @@ export function PlanillaFaltas(props: {
             </select>
           </CampoLista>
           {/*
-            §4.6.1 — solo la enfermedad puede no descontar: el subsidio de BPS cubre desde
-            el 4° día, así que los primeros pueden quedar a cargo del empleador. En las
-            demás causales el campo se fuerza a true y no se muestra, pero la columna se
-            reserva igual para que no se corra el resto de la fila.
+            El interruptor se muestra en todos los renglones, deshabilitado donde la causal
+            fija el valor, para que el efecto de la causal se lea sin tener que recordarlo.
           */}
-          {descuentaEsEditable(extra(renglon).causal) ? (
-            <CampoLista etiqueta="Descontar días">
-              <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
-                <Switch
-                  checked={extra(renglon).descuenta}
-                  onCheckedChange={(v) => {
-                    setDescuenta(v)
-                    actualizar({ extra: { ...extra(renglon), descuenta: v } })
-                  }}
-                  aria-label="Descontar los días del sueldo"
-                />
-              </div>
-            </CampoLista>
-          ) : (
-            <div className={cn('hidden sm:block', COL_INTERRUPTOR)} aria-hidden />
-          )}
+          <CampoLista etiqueta="Descontar horas">
+            <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
+              <Switch
+                checked={extra(renglon).descuenta}
+                disabled={!descuentaEsEditable(extra(renglon).causal)}
+                onCheckedChange={(v) => {
+                  setDescuenta(v)
+                  actualizar({ extra: { ...extra(renglon), descuenta: v } })
+                }}
+                aria-label="Descontar horas del sueldo"
+              />
+            </div>
+          </CampoLista>
           <Button
             variant="ghost"
             size="icon"
@@ -211,7 +205,7 @@ export function PlanillaFaltas(props: {
       )}
       etiquetaEntrada="Horas falta"
       etiquetaOpcion="Causal"
-      etiquetaInterruptor="Descontar días"
+      etiquetaInterruptor="Descontar horas"
       extraNuevoRenglon={() => ({
         causal,
         // §4.6.1 — fuera de ENFERMEDAD lo fija la causal, no el cliente.
@@ -368,7 +362,11 @@ function PopoverFalta({
         <select
           id="falta-causal"
           value={causal}
-          onChange={(e) => setCausal(e.target.value as CausalFaltaValor)}
+          onChange={(e) => {
+            const nueva = e.target.value as CausalFaltaValor
+            setCausal(nueva)
+            setDescuenta(descuentaInicial(nueva))
+          }}
           className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
         >
           {CAUSALES_FALTA.map((c) => (
@@ -379,19 +377,24 @@ function PopoverFalta({
         </select>
       </div>
 
-      {/* §4.6.1 — el switch solo aparece con causal Enfermedad. */}
-      {descuentaEsEditable(causal) ? (
-        <div className="space-y-1.5 rounded-md border p-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="falta-descuenta">Se descuenta del sueldo</Label>
-            <Switch id="falta-descuenta" checked={descuenta} onCheckedChange={setDescuenta} />
-          </div>
+      {/* Igual que en la lista rápida: se muestra siempre, deshabilitado donde lo fija la causal. */}
+      <div className="space-y-1.5 rounded-md border p-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="falta-descuenta">Descontar horas</Label>
+          <Switch
+            id="falta-descuenta"
+            checked={descuenta}
+            disabled={!descuentaEsEditable(causal)}
+            onCheckedChange={setDescuenta}
+          />
+        </div>
+        {causal === 'ENFERMEDAD' ? (
           <p className="text-xs text-muted-foreground">
             El subsidio de BPS cubre desde el 4° día. Desactivá esta opción si vas a pagar los
             días a tu cargo.
           </p>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <Textarea
         value={nota}

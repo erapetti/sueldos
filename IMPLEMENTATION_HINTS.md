@@ -176,7 +176,30 @@ régimen». Tomado al pie de la letra eso valdría para todo —el tope de horas
 Si alguna vez se quiere la lectura amplia, hay que pasarle los feriados a `horasDelDia` y
 revisar sus tres usos.
 
-### 1.8 El loopback del cron no se puede implementar como está escrito
+### 1.8 «Con aviso» también puede no descontar
+
+El §4.6.1 hace editable el campo `descuenta` **solo** con `ENFERMEDAD` y lista `CON_AVISO`,
+`SIN_AVISO` y `MATERNIDAD` entre las que se fuerzan a `true` sin mostrar el interruptor. Por
+pedido del usuario `CON_AVISO` pasa a ser editable, por flexibilidad. La tabla que rige es:
+
+| Causal | Arranca | Se puede cambiar |
+|---|---|---|
+| Con aviso | descuenta | **sí** (divergencia) |
+| Sin aviso | descuenta | no |
+| Enfermedad | descuenta | sí (§4.6.1) |
+| Maternidad | descuenta | no — esa licencia la paga BPS, nunca el empleador |
+| Recupera otro día | no descuenta | no (§1.6) |
+
+Dos cosas más que cambian respecto del §4.6.1, y son de presentación: el interruptor **se
+muestra siempre**, deshabilitado donde la causal lo fija —así el efecto de la causal se lee
+sin recordarlo—, y **cambiar de causal lo devuelve al valor inicial de la causal nueva**,
+aunque se lo haya movido a mano.
+
+La tabla vive en `constants/causales.ts`, en dos funciones —`descuentaInicial` y
+`descuentaEsEditable`— que usan la UI y el servidor. `tests/causales.test.ts` la fija fila por
+fila: si se agrega una causal, ese test falla hasta que se decida su comportamiento.
+
+### 1.9 El loopback del cron no se puede implementar como está escrito
 
 El §7.12 pide que `/api/cron/*` verifique que la conexión viene de loopback. **Next 16 no
 expone la dirección del socket a los route handlers.** Lo único disponible es
@@ -190,7 +213,7 @@ La verificación del header queda como segunda línea de defensa. Está explicad
 
 Si algún día Next expone la dirección real, ese es el lugar a cambiar.
 
-### 1.9 Funcionalidad pendiente de definición (§13)
+### 1.10 Funcionalidad pendiente de definición (§13)
 
 Aguinaldo (§13.3) y Aumento de sueldos (§13.4) muestran **«funcionalidad no implementada
 aún»**, por pedido del usuario. Pero no están vacíos:
