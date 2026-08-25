@@ -163,6 +163,7 @@ export function FichaEmpleado(props: FichaProps) {
         activa={seccion}
         estados={
           <EstadosEmpleada
+            empleadoId={props.empleadoId}
             activo={props.empleado.activo}
             visible={props.empleado.visible}
           />

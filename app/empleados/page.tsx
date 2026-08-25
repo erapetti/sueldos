@@ -73,7 +73,7 @@ export default async function PantallaEmpleados() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <ChipEstado estado={empleado.estado} />
+                  <ChipEstado estado={empleado.estado} empleadoId={empleado.id} />
                   {compartidoConmigo ? (
                     <Badge variant="secondary">Compartido conmigo</Badge>
                   ) : null}

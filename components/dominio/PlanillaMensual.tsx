@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -709,9 +710,16 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
             </Button>
           </div>
 
-          <span className="rounded-full border px-3 py-1 text-sm text-muted-foreground">
+          {/*
+            El estado de la liquidación es un link a la liquidación **de ese mes**: «Sin
+            liquidar» sin decir dónde liquidar deja el trabajo a medias.
+          */}
+          <Link
+            href={`/empleados/${props.empleadoId}/liquidacion?periodo=${props.periodo}`}
+            className="rounded-full border px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
             {ESTADO_TEXTO[props.estadoLiquidacion]}
-          </span>
+          </Link>
 
           <Button
             variant="outline"

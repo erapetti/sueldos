@@ -123,12 +123,32 @@ export function EncabezadoEmpleada({
  * Chips de estado. El §8.4 no pide ninguno —solo título y subtítulo— así que acá van los dos
  * que cambian lo que se puede hacer con la empleada y no se ven en ninguna otra parte de la
  * pantalla. «Sin aportes al BPS» se sacó: es un dato de Datos/Generales, no un estado.
+ *
+ * Los dos son links a donde se cambia el dato: la baja sale de la fecha de egreso, en los
+ * datos generales, y la visibilidad se maneja desde «Todo el Personal», que es el único
+ * listado que muestra a las ocultas (§8.7).
  */
-export function EstadosEmpleada({ activo, visible }: { activo: boolean; visible: boolean }) {
+export function EstadosEmpleada({
+  empleadoId,
+  activo,
+  visible,
+}: {
+  empleadoId: string
+  activo: boolean
+  visible: boolean
+}) {
   return (
     <>
-      {!activo ? <Badge variant="secondary">Dado de baja</Badge> : null}
-      {!visible ? <Badge variant="outline">Oculto del listado</Badge> : null}
+      {!activo ? (
+        <Badge asChild variant="secondary" className="transition-opacity hover:opacity-80">
+          <Link href={`/empleados/${empleadoId}?seccion=datos`}>Dado de baja</Link>
+        </Badge>
+      ) : null}
+      {!visible ? (
+        <Badge asChild variant="outline" className="transition-opacity hover:opacity-80">
+          <Link href="/empleados/todos">Oculto del listado</Link>
+        </Badge>
+      ) : null}
     </>
   )
 }

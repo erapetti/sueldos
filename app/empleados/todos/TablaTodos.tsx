@@ -212,7 +212,7 @@ export function TablaTodos({
                       {fila.fechaIngresoTexto}
                     </TableCell>
                     <TableCell>
-                      <ChipEstado estado={fila.estado} />
+                      <ChipEstado estado={fila.estado} empleadoId={fila.id} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
