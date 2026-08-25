@@ -740,6 +740,10 @@ días_extra_con_boleto =
     y que no estén ya contadas en días_a_trabajar
 ```
 
+Los feriados no laborables invalidan las horas del régimen vigente, por lo tanto son días
+con 0 horas, y no pagan boleto.
+
+
 Aplica **si el empleado tiene `cobra_boletos = true`**; no depende de `con_bps` ni de ningún
 atributo del registro de horas extras. Cada uno de esos días suma 2 boletos, igual que un día
 normal.
