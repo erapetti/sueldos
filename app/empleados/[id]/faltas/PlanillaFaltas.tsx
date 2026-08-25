@@ -104,8 +104,8 @@ export function PlanillaFaltas(props: {
       onGuardar={alGuardar}
       encabezado={
         <span>
-          La celda muestra las horas que corresponden a cada día según el régimen, para
-          distinguir a simple vista si la falta es total o parcial.
+          Las inasistencias registradas pueden descontar horas no trabajadas del régimen base y
+          pueden descontar boletos.
         </span>
       }
       signo="−"
