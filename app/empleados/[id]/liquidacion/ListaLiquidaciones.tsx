@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * §7.6 — vista «Lista» del cálculo de sueldo: el histórico de liquidaciones de la empleada.
  *
@@ -15,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { ENLACE_PRINCIPAL, FilaConDetalle } from '@/components/dominio/FilaConDetalle'
 import { cn } from '@/lib/utils'
 import { formatearImporte } from '@/lib/format/money'
 
@@ -66,14 +69,17 @@ export function ListaLiquidaciones({
               </TableCell>
             </TableRow>
           ) : (
-            liquidaciones.map((l) => (
-              <TableRow key={l.id} className={cn(l.estado === 'ANULADA' && 'opacity-60')}>
+            liquidaciones.map((l) => {
+              const detalle = `/empleados/${empleadoId}/liquidacion?periodo=${l.periodoISO.slice(0, 7)}`
+              return (
+              <FilaConDetalle
+                key={l.id}
+                href={detalle}
+                className={cn(l.estado === 'ANULADA' && 'opacity-60')}
+              >
                 <TableCell>
-                  {/* El período es el enlace al detalle de ese mes. */}
-                  <Link
-                    href={`/empleados/${empleadoId}/liquidacion?periodo=${l.periodoISO.slice(0, 7)}`}
-                    className="capitalize hover:underline"
-                  >
+                  {/* El período es el enlace al detalle de ese mes, y con él toda la fila. */}
+                  <Link href={detalle} className={cn(ENLACE_PRINCIPAL, 'capitalize')}>
                     {l.periodo}
                   </Link>
                 </TableCell>
@@ -94,8 +100,9 @@ export function ListaLiquidaciones({
                     <Badge variant="outline">Sin pagar</Badge>
                   )}
                 </TableCell>
-              </TableRow>
-            ))
+              </FilaConDetalle>
+              )
+            })
           )}
         </TableBody>
       </Table>

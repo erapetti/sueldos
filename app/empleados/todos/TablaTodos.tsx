@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { ENLACE_PRINCIPAL, FilaConDetalle } from '@/components/dominio/FilaConDetalle'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
 import { DialogoCambiarDueno } from '@/components/dominio/DialogoCambiarDueno'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
@@ -180,10 +181,10 @@ export function TablaTodos({
               visibles.map((fila) => {
                 const ajeno = fila.nivel === 'ADMIN'
                 return (
-                  <TableRow key={fila.id}>
+                  <FilaConDetalle key={fila.id} href={`/empleados/${fila.id}/faltas`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Link href={`/empleados/${fila.id}/faltas`} className="font-medium hover:underline">
+                        <Link href={`/empleados/${fila.id}/faltas`} className={ENLACE_PRINCIPAL}>
                           {fila.alias}
                         </Link>
                         {!fila.visible ? (
@@ -235,7 +236,7 @@ export function TablaTodos({
                         ) : null}
                       </div>
                     </TableCell>
-                  </TableRow>
+                  </FilaConDetalle>
                 )
               })
             )}

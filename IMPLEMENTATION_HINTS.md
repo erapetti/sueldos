@@ -264,11 +264,31 @@ pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salve
 en Movimientos tres de los cuatro abren un diálogo en vez de navegar; se corrige solo cuando
 tengan su pantalla.
 
-**Las tablas de préstamos no resaltan la fila al pasar por encima.** `TableRow` de shadcn trae
-`hover:bg-muted/50` y lo tienen todas las tablas de la aplicación, pero acá la fila entera se
-pintaba como si fuera clickeable cuando lo único que enlaza es la columna principal. Esa
-columna se dibuja como el alias en «Mi Personal» —`text-lg font-medium hover:underline`—, y el
-`<Link>` lo pone `ListadoDeMovimientos`, no cada pantalla, para que las cuatro queden iguales.
+**Las tablas siguen un criterio único, y vale para todas** (ver `FilaConDetalle`):
+
+- **La fila tiene detalle** → la primera columna es el enlace, con `ENLACE_PRINCIPAL`
+  (`text-lg font-medium hover:underline`), y la fila entera lleva al mismo lado y se resalta
+  con `hover:bg-muted/5`. Son tres: préstamos, la vista «Lista» de liquidaciones y «Todo el
+  Personal».
+- **La fila no tiene detalle** —el desglose de la liquidación, la cuenta corriente, el plan de
+  pagos, las licencias, los listados de administración, compartido con— → ni enlace ni
+  resaltado, y la primera columna se dibuja como le convenga.
+
+El resaltado es la promesa de que hay algo del otro lado; sin destino, engaña. Por eso
+`TableRow` dejó de traer `hover:bg-muted/50` de fábrica: era un default que resaltaba las diez
+tablas cuando solo tres llevan a alguna parte. La divergencia está en el README (§2.6).
+
+**El enlace real vive en la celda, no en la fila.** Un `<a>` no puede envolver un `<tr>`, así
+que `FilaConDetalle` agrega el clic con `router.push` y la celda conserva su `<Link>`: el
+teclado y el lector de pantalla ven un enlace por fila, y sin JavaScript la tabla se sigue
+navegando por la primera columna. Se descartó el «stretched link» —un `::after` estirado desde
+el enlace— porque depende de que el navegador respete `position: relative` sobre un `<tr>`, que
+la especificación deja indefinido: si lo ignora, el área invisible se estira contra la tarjeta
+entera y se come los clics de media pantalla sin que nada lo delate.
+
+`FilaConDetalle` deja pasar el clic cuando cae sobre un control propio de la fila —el chip de
+estado, el menú de acciones de «Todo el Personal»— y cuando hay texto seleccionado, para que
+arrastrar para copiar no termine navegando.
 
 Dos reglas del detalle que son de negocio y conviene no aflojar:
 

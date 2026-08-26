@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Listado de uno de los movimientos que se cargan de a uno: préstamos, y en su momento pagos
  * adicionales, licencias y pagos bancarios.
@@ -8,6 +10,7 @@
  * por props y la cáscara se escribe una sola vez.
  */
 import Link from 'next/link'
+import { ENLACE_PRINCIPAL, FilaConDetalle } from './FilaConDetalle'
 import {
   Table,
   TableBody,
@@ -22,9 +25,8 @@ export type ColumnaListado<T> = {
   clave: string
   etiqueta: string
   /**
-   * La columna que enlaza al detalle. Se dibuja con el mismo tratamiento que el alias en «Mi
-   * Personal», que es el otro listado donde una columna es la puerta de entrada a la ficha.
-   * Va exactamente una por tabla.
+   * La columna que enlaza al detalle: la primera. Lleva `ENLACE_PRINCIPAL` y, con ella, la
+   * fila entera va al mismo lado. Va exactamente una por tabla.
    */
   principal?: boolean
   /** Alinea a la derecha y usa la tipografía tabular; para importes y cantidades. */
@@ -63,7 +65,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
       <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow>
               {columnas.map((c) => (
                 <TableHead key={c.clave} className={cn(c.numerica && 'text-right')}>
                   {c.etiqueta}
@@ -73,7 +75,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
           </TableHeader>
           <TableBody>
             {filas.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
+              <TableRow>
                 <TableCell
                   colSpan={columnas.length}
                   className="py-8 text-center text-muted-foreground"
@@ -83,14 +85,10 @@ export function ListadoDeMovimientos<T extends { id: string }>({
               </TableRow>
             ) : (
               filas.map((fila) => (
-                <TableRow
+                <FilaConDetalle
                   key={fila.id}
-                  /*
-                    Sin el resaltado al pasar por encima que trae `TableRow` de shadcn: la
-                    fila entera se pintaba como si fuera clickeable y lo único que enlaza es
-                    la columna principal, así que prometía un blanco que no existe.
-                  */
-                  className={cn('hover:bg-transparent', atenuada?.(fila) && 'opacity-60')}
+                  href={hrefDetalle(fila)}
+                  className={cn(atenuada?.(fila) && 'opacity-60')}
                 >
                   {columnas.map((c) => (
                     <TableCell
@@ -98,10 +96,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
                       className={cn(c.numerica && 'text-right tabular')}
                     >
                       {c.principal ? (
-                        <Link
-                          href={hrefDetalle(fila)}
-                          className="text-lg font-medium hover:underline"
-                        >
+                        <Link href={hrefDetalle(fila)} className={ENLACE_PRINCIPAL}>
                           {c.celda(fila)}
                         </Link>
                       ) : (
@@ -109,7 +104,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
                       )}
                     </TableCell>
                   ))}
-                </TableRow>
+                </FilaConDetalle>
               ))
             )}
           </TableBody>

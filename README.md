@@ -376,8 +376,8 @@ Otros pendientes que no bloquean pantallas:
 
 shadcn no es una dependencia: es un generador que copia el código a `components/ui/`, así que
 esos archivos son nuestros. Aun así conviene mantenerlos lo más cerca posible del original,
-para poder regenerarlos sin pensar. **Hoy hay una sola divergencia**, y si algún día corrés
-`npx shadcn@latest add <componente> --overwrite` hay que volver a aplicarla:
+para poder regenerarlos sin pensar. **Hoy hay dos divergencias**, y si algún día corrés
+`npx shadcn@latest add <componente> --overwrite` hay que volver a aplicarlas:
 
 ### `components/ui/select.tsx`
 
@@ -395,6 +395,23 @@ los usos que todavía no existen. Los selects que necesitan un ancho propio lo p
 
 Para comprobar que sigue bien después de tocar algo: elegir el seguro 9 en `/admin/bps` y
 verificar que `document.documentElement.scrollWidth` no supere al `clientWidth`.
+
+### `components/ui/table.tsx`
+
+`TableRow`: se saca `hover:bg-muted/50`. El resaltado al pasar por encima queda como algo que
+la tabla **pide**, no como default.
+
+El criterio de la aplicación es que el resaltado promete que hay algo del otro lado: una fila
+se resalta solo si además lleva a un detalle. Con el default de shadcn se resaltaban todas —las
+líneas de la liquidación, la cuenta corriente, los listados de administración—, y ahí la fila
+se pintaba como clickeable sin tener a dónde ir.
+
+Se corrigió en el componente y no fila por fila porque las tablas sin detalle son la mayoría:
+siete de las diez. Las tres que sí lo tienen usan `FilaConDetalle` (`components/dominio/`), que
+agrega el resaltado junto con el clic que lo justifica.
+
+Para comprobarlo: en `/empleados/todos` la fila se resalta y lleva a la empleada; en la cuenta
+corriente de una ficha, no se resalta.
 
 ## Overrides de dependencias
 

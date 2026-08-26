@@ -40,7 +40,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { cn } from '@/lib/utils'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { useAccion } from '@/hooks/useAccion'
@@ -243,8 +242,7 @@ export function DetallePrestamo({
             <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
               <Table>
                 <TableHeader>
-                  {/* Sin el resaltado de fila de shadcn, por lo mismo que el listado. */}
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow>
                     <TableHead>Mes</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead>Estado</TableHead>
@@ -259,10 +257,7 @@ export function DetallePrestamo({
                     return (
                       <TableRow
                         key={cuota.id}
-                        className={cn(
-                          'hover:bg-transparent',
-                          cuota.estado === 'CANCELADA' && 'opacity-60',
-                        )}
+                        className={cuota.estado === 'CANCELADA' ? 'opacity-60' : undefined}
                       >
                         <TableCell>
                           {formatearPeriodoCapitalizado(parseFechaISO(cuota.fechaISO))}
