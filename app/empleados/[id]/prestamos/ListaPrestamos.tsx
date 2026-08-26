@@ -48,8 +48,8 @@ export function ListaPrestamos({
     : formatearImporte
 
   const columnas: ColumnaListado<FilaPrestamo>[] = [
-    // La fecha es la puerta de entrada al detalle; el `<Link>` y su estilo los pone la plantilla.
-    { clave: 'fecha', etiqueta: 'Fecha', principal: true, celda: (p) => p.fecha },
+    // La fecha es la puerta de entrada al detalle: por ser la primera, `Tabla` la hace enlace.
+    { clave: 'fecha', etiqueta: 'Fecha', celda: (p) => p.fecha },
     {
       clave: 'concepto',
       etiqueta: 'Comentario',

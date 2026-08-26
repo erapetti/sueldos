@@ -15,14 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { useAccion } from '@/hooks/useAccion'
 import {
   buscarUsuariosParaCompartir,
@@ -69,6 +62,67 @@ export function PanelCompartir({
       },
     })
   }
+
+  /** `Tabla` indexa por `id`; el permiso se identifica por el usuario. */
+  const filasDePermisos = permisos.map((p) => ({ ...p, id: p.usuarioId }))
+  type FilaPermiso = (typeof filasDePermisos)[number]
+
+  const columnasDePermisos: Columna<FilaPermiso>[] = [
+    {
+      clave: 'usuario',
+      etiqueta: 'Usuario',
+      celda: (p) => (
+        <>
+          {p.nombre}
+          <span className="ml-2 text-sm text-muted-foreground">{p.email}</span>
+        </>
+      ),
+    },
+    {
+      clave: 'permiso',
+      etiqueta: 'Permiso',
+      celda: (p) => (
+        <Select
+          value={p.permiso}
+          onValueChange={(v) =>
+            ejecutar(
+              () => compartirEmpleado({ empleadoId, usuarioId: p.usuarioId, permiso: v }),
+              { onExito: onCambio },
+            )
+          }
+          disabled={enviando}
+        >
+          <SelectTrigger className="w-32" aria-label={`Permiso de ${p.nombre}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="VER">Ver</SelectItem>
+            <SelectItem value="EDITAR">Editar</SelectItem>
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      celda: (p) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Quitar el acceso de ${p.nombre}`}
+          disabled={enviando}
+          onClick={() =>
+            ejecutar(() => dejarDeCompartirEmpleado({ empleadoId, usuarioId: p.usuarioId }), {
+              onExito: onCambio,
+            })
+          }
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-5">
@@ -135,68 +189,7 @@ export function PanelCompartir({
             Todavía no lo compartiste con nadie.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Permiso</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {permisos.map((p) => (
-                  <TableRow key={p.usuarioId}>
-                    <TableCell>
-                      {p.nombre}
-                      <span className="ml-2 text-sm text-muted-foreground">{p.email}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={p.permiso}
-                        onValueChange={(v) =>
-                          ejecutar(
-                            () =>
-                              compartirEmpleado({
-                                empleadoId,
-                                usuarioId: p.usuarioId,
-                                permiso: v,
-                              }),
-                            { onExito: onCambio },
-                          )
-                        }
-                        disabled={enviando}
-                      >
-                        <SelectTrigger className="w-32" aria-label={`Permiso de ${p.nombre}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="VER">Ver</SelectItem>
-                          <SelectItem value="EDITAR">Editar</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Quitar el acceso de ${p.nombre}`}
-                        disabled={enviando}
-                        onClick={() =>
-                          ejecutar(
-                            () => dejarDeCompartirEmpleado({ empleadoId, usuarioId: p.usuarioId }),
-                            { onExito: onCambio },
-                          )
-                        }
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabla columnas={columnasDePermisos} filas={filasDePermisos} />
         )}
       </section>
     </div>

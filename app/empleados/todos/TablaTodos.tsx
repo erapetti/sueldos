@@ -5,7 +5,6 @@
  * por dueño, por estado y por visibilidad.
  */
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import { EyeOff, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -17,15 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ENLACE_PRINCIPAL, FilaConDetalle } from '@/components/dominio/FilaConDetalle'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
 import { DialogoCambiarDueno } from '@/components/dominio/DialogoCambiarDueno'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
@@ -83,6 +74,81 @@ export function TablaTodos({
       )
     })
   }, [filas, busqueda, dueno, estado, visibilidad])
+
+  const columnas: Columna<FilaTabla>[] = [
+    {
+      clave: 'alias',
+      etiqueta: 'Alias',
+      celda: (fila) => fila.alias,
+      // El chip y el nombre van fuera del enlace: si no, el enlace se llamaría «Ana Ana
+      // Pereyra Gómez». Abajo de `md` la columna del nombre completo no está, así que baja acá.
+      alLado: (fila) =>
+        !fila.visible ? (
+          <Badge variant="outline" className="gap-1">
+            <EyeOff className="size-3" aria-hidden />
+            Oculto
+          </Badge>
+        ) : null,
+      debajo: (fila) => (
+        <p className="text-sm text-muted-foreground md:hidden">{fila.nombreCompleto}</p>
+      ),
+    },
+    { clave: 'nombre', etiqueta: 'Nombre completo', desde: 'md', celda: (f) => f.nombreCompleto },
+    {
+      clave: 'dueno',
+      etiqueta: 'Dueño',
+      celda: (fila) => (
+        <>
+          {fila.duenoNombre}
+          {fila.duenoId === usuarioId ? (
+            <span className="ml-1 text-muted-foreground">(vos)</span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      clave: 'compartido',
+      etiqueta: 'Compartido con',
+      desde: 'lg',
+      className: 'text-sm text-muted-foreground',
+      celda: (f) => (f.compartidoCon.length > 0 ? f.compartidoCon.join(', ') : '—'),
+    },
+    {
+      clave: 'ingreso',
+      etiqueta: 'Ingreso',
+      desde: 'sm',
+      className: 'tabular',
+      celda: (f) => f.fechaIngresoTexto,
+    },
+    {
+      clave: 'estado',
+      etiqueta: 'Estado',
+      celda: (f) => <ChipEstado estado={f.estado} empleadoId={f.id} />,
+    },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      /*
+        Transferir la propiedad lo puede hacer el dueño o un administrador
+        (`exigirDuenoOAdmin`), así que el menú va en todas las filas donde alguna de las dos
+        cosas se cumple. «Compartírmelo a mí» solo tiene sentido sobre una ajena: sobre las
+        propias ya tenés permiso total (§8.7).
+      */
+      celda: (fila) => {
+        const ajeno = fila.nivel === 'ADMIN'
+        return fila.nivel === 'DUENO' || ajeno ? (
+          <DialogoCambiarDueno
+            empleadoId={fila.id}
+            alias={fila.alias}
+            duenoActualId={fila.duenoId}
+            puedeAutocompartirse={ajeno && esAdmin}
+            esAjena={ajeno}
+          />
+        ) : null
+      },
+    },
+  ]
 
   return (
     <div className="space-y-4">
@@ -157,92 +223,12 @@ export function TablaTodos({
         {visibles.length} de {filas.length} en el personal
       </p>
 
-      <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Alias</TableHead>
-              <TableHead className="hidden md:table-cell">Nombre completo</TableHead>
-              <TableHead>Dueño</TableHead>
-              <TableHead className="hidden lg:table-cell">Compartido con</TableHead>
-              <TableHead className="hidden sm:table-cell">Ingreso</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibles.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Ninguna empleada coincide con el filtro.
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibles.map((fila) => {
-                const ajeno = fila.nivel === 'ADMIN'
-                return (
-                  <FilaConDetalle key={fila.id} href={`/empleados/${fila.id}/faltas`}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link href={`/empleados/${fila.id}/faltas`} className={ENLACE_PRINCIPAL}>
-                          {fila.alias}
-                        </Link>
-                        {!fila.visible ? (
-                          <Badge variant="outline" className="gap-1">
-                            <EyeOff className="size-3" aria-hidden />
-                            Oculto
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground md:hidden">
-                        {fila.nombreCompleto}
-                      </p>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{fila.nombreCompleto}</TableCell>
-                    <TableCell>
-                      {fila.duenoNombre}
-                      {fila.duenoId === usuarioId ? (
-                        <span className="ml-1 text-muted-foreground">(vos)</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                      {fila.compartidoCon.length > 0 ? fila.compartidoCon.join(', ') : '—'}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell tabular">
-                      {fila.fechaIngresoTexto}
-                    </TableCell>
-                    <TableCell>
-                      <ChipEstado estado={fila.estado} empleadoId={fila.id} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        {/*
-                          Transferir la propiedad lo puede hacer el dueño o un administrador
-                          (`exigirDuenoOAdmin`), así que el menú va en todas las filas donde
-                          alguna de las dos cosas se cumple —antes estaba solo en las ajenas y
-                          la columna quedaba vacía cuando eran todas propias—.
-
-                          «Compartírmelo a mí» solo tiene sentido sobre una ajena: sobre las
-                          propias ya tenés permiso total (§8.7).
-                        */}
-                        {fila.nivel === 'DUENO' || fila.nivel === 'ADMIN' ? (
-                          <DialogoCambiarDueno
-                            empleadoId={fila.id}
-                            alias={fila.alias}
-                            duenoActualId={fila.duenoId}
-                            puedeAutocompartirse={ajeno && esAdmin}
-                            esAjena={ajeno}
-                          />
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </FilaConDetalle>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Tabla
+        columnas={columnas}
+        filas={visibles}
+        hrefDetalle={(fila) => `/empleados/${fila.id}/faltas`}
+        vacio="Ninguna empleada coincide con el filtro."
+      />
     </div>
   )
 }

@@ -32,14 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { useAccion } from '@/hooks/useAccion'
@@ -149,6 +142,57 @@ export function DetallePrestamo({
     })
   }
 
+  const columnasDeCuotas: Columna<CuotaDetalle>[] = [
+    {
+      clave: 'mes',
+      etiqueta: 'Mes',
+      celda: (c) => formatearPeriodoCapitalizado(parseFechaISO(c.fechaISO)),
+    },
+    {
+      clave: 'monto',
+      etiqueta: 'Monto',
+      numerica: true,
+      celda: (cuota) => {
+        const i = prestamo.cuotas.indexOf(cuota)
+        return editable && !bloqueos.get(cuota.id) ? (
+          <Input
+            value={montos[cuota.id] ?? ''}
+            onChange={(e) => setMontos((m) => ({ ...m, [cuota.id]: e.target.value }))}
+            disabled={enviando}
+            inputMode="decimal"
+            aria-label={`Monto de la cuota ${i + 1}`}
+            className="ml-auto max-w-40 text-right tabular"
+          />
+        ) : (
+          importe(cuota.monto)
+        )
+      },
+    },
+    {
+      clave: 'estado',
+      etiqueta: 'Estado',
+      celda: (cuota) => {
+        const bloqueo = bloqueos.get(cuota.id) ?? null
+        return bloqueo ? (
+          <Badge variant="outline">{bloqueo}</Badge>
+        ) : (
+          <Badge variant="secondary">Pendiente</Badge>
+        )
+      },
+    },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      celda: (cuota) =>
+        editable && !bloqueos.get(cuota.id) ? (
+          <Button variant="ghost" size="sm" disabled={enviando} onClick={() => setACancelar(cuota)}>
+            Cancelar cuota
+          </Button>
+        ) : null,
+    },
+  ]
+
   return (
     <div className="space-y-5">
       <EncabezadoEmpleada
@@ -239,70 +283,11 @@ export function DetallePrestamo({
               Este préstamo se registró sin cuotas previstas.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mes</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {prestamo.cuotas.map((cuota, i) => {
-                    const bloqueo = bloqueos.get(cuota.id) ?? null
-                    const sePuede = editable && !bloqueo
-
-                    return (
-                      <TableRow
-                        key={cuota.id}
-                        className={cuota.estado === 'CANCELADA' ? 'opacity-60' : undefined}
-                      >
-                        <TableCell>
-                          {formatearPeriodoCapitalizado(parseFechaISO(cuota.fechaISO))}
-                        </TableCell>
-                        <TableCell className="text-right tabular">
-                          {sePuede ? (
-                            <Input
-                              value={montos[cuota.id] ?? ''}
-                              onChange={(e) =>
-                                setMontos((m) => ({ ...m, [cuota.id]: e.target.value }))
-                              }
-                              disabled={enviando}
-                              inputMode="decimal"
-                              aria-label={`Monto de la cuota ${i + 1}`}
-                              className="ml-auto max-w-40 text-right tabular"
-                            />
-                          ) : (
-                            importe(cuota.monto)
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {bloqueo ? (
-                            <Badge variant="outline">{bloqueo}</Badge>
-                          ) : (
-                            <Badge variant="secondary">Pendiente</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {sePuede ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={enviando}
-                              onClick={() => setACancelar(cuota)}
-                            >
-                              Cancelar cuota
-                            </Button>
-                          ) : null}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <Tabla
+              columnas={columnasDeCuotas}
+              filas={prestamo.cuotas}
+              claseDeFila={(c) => (c.estado === 'CANCELADA' ? 'opacity-60' : undefined)}
+            />
           )}
 
           {campos.cuotas ? <p className="text-sm text-destructive">{campos.cuotas}</p> : null}

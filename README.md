@@ -410,6 +410,9 @@ Se corrigió en el componente y no fila por fila porque las tablas sin detalle s
 siete de las diez. Las tres que sí lo tienen usan `FilaConDetalle` (`components/dominio/`), que
 agrega el resaltado junto con el clic que lo justifica.
 
+Ninguna pantalla usa `components/ui/table` directamente: las diez tablas pasan por
+`components/dominio/Tabla`, que es la única que lo importa junto con `FilaConDetalle`.
+
 Para comprobarlo: en `/empleados/todos` la fila se resalta y lleva a la empleada; en la cuenta
 corriente de una ficha, no se resalta.
 

@@ -5,14 +5,7 @@
  */
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { cn } from '@/lib/utils'
 import { FormularioSeries } from './FormularioSeries'
 import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
@@ -153,6 +146,109 @@ export function FichaEmpleado(props: FichaProps) {
   const cuentaSinCentavos = todosEnteros(importesDeCuenta)
   const importeCuenta = cuentaSinCentavos ? formatearImporteEntero : formatearImporte
 
+  const columnasDeSalarios: Columna<Salario>[] = [
+    { clave: 'vigencia', etiqueta: 'Vigente desde', className: 'tabular', celda: (s) => s.fechaVigencia },
+    { clave: 'salario', etiqueta: 'Salario', numerica: true, celda: (s) => formatearImporte(s.salario) },
+    { clave: 'horas', etiqueta: 'Horas semanales', numerica: true, celda: (s) => `${s.horasSemanales} h` },
+    { clave: 'valor-hora', etiqueta: 'Valor hora calculado', numerica: true, celda: (s) => formatearImporte(s.valorHora) },
+    {
+      clave: 'origen',
+      etiqueta: 'Origen',
+      className: 'text-sm text-muted-foreground',
+      celda: (s) => (s.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'),
+    },
+  ]
+
+  const columnasDeValorHora: Columna<ValorHoraNegro>[] = [
+    { clave: 'vigencia', etiqueta: 'Vigente desde', className: 'tabular', celda: (v) => v.fechaVigencia },
+    { clave: 'valor', etiqueta: 'Valor', numerica: true, celda: (v) => formatearImporte(v.valor) },
+    {
+      clave: 'referencia',
+      etiqueta: 'Valor hora calculado',
+      numerica: true,
+      className: 'text-muted-foreground',
+      // El valor hora calculado vigente a esa fecha, como referencia.
+      celda: (v) => {
+        const referencia = props.salarios.find((s) => s.fechaVigenciaISO <= v.fechaVigenciaISO)
+        return referencia ? formatearImporte(referencia.valorHora) : '—'
+      },
+    },
+    {
+      clave: 'origen',
+      etiqueta: 'Origen',
+      className: 'text-sm text-muted-foreground',
+      celda: (v) => (v.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'),
+    },
+  ]
+
+  const columnasDeRegimen: Columna<Regimen>[] = [
+    { clave: 'vigencia', etiqueta: 'Vigente desde', className: 'tabular', celda: (r) => r.fechaVigencia },
+    // Un día por columna, en el orden de la semana.
+    ...NOMBRES_DIAS_CORTOS.map((dia, i) => ({
+      clave: dia,
+      etiqueta: dia,
+      numerica: true,
+      celda: (r: Regimen) => (Number(r.dias[i]) > 0 ? r.dias[i] : '—'),
+    })),
+    { clave: 'total', etiqueta: 'Total', numerica: true, className: 'font-medium', celda: (r) => `${r.total} h` },
+  ]
+
+  const columnasDeCuenta: Columna<FichaProps['cuentaCorriente'][number]>[] = [
+    { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (m) => m.fecha },
+    { clave: 'concepto', etiqueta: 'Concepto', celda: (m) => m.concepto },
+    { clave: 'debe', etiqueta: 'Debe', numerica: true, celda: (m) => (Number(m.debe) > 0 ? importeCuenta(m.debe) : '') },
+    { clave: 'haber', etiqueta: 'Haber', numerica: true, celda: (m) => (Number(m.haber) > 0 ? importeCuenta(m.haber) : '') },
+    {
+      clave: 'saldo',
+      etiqueta: 'Saldo',
+      numerica: true,
+      celda: (m) => (
+        <span className={cn(Number(m.saldoAcumulado) < 0 && 'text-destructive')}>
+          {importeCuenta(m.saldoAcumulado)}
+        </span>
+      ),
+    },
+  ]
+
+  const columnasDeCuotas: Columna<FichaProps['cuotas'][number]>[] = [
+    { clave: 'mes', etiqueta: 'Mes', className: 'tabular', celda: (c) => c.fecha },
+    { clave: 'monto', etiqueta: 'Monto', numerica: true, celda: (c) => importeCuenta(c.monto) },
+    {
+      clave: 'estado',
+      etiqueta: 'Estado',
+      celda: (c) => (
+        <Badge variant={c.estado === 'APLICADA' ? 'secondary' : 'outline'}>
+          {c.estado === 'APLICADA' ? 'Aplicada' : 'Pendiente'}
+        </Badge>
+      ),
+    },
+  ]
+
+  const columnasDeLicenciaMovimientos: Columna<FichaProps['licenciaMovimientos'][number]>[] = [
+    { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (m) => m.fecha },
+    { clave: 'concepto', etiqueta: 'Concepto', celda: (m) => m.concepto },
+    { clave: 'consumidos', etiqueta: 'Consumidos', numerica: true, celda: (m) => (Number(m.debe) > 0 ? m.debe : '') },
+    { clave: 'generados', etiqueta: 'Generados', numerica: true, celda: (m) => (Number(m.haber) > 0 ? m.haber : '') },
+    { clave: 'saldo', etiqueta: 'Saldo', numerica: true, celda: (m) => m.saldoAcumulado },
+  ]
+
+  const columnasDeLicencias: Columna<FichaProps['licencias'][number]>[] = [
+    { clave: 'desde', etiqueta: 'Desde', className: 'tabular', celda: (l) => l.desde },
+    { clave: 'hasta', etiqueta: 'Hasta', className: 'tabular', celda: (l) => l.hasta },
+    { clave: 'dias', etiqueta: 'Días hábiles', numerica: true, celda: (l) => l.diasHabiles },
+    {
+      clave: 'vacacional',
+      etiqueta: 'Salario vacacional',
+      numerica: true,
+      celda: (l) => (
+        <>
+          {l.salarioVacacional ? formatearImporte(l.salarioVacacional) : '—'}
+          {l.liquidacionAnulada ? <span className="ml-1 text-muted-foreground">(anulada)</span> : null}
+        </>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-5">
       <EncabezadoEmpleada
@@ -219,36 +315,7 @@ export function FichaEmpleado(props: FichaProps) {
           <div className="space-y-6">
           <section className="space-y-3">
             <h2 className="text-[20px]">Salario y horas semanales</h2>
-            <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Vigente desde</TableHead>
-                    <TableHead className="text-right">Salario</TableHead>
-                    <TableHead className="text-right">Horas semanales</TableHead>
-                    <TableHead className="text-right">Valor hora calculado</TableHead>
-                    <TableHead>Origen</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {props.salarios.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="tabular">{s.fechaVigencia}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatearImporte(s.salario)}
-                      </TableCell>
-                      <TableCell className="text-right tabular">{s.horasSemanales} h</TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatearImporte(s.valorHora)}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {s.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <Tabla columnas={columnasDeSalarios} filas={props.salarios} />
 
             {!props.soloLectura ? (
               <FormularioSeries
@@ -264,40 +331,7 @@ export function FichaEmpleado(props: FichaProps) {
             <p className="text-sm text-muted-foreground">
               Con el que se pagan las horas extras sin descuento de BPS (§4.3.1).
             </p>
-            <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Vigente desde</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Valor hora calculado</TableHead>
-                    <TableHead>Origen</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {props.valoresHoraNegro.map((v) => {
-                    // El valor hora calculado vigente a esa fecha, como referencia.
-                    const referencia = props.salarios.find(
-                      (s) => s.fechaVigenciaISO <= v.fechaVigenciaISO,
-                    )
-                    return (
-                      <TableRow key={v.id}>
-                        <TableCell className="tabular">{v.fechaVigencia}</TableCell>
-                        <TableCell className="text-right tabular">
-                          {formatearImporte(v.valor)}
-                        </TableCell>
-                        <TableCell className="text-right tabular text-muted-foreground">
-                          {referencia ? formatearImporte(referencia.valorHora) : '—'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {v.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <Tabla columnas={columnasDeValorHora} filas={props.valoresHoraNegro} />
 
             {!props.soloLectura ? (
               <FormularioSeries
@@ -313,34 +347,7 @@ export function FichaEmpleado(props: FichaProps) {
         {/* 3 — Régimen */}
         {seccion === 'regimen' ? (
           <div className="space-y-4">
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vigente desde</TableHead>
-                  {NOMBRES_DIAS_CORTOS.map((d) => (
-                    <TableHead key={d} className="text-right">
-                      {d}
-                    </TableHead>
-                  ))}
-                  <TableHead className="text-right">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.regimenes.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="tabular">{r.fechaVigencia}</TableCell>
-                    {r.dias.map((horas, i) => (
-                      <TableCell key={i} className="text-right tabular">
-                        {Number(horas) > 0 ? horas : '—'}
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-right tabular font-medium">{r.total} h</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabla columnas={columnasDeRegimen} filas={props.regimenes} />
 
           {!props.soloLectura ? (
             <FormularioSeries
@@ -404,79 +411,17 @@ export function FichaEmpleado(props: FichaProps) {
             </p>
           ) : null}
 
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Concepto</TableHead>
-                  <TableHead className="text-right">Debe</TableHead>
-                  <TableHead className="text-right">Haber</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.cuentaCorriente.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Todavía no hay movimientos.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  props.cuentaCorriente.map((m) => (
-                    <TableRow key={m.id} className={cn(m.esReversa && 'text-muted-foreground')}>
-                      <TableCell className="tabular">{m.fecha}</TableCell>
-                      <TableCell>{m.concepto}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {Number(m.debe) > 0 ? importeCuenta(m.debe) : ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular">
-                        {Number(m.haber) > 0 ? importeCuenta(m.haber) : ''}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'text-right tabular',
-                          Number(m.saldoAcumulado) < 0 && 'text-destructive',
-                        )}
-                      >
-                        {importeCuenta(m.saldoAcumulado)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabla
+            columnas={columnasDeCuenta}
+            filas={props.cuentaCorriente}
+            claseDeFila={(m) => (m.esReversa ? 'text-muted-foreground' : undefined)}
+            vacio="Todavía no hay movimientos."
+          />
 
           {props.cuotas.length > 0 ? (
             <section className="space-y-2">
               <h2 className="text-[20px]">Plan de pagos</h2>
-              <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mes</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {props.cuotas.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="tabular">{c.fecha}</TableCell>
-                        <TableCell className="text-right tabular">
-                          {importeCuenta(c.monto)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={c.estado === 'APLICADA' ? 'secondary' : 'outline'}>
-                            {c.estado === 'APLICADA' ? 'Aplicada' : 'Pendiente'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <Tabla columnas={columnasDeCuotas} filas={props.cuotas} />
             </section>
           ) : null}
           </div>
@@ -497,73 +442,16 @@ export function FichaEmpleado(props: FichaProps) {
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Concepto</TableHead>
-                  <TableHead className="text-right">Consumidos</TableHead>
-                  <TableHead className="text-right">Generados</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.licenciaMovimientos.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Todavía no hay movimientos de licencia.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  props.licenciaMovimientos.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="tabular">{m.fecha}</TableCell>
-                      <TableCell>{m.concepto}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {Number(m.debe) > 0 ? m.debe : ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular">
-                        {Number(m.haber) > 0 ? m.haber : ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular">{m.saldoAcumulado}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabla
+            columnas={columnasDeLicenciaMovimientos}
+            filas={props.licenciaMovimientos}
+            vacio="Todavía no hay movimientos de licencia."
+          />
 
           {props.licencias.length > 0 ? (
             <section className="space-y-2">
               <h2 className="text-[20px]">Períodos gozados</h2>
-              <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Desde</TableHead>
-                      <TableHead>Hasta</TableHead>
-                      <TableHead className="text-right">Días hábiles</TableHead>
-                      <TableHead className="text-right">Salario vacacional</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {props.licencias.map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell className="tabular">{l.desde}</TableCell>
-                        <TableCell className="tabular">{l.hasta}</TableCell>
-                        <TableCell className="text-right tabular">{l.diasHabiles}</TableCell>
-                        <TableCell className="text-right tabular">
-                          {l.salarioVacacional ? formatearImporte(l.salarioVacacional) : '—'}
-                          {l.liquidacionAnulada ? (
-                            <span className="ml-1 text-muted-foreground">(anulada)</span>
-                          ) : null}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <Tabla columnas={columnasDeLicencias} filas={props.licencias} />
             </section>
           ) : null}
           </div>

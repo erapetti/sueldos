@@ -264,7 +264,8 @@ pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salve
 en Movimientos tres de los cuatro abren un diálogo en vez de navegar; se corrige solo cuando
 tengan su pantalla.
 
-**Las tablas siguen un criterio único, y vale para todas** (ver `FilaConDetalle`):
+**Las diez tablas se dibujan con `Tabla`** (`components/dominio/Tabla.tsx`), y siguen un
+criterio único:
 
 - **La fila tiene detalle** → la primera columna es el enlace, con `ENLACE_PRINCIPAL`
   (`text-lg font-medium hover:underline`), y la fila entera lleva al mismo lado y se resalta
@@ -277,6 +278,20 @@ tengan su pantalla.
 El resaltado es la promesa de que hay algo del otro lado; sin destino, engaña. Por eso
 `TableRow` dejó de traer `hover:bg-muted/50` de fábrica: era un default que resaltaba las diez
 tablas cuando solo tres llevan a alguna parte. La divergencia está en el README (§2.6).
+
+**Los dos tipos son el mismo componente**, y lo que los separa es `hrefDetalle`: con él, la
+primera columna se dibuja como enlace y la fila entera lo acompaña; sin él, ni una cosa ni la
+otra. Las columnas se declaran en un array —`Columna<T>`— en vez de escribir el `<thead>` y el
+`<tbody>` por separado, que es lo que los hacía divergir: antes el andamio estaba copiado en
+quince lugares y cada estado vacío llevaba su `colSpan` escrito a mano, que quedaba viejo en
+cuanto alguien agregaba una columna. Ahora sale de `columnas.length`.
+
+Solo `Tabla` y `FilaConDetalle` importan de `components/ui/table`; ninguna pantalla arma su
+propio andamio. Si una tabla necesita algo que la plantilla no da, **agregalo a la plantilla**:
+las columnas ya soportan alineación a la derecha, tipografía tabular, esconderse por
+breakpoint y clases propias, y la primera columna tiene `alLado` y `debajo` para lo que no
+debe quedar adentro del enlace —si el chip de estado y el nombre completo cayeran dentro del
+`<a>`, el lector de pantalla anunciaría «Ana Ana Pereyra Gómez» en vez de «Ana»—.
 
 **El enlace real vive en la celda, no en la fila.** Un `<a>` no puede envolver un `<tr>`, así
 que `FilaConDetalle` agrega el clic con `router.push` y la celda conserva su `<Link>`: el

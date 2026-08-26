@@ -30,14 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { CampoTexto } from '@/components/dominio/CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
 import { actualizarUsuario, borrarUsuario, crearUsuario } from '@/actions/admin'
@@ -116,6 +109,78 @@ export function PantallaUsuarios({
 
   const enviando = alta.enviando || cambio.enviando
 
+  type FilaUsuario = (typeof usuarios)[number]
+  const esElActual = (u: FilaUsuario) => u.id === usuarioActualId
+
+  const columnasDeUsuarios: Columna<FilaUsuario>[] = [
+    {
+      clave: 'usuario',
+      etiqueta: 'Usuario',
+      celda: (u) => (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{u.nombre ?? u.email}</span>
+            {esElActual(u) ? <Badge variant="secondary">Vos</Badge> : null}
+            {!u.reclamado ? <Badge variant="outline">Sin ingresar</Badge> : null}
+          </div>
+          <p className="text-sm text-muted-foreground">{u.email}</p>
+        </>
+      ),
+    },
+    {
+      clave: 'ultimo-acceso',
+      etiqueta: 'Último acceso',
+      desde: 'sm',
+      className: 'tabular',
+      celda: (u) => u.ultimoAcceso ?? '—',
+    },
+    { clave: 'personal', etiqueta: 'Personal', numerica: true, celda: (u) => u.empleados },
+    {
+      clave: 'admin',
+      etiqueta: 'Administrador',
+      celda: (u) => (
+        <Switch
+          checked={u.esAdmin}
+          onCheckedChange={(v) => cambiarFlag(u, { esAdmin: v })}
+          // §3.4 — un administrador no puede quitarse a sí mismo el flag.
+          disabled={enviando || (esElActual(u) && u.esAdmin)}
+          aria-label={`Administrador: ${u.nombre ?? u.email}`}
+        />
+      ),
+    },
+    {
+      clave: 'activo',
+      etiqueta: 'Activo',
+      celda: (u) => (
+        <Switch
+          checked={u.activo}
+          onCheckedChange={(v) => cambiarFlag(u, { activo: v })}
+          disabled={enviando || esElActual(u)}
+          aria-label={`Activo: ${u.nombre ?? u.email}`}
+        />
+      ),
+    },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      celda: (u) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Borrar a ${u.nombre ?? u.email}`}
+          disabled={enviando || esElActual(u)}
+          onClick={() => {
+            setABorrar(u)
+            setNuevoDuenoId('')
+          }}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <EncabezadoPagina
@@ -166,72 +231,7 @@ export function PantallaUsuarios({
 
       <section className="space-y-2">
         <h2 className="text-[20px]">Usuarios del sistema</h2>
-        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead className="hidden sm:table-cell">Último acceso</TableHead>
-                <TableHead className="text-right">Personal</TableHead>
-                <TableHead>Administrador</TableHead>
-                <TableHead>Activo</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuarios.map((u) => {
-                const esUnoMismo = u.id === usuarioActualId
-                return (
-                  <TableRow key={u.id}>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{u.nombre ?? u.email}</span>
-                        {esUnoMismo ? <Badge variant="secondary">Vos</Badge> : null}
-                        {!u.reclamado ? <Badge variant="outline">Sin ingresar</Badge> : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{u.email}</p>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell tabular">
-                      {u.ultimoAcceso ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular">{u.empleados}</TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={u.esAdmin}
-                        onCheckedChange={(v) => cambiarFlag(u, { esAdmin: v })}
-                        // §3.4 — un administrador no puede quitarse a sí mismo el flag.
-                        disabled={enviando || (esUnoMismo && u.esAdmin)}
-                        aria-label={`Administrador: ${u.nombre ?? u.email}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={u.activo}
-                        onCheckedChange={(v) => cambiarFlag(u, { activo: v })}
-                        disabled={enviando || esUnoMismo}
-                        aria-label={`Activo: ${u.nombre ?? u.email}`}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Borrar a ${u.nombre ?? u.email}`}
-                        disabled={enviando || esUnoMismo}
-                        onClick={() => {
-                          setABorrar(u)
-                          setNuevoDuenoId('')
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <Tabla columnas={columnasDeUsuarios} filas={usuarios} />
       </section>
 
       <AlertDialog open={aBorrar !== null} onOpenChange={(v) => !v && setABorrar(null)}>

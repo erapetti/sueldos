@@ -5,14 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { CampoMonto } from '@/components/dominio/CampoMonto'
 import { SelectorVigencia, vigenciaPorDefecto } from '@/components/dominio/SelectorVigencia'
 import { useAccion } from '@/hooks/useAccion'
@@ -51,6 +44,40 @@ export function PantallaBoletos({ valores }: { valores: Valor[] }) {
       },
     })
   }
+
+  type FilaValor = (typeof valores)[number]
+
+  const columnasDeValores: Columna<FilaValor>[] = [
+    {
+      clave: 'vigencia',
+      etiqueta: 'Vigente desde',
+      className: 'tabular',
+      celda: (v) => v.fechaVigencia,
+    },
+    { clave: 'monto', etiqueta: 'Monto', numerica: true, celda: (v) => formatearImporte(v.monto) },
+    { clave: 'cargado-por', etiqueta: 'Cargado por', celda: (v) => v.cargadoPor },
+    { clave: 'cargado-el', etiqueta: 'Cargado el', className: 'tabular', celda: (v) => v.cargadoEn },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      // §5.4 — solo se borran los de vigencia futura.
+      celda: (v) =>
+        v.fechaVigenciaISO > mesActual ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Borrar el valor vigente desde ${v.fechaVigencia}`}
+            disabled={enviando}
+            onClick={() =>
+              ejecutar(() => borrarValorBoleto(v.id), { onExito: () => router.refresh() })
+            }
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        ) : null,
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -98,60 +125,11 @@ export function PantallaBoletos({ valores }: { valores: Valor[] }) {
 
       <section className="space-y-2">
         <h2 className="text-[20px]">Histórico</h2>
-        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vigente desde</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead>Cargado por</TableHead>
-                <TableHead>Cargado el</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {valores.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Todavía no hay valores cargados.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                valores.map((v) => {
-                  // §5.4 — solo se borran los de vigencia futura.
-                  const futuro = v.fechaVigenciaISO > mesActual
-                  return (
-                    <TableRow key={v.id}>
-                      <TableCell className="tabular">{v.fechaVigencia}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatearImporte(v.monto)}
-                      </TableCell>
-                      <TableCell>{v.cargadoPor}</TableCell>
-                      <TableCell className="tabular">{v.cargadoEn}</TableCell>
-                      <TableCell className="text-right">
-                        {futuro ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Borrar el valor vigente desde ${v.fechaVigencia}`}
-                            disabled={enviando}
-                            onClick={() =>
-                              ejecutar(() => borrarValorBoleto(v.id), {
-                                onExito: () => router.refresh(),
-                              })
-                            }
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <Tabla
+          columnas={columnasDeValores}
+          filas={valores}
+          vacio="Todavía no hay valores cargados."
+        />
       </section>
     </div>
   )

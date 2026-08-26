@@ -11,14 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { CampoTexto } from '@/components/dominio/CampoMonto'
 import { SelectorFecha } from '@/components/dominio/SelectorFecha'
 import { useAccion } from '@/hooks/useAccion'
@@ -58,6 +51,44 @@ export function PantallaFeriados({
       },
     })
   }
+
+  /** `Tabla` indexa por `id`; un feriado se identifica por su fecha. */
+  const filasDeFeriados = feriados.map((f) => ({ ...f, id: f.fechaISO }))
+  type FilaFeriado = (typeof filasDeFeriados)[number]
+
+  const columnasDeFeriados: Columna<FilaFeriado>[] = [
+    { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (f) => f.fecha },
+    { clave: 'descripcion', etiqueta: 'Descripción', celda: (f) => f.descripcion },
+    {
+      clave: 'tipo',
+      etiqueta: 'Tipo',
+      celda: (f) => (
+        <Badge variant={f.noLaborable ? 'secondary' : 'outline'}>
+          {f.noLaborable ? 'No laborable' : 'Laborable'}
+        </Badge>
+      ),
+    },
+    {
+      clave: 'acciones',
+      etiqueta: 'Acciones',
+      derecha: true,
+      // Solo se borran los que todavía no pasaron.
+      celda: (f) =>
+        f.fechaISO > hoyISO ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Borrar el feriado del ${f.fecha}`}
+            disabled={enviando}
+            onClick={() =>
+              ejecutar(() => borrarFeriado(f.fechaISO), { onExito: () => router.refresh() })
+            }
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        ) : null,
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -139,56 +170,11 @@ export function PantallaFeriados({
 
       <section className="space-y-2">
         <h2 className="text-[20px]">Feriados de {anio}</h2>
-        <div className="overflow-x-auto rounded-card bg-card shadow-soft border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {feriados.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    No hay feriados cargados en {anio}.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                feriados.map((f) => (
-                  <TableRow key={f.fechaISO}>
-                    <TableCell className="tabular">{f.fecha}</TableCell>
-                    <TableCell>{f.descripcion}</TableCell>
-                    <TableCell>
-                      <Badge variant={f.noLaborable ? 'secondary' : 'outline'}>
-                        {f.noLaborable ? 'No laborable' : 'Laborable'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {f.fechaISO > hoyISO ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Borrar el feriado del ${f.fecha}`}
-                          disabled={enviando}
-                          onClick={() =>
-                            ejecutar(() => borrarFeriado(f.fechaISO), {
-                              onExito: () => router.refresh(),
-                            })
-                          }
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <Tabla
+          columnas={columnasDeFeriados}
+          filas={filasDeFeriados}
+          vacio={`No hay feriados cargados en ${anio}.`}
+        />
       </section>
     </div>
   )

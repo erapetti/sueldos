@@ -7,18 +7,8 @@
  * la lista dice qué meses están cerrados y el detalle muestra uno. Desde una fila se salta al
  * detalle de ese período.
  */
-import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ENLACE_PRINCIPAL, FilaConDetalle } from '@/components/dominio/FilaConDetalle'
-import { cn } from '@/lib/utils'
+import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { formatearImporte } from '@/lib/format/money'
 
 export type FilaLiquidacion = {
@@ -48,64 +38,48 @@ export function ListaLiquidaciones({
   /** Total del período agrupando secuencias (§7.6.1), por `periodoISO|tipo`. */
   totalesPorPeriodo: Record<string, string>
 }) {
+  const detalleDe = (l: FilaLiquidacion) =>
+    `/empleados/${empleadoId}/liquidacion?periodo=${l.periodoISO.slice(0, 7)}`
+
+  const columnas: Columna<FilaLiquidacion>[] = [
+    // El período es la puerta al detalle de ese mes, y con él toda la fila.
+    { clave: 'periodo', etiqueta: 'Período', className: 'capitalize', celda: (l) => l.periodo },
+    { clave: 'tipo', etiqueta: 'Tipo', celda: (l) => ETIQUETA_TIPO[l.tipo] ?? l.tipo },
+    { clave: 'secuencia', etiqueta: 'Secuencia', numerica: true, celda: (l) => `#${l.secuencia}` },
+    {
+      clave: 'total',
+      etiqueta: 'Total',
+      numerica: true,
+      celda: (l) => formatearImporte(l.totalAPagar),
+    },
+    {
+      clave: 'total-periodo',
+      etiqueta: 'Total del período',
+      numerica: true,
+      className: 'text-muted-foreground',
+      celda: (l) => formatearImporte(totalesPorPeriodo[`${l.periodoISO}|${l.tipo}`] ?? '0'),
+    },
+    {
+      clave: 'estado',
+      etiqueta: 'Estado',
+      celda: (l) =>
+        l.estado === 'ANULADA' ? (
+          <Badge variant="outline">Anulada</Badge>
+        ) : l.pagada ? (
+          <Badge variant="secondary">Pagada</Badge>
+        ) : (
+          <Badge variant="outline">Sin pagar</Badge>
+        ),
+    },
+  ]
+
   return (
-    <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Período</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead className="text-right">Secuencia</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">Total del período</TableHead>
-            <TableHead>Estado</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {liquidaciones.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                Todavía no hay liquidaciones confirmadas.
-              </TableCell>
-            </TableRow>
-          ) : (
-            liquidaciones.map((l) => {
-              const detalle = `/empleados/${empleadoId}/liquidacion?periodo=${l.periodoISO.slice(0, 7)}`
-              return (
-              <FilaConDetalle
-                key={l.id}
-                href={detalle}
-                className={cn(l.estado === 'ANULADA' && 'opacity-60')}
-              >
-                <TableCell>
-                  {/* El período es el enlace al detalle de ese mes, y con él toda la fila. */}
-                  <Link href={detalle} className={cn(ENLACE_PRINCIPAL, 'capitalize')}>
-                    {l.periodo}
-                  </Link>
-                </TableCell>
-                <TableCell>{ETIQUETA_TIPO[l.tipo] ?? l.tipo}</TableCell>
-                <TableCell className="text-right tabular">#{l.secuencia}</TableCell>
-                <TableCell className="text-right tabular">
-                  {formatearImporte(l.totalAPagar)}
-                </TableCell>
-                <TableCell className="text-right tabular text-muted-foreground">
-                  {formatearImporte(totalesPorPeriodo[`${l.periodoISO}|${l.tipo}`] ?? '0')}
-                </TableCell>
-                <TableCell>
-                  {l.estado === 'ANULADA' ? (
-                    <Badge variant="outline">Anulada</Badge>
-                  ) : l.pagada ? (
-                    <Badge variant="secondary">Pagada</Badge>
-                  ) : (
-                    <Badge variant="outline">Sin pagar</Badge>
-                  )}
-                </TableCell>
-              </FilaConDetalle>
-              )
-            })
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <Tabla
+      columnas={columnas}
+      filas={liquidaciones}
+      hrefDetalle={detalleDe}
+      claseDeFila={(l) => (l.estado === 'ANULADA' ? 'opacity-60' : undefined)}
+      vacio="Todavía no hay liquidaciones confirmadas."
+    />
   )
 }
