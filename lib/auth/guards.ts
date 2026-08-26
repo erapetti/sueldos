@@ -7,6 +7,8 @@
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
 import { usuarioActual, type UsuarioActual } from './currentUser'
+import { aISO } from '@/lib/format/dates'
+import type { EmpleadaDelMarco } from '@/components/dominio/MarcoDeMovimientos'
 
 /**
  * Nivel de acceso de un usuario sobre un empleado.
@@ -71,6 +73,23 @@ export type EmpleadoConAcceso = {
     seguroSalud: string | null
   }
   nivel: NivelAcceso
+}
+
+/**
+ * Lo que las pantallas de la rama «Movimientos» le pasan a su marco (`MarcoDeMovimientos`).
+ * Sale del mismo `accesoAEmpleado` que ya resolvió el permiso, así que las seis páginas no lo
+ * rearman una por una.
+ */
+export function empleadaDelMarco({ empleado, nivel }: EmpleadoConAcceso): EmpleadaDelMarco {
+  return {
+    id: empleado.id,
+    alias: empleado.alias,
+    nombreCompleto: empleado.nombreCompleto,
+    fechaIngreso: aISO(empleado.fechaIngreso),
+    soloLectura: !puedeEditar(nivel),
+    dadoDeBaja: !empleado.activo,
+    visible: empleado.visible,
+  }
 }
 
 /** Resuelve el nivel de acceso de un usuario sobre un empleado, en una sola consulta. */

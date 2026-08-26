@@ -14,6 +14,7 @@ import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
 import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
+import { ETIQUETA_LIBRO } from '@/constants/etiquetas'
 import {
   EncabezadoEmpleada,
   EstadosEmpleada,
@@ -122,12 +123,6 @@ export type FichaProps = {
   }[]
   totalesPorPeriodo: Record<string, string>
   permisos: { usuarioId: string; nombre: string; email: string; permiso: string }[]
-}
-
-/** §4.9 — cómo se rotula cada libro de la cuenta corriente. */
-const ETIQUETA_LIBRO: Record<'FORMAL' | 'INFORMAL', string> = {
-  FORMAL: 'Formal (con BPS)',
-  INFORMAL: 'Sin aportes',
 }
 
 /** Las cuatro secciones que cuelgan de «Datos», en el orden en que se muestran. */

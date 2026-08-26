@@ -10,6 +10,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { formatearImporte } from '@/lib/format/money'
+import { ETIQUETA_TIPO_LIQUIDACION } from '@/constants/etiquetas'
 
 export type FilaLiquidacion = {
   id: string
@@ -21,12 +22,6 @@ export type FilaLiquidacion = {
   totalAPagar: string
   /** §4.14 — el pago se mira libro por libro: puede faltar solo uno de los dos. */
   pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
-}
-
-const ETIQUETA_TIPO: Record<string, string> = {
-  MENSUAL: 'Mensual',
-  AGUINALDO: 'Aguinaldo',
-  SALARIO_VACACIONAL: 'Salario vacacional',
 }
 
 export function ListaLiquidaciones({
@@ -45,7 +40,7 @@ export function ListaLiquidaciones({
   const columnas: Columna<FilaLiquidacion>[] = [
     // El período es la puerta al detalle de ese mes, y con él toda la fila.
     { clave: 'periodo', etiqueta: 'Período', className: 'capitalize', celda: (l) => l.periodo },
-    { clave: 'tipo', etiqueta: 'Tipo', celda: (l) => ETIQUETA_TIPO[l.tipo] ?? l.tipo },
+    { clave: 'tipo', etiqueta: 'Tipo', celda: (l) => ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo },
     { clave: 'secuencia', etiqueta: 'Secuencia', numerica: true, celda: (l) => `#${l.secuencia}` },
     {
       clave: 'total',

@@ -349,13 +349,63 @@ El §7.4 y el §7.5 describen las cuatro acciones que se cargan de a una —pré
 adicional, licencia y pago bancario— **solo como diálogos de alta**. Con eso, lo registrado no
 se podía volver a mirar ni corregir: el préstamo quedaba como un asiento en la cuenta corriente
 y sus cuotas en el plan de pagos, sin ninguna pantalla que las juntara. Por pedido del usuario
-cada una pasa a tener **listado y detalle**, empezando por préstamos.
+cada una pasa a tener **listado y detalle**, empezando por préstamos. Ya lo tienen **tres de las
+cuatro** —préstamo, pago adicional y pago bancario—; **licencia queda pendiente**, porque su
+pantalla además tiene que hacerse cargo de la cuenta corriente de días (§4.15.1) y de dónde va
+el saldo, y eso lo decide el dueño del proyecto.
+
+**Las tres pantallas son la misma, y eso está factorizado.** Lo que comparten no se copió:
+
+| Pieza | Qué pone |
+|---|---|
+| `MarcoDeMovimientos` | El encabezado de la empleada y su submenú, con el ítem donde estás marcado. Recibe los siete datos de la empleada en un objeto, que la página arma con `empleadaDelMarco` (`lib/auth/guards.ts`) desde el `accesoAEmpleado` que ya resolvió el permiso |
+| `DetalleDeMovimiento` | El detalle entero: flecha de volver, título con sus chips, el cartel de aviso, la tarjeta de datos grabados con su nota, el campo del concepto, y las ranuras `children` y `pie` para lo propio de cada uno |
+| `ListadoDeMovimientos` | El listado: título, botón de alta y `Tabla` con `hrefDetalle` |
+
+**Tres reglas del detalle, iguales para los cuatro, y todas de negocio:**
+
+1. **La fecha y el monto no se editan; el concepto sí.** El movimiento puede tener liquidaciones
+   confirmadas encima, así que corregirlo movería un saldo hacia atrás. El camino es anular —o
+   borrar— y registrar de nuevo. La validación es una sola, `edicionConcepto`, y la acción de
+   los asientos también: `actualizarMovimiento` reemplazó a `actualizarPrestamo` y sirve para el
+   préstamo y para el pago bancario.
+2. **Los datos fijos se muestran como dato, no como campo deshabilitado.** Un input en gris
+   invita a escribirlo y después no explica por qué no se puede; para eso está la nota debajo.
+3. **Anular deja su contra-asiento**, nunca se borra nada (§4.9). El anulado se sigue mostrando,
+   atenuado en el listado y sin botones en el detalle.
+
+**Los rótulos de dominio que se repiten viven en `constants/etiquetas.ts`.** El del libro estaba
+declarado de nuevo en tres pantallas y el del tipo de liquidación en dos, y una copia vieja hace
+que la misma cosa se llame distinto según por dónde se llegue. Ahí está también
+`nombreDeLiquidacion`, que es cómo se la menciona desde otra pantalla —«Mensual agosto 2026»,
+con la secuencia solo si hay más de una—. `PantallaLiquidacion` conserva los suyos aparte:
+escribe «con BPS» y «sin aportes» en minúscula porque los usa en medio de una oración.
+
+**El pago adicional es la excepción de la tercera, porque no es un asiento** sino una novedad de
+la liquidación (§4.7): se **borra** con `borrarNovedad`, que es lo que ya hacían las planillas,
+y no hay nada que contra-asentar. Lo que sí tiene es el aviso del §6.11, dos veces y a propósito:
+el listado y el detalle marcan «ya liquidado» **antes** de tocarlo, con enlace a la pantalla de
+cálculo del mes —que es lo que pide el §6.11 y un toast no puede dar—, y la acción devuelve su
+aviso **después**. El concepto entra en la descripción de la línea (§6.2, paso 10), así que
+editarlo también cambia el resultado del recálculo.
+
+**El pago bancario muestra sus dos vínculos y no deja editar ninguno**: el libro del que salió
+(§4.9) y la liquidación que cancela (§4.14), con enlace a su pantalla. El vínculo es lo que
+marca la liquidación como pagada, así que cambiarlo movería el estado de otra pantalla sin
+decirlo; el camino es anular y registrar de nuevo.
+
+**El préstamo no tiene botón de anular** y las otras dos sí. No es una decisión: `anularMovimiento`
+existe desde antes y nunca tuvo desde dónde llamarse, así que el chip «Anulado» de su listado
+hoy no se puede producir desde la UI. Falta agregárselo.
 
 **No se creó una tabla `prestamos`, y no hace falta.** Un préstamo *es* el asiento `PRESTAMO`
 de `cuenta_corriente` (§4.9): `plan_pagos.prestamo_id` ya es FK a esa tabla y el §4.8 la
 describe como «préstamo que originó el plan». Darle tabla propia duplicaría la identidad del
 movimiento y obligaría a migrar esa FK. El listado se arma leyendo el asiento con sus cuotas,
-en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado.
+en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado: dos
+ya entraron —pago adicional y pago bancario, cada una con su función de listado y su función de
+detalle— y falta licencia. **El detalle siempre devuelve `null` si el id no es de esa empleada**,
+y es la página la que lo traduce a 404: así el id de otra empleada no filtra ni que exista.
 
 **El menú de fila de «Todo el Personal» no ofrece «abrir la ficha».** La fila entera ya enlaza
 a la empleada desde que las tablas siguen el criterio de arriba, así que era ofrecer dos
@@ -367,8 +417,10 @@ deshabilita sobre una empleada ajena, porque `cambiarVisibilidad` pasa por `exig
 un administrador primero tiene que compartírsela (§8.7).
 
 **El ítem «Acciones» del menú se llama ahora «Movimientos»** y dejó de ser solo botonera: es el
-índice desde donde se entra a cada listado. Por ahora solo «Préstamos» lleva a su pantalla; las
-otras tres conservan el «Registrar …» y su diálogo hasta que tengan la suya.
+índice desde donde se entra a cada listado. Tres de los cuatro son links a su pantalla y el alta
+vive ahí; el único que todavía abre un diálogo es «Registrar licencia», hasta que tenga la suya.
+Con permiso `VER` los links siguen activos —mirar no pide permiso de edición, y el alta la
+esconde la propia pantalla— y el que registra queda deshabilitado.
 
 **Los dos submenús se dibujan con `SubmenuSeccion`.** «Datos» y «Movimientos» son lo mismo —una
 rama del menú de la empleada con varias hojas— y se dibujaban distinto: Datos como una fila de
@@ -378,17 +430,17 @@ la forma de Datos, que es la que se comporta como submenú: está a la vista en 
 `default` con `aria-current="page"`.
 
 Es un **`<nav>`** y no un `<div>`: un submenú es navegación, y el landmark le da al lector de
-pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salvedad de hoy es que
-en Movimientos tres de los cuatro abren un diálogo en vez de navegar; se corrige solo cuando
-tengan su pantalla.
+pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salvedad quedó reducida
+a uno: en Movimientos, «Registrar licencia» abre un diálogo en vez de navegar; se corrige cuando
+tenga su pantalla.
 
 **Las diez tablas se dibujan con `Tabla`** (`components/dominio/Tabla.tsx`), y siguen un
 criterio único:
 
 - **La fila tiene detalle** → la primera columna es el enlace, con `ENLACE_PRINCIPAL`
   (`text-lg font-medium hover:underline`), y la fila entera lleva al mismo lado y se resalta
-  con `hover:bg-muted/5`. Son tres: préstamos, la vista «Lista» de liquidaciones y «Todo el
-  Personal».
+  con `hover:bg-muted/5`. Son cinco: los tres listados de movimientos —préstamos, pagos
+  adicionales, pagos bancarios—, la vista «Lista» de liquidaciones y «Todo el Personal».
 - **La fila no tiene detalle** —el desglose de la liquidación, la cuenta corriente, el plan de
   pagos, las licencias, los listados de administración, compartido con— → ni enlace ni
   resaltado, y la primera columna se dibuja como le convenga.

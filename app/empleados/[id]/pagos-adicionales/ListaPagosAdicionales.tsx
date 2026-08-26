@@ -1,16 +1,17 @@
 'use client'
 
 /**
- * §7.4 — la tabla de préstamos, con el alta arriba y el detalle a un clic de la fecha.
+ * §7.3 — la tabla de pagos adicionales, con el alta arriba y el detalle a un clic de la fecha.
  *
- * El diálogo de alta es el mismo de siempre: la pantalla no lo reemplaza, le da un lugar
- * donde volver a mirar lo que registró.
+ * La columna del **período** es propia de este movimiento: el pago adicional no se paga el día
+ * de su fecha sino en la liquidación del mes de esa fecha (§4.7). Si ese mes ya está liquidado
+ * se avisa acá mismo, que es antes de entrar a tocarlo (§6.11).
  */
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DialogoPrestamo } from '@/components/dominio/DialogoPrestamo'
+import { DialogoPagoAdicional } from '@/components/dominio/DialogoPagoAdicional'
 import {
   MarcoDeMovimientos,
   type EmpleadaDelMarco,
@@ -20,63 +21,68 @@ import {
   type ColumnaListado,
 } from '@/components/dominio/ListadoDeMovimientos'
 import { formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
-import type { FilaPrestamo } from '@/lib/consultas/movimientos'
+import type { FilaPagoAdicional } from '@/lib/consultas/movimientos'
 
-export function ListaPrestamos({
+export function ListaPagosAdicionales({
   empleada,
-  prestamos,
+  pagos,
 }: {
   empleada: EmpleadaDelMarco
-  prestamos: FilaPrestamo[]
+  pagos: FilaPagoAdicional[]
 }) {
-  // El refresh tras el alta lo hace el propio `DialogoPrestamo`, que ya llama a `router.refresh()`.
+  // El refresh tras el alta lo hace el propio diálogo, que ya llama a `router.refresh()`.
   const [alta, setAlta] = useState(false)
 
   // §1.3 de las notas — el `,00` sobra si no hay centavos en toda la columna.
-  const importe = todosEnteros(prestamos.flatMap((p) => [p.monto, p.saldo]))
+  const importe = todosEnteros(pagos.map((p) => p.monto))
     ? formatearImporteEntero
     : formatearImporte
 
-  const columnas: ColumnaListado<FilaPrestamo>[] = [
+  const columnas: ColumnaListado<FilaPagoAdicional>[] = [
     // La fecha es la puerta de entrada al detalle: por ser la primera, `Tabla` la hace enlace.
     { clave: 'fecha', etiqueta: 'Fecha', celda: (p) => p.fecha },
     {
       clave: 'concepto',
-      etiqueta: 'Comentario',
+      etiqueta: 'Concepto',
+      celda: (p) => p.concepto ?? <span className="text-muted-foreground">Sin concepto</span>,
+    },
+    {
+      clave: 'periodo',
+      etiqueta: 'Se liquida en',
+      className: 'capitalize',
       celda: (p) => (
         <span className="flex flex-wrap items-center gap-2">
-          {p.concepto}
-          {p.anulado ? <Badge variant="outline">Anulado</Badge> : null}
-          {!p.conPlan && !p.anulado ? (
-            <Badge variant="outline">Sin plan de devolución</Badge>
+          {p.periodo}
+          {p.periodoLiquidado ? (
+            <Badge variant="outline" className="normal-case">
+              Ya liquidado
+            </Badge>
           ) : null}
         </span>
       ),
     },
     { clave: 'monto', etiqueta: 'Monto', numerica: true, celda: (p) => importe(p.monto) },
-    { clave: 'saldo', etiqueta: 'Saldo', numerica: true, celda: (p) => importe(p.saldo) },
   ]
 
   return (
-    <MarcoDeMovimientos empleada={empleada} activo="prestamo">
+    <MarcoDeMovimientos empleada={empleada} activo="pago-adicional">
       <ListadoDeMovimientos
-        titulo="Préstamos"
+        titulo="Pagos adicionales"
         accion={
           empleada.soloLectura ? null : (
             <Button onClick={() => setAlta(true)}>
               <Plus className="size-4" aria-hidden />
-              Nuevo préstamo
+              Nuevo pago adicional
             </Button>
           )
         }
         columnas={columnas}
-        filas={prestamos}
-        hrefDetalle={(p) => `/empleados/${empleada.id}/prestamos/${p.id}`}
-        atenuada={(p) => p.anulado}
-        vacio="Todavía no hay préstamos registrados."
+        filas={pagos}
+        hrefDetalle={(p) => `/empleados/${empleada.id}/pagos-adicionales/${p.id}`}
+        vacio="Todavía no hay pagos adicionales registrados."
       />
 
-      <DialogoPrestamo
+      <DialogoPagoAdicional
         abierto={alta}
         onCerrar={() => setAlta(false)}
         empleadoId={empleada.id}

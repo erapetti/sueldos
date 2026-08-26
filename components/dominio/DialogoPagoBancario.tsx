@@ -42,6 +42,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { formatearImporte } from '@/lib/format/money'
+import { ETIQUETA_LIBRO, ETIQUETA_TIPO_LIQUIDACION } from '@/constants/etiquetas'
 
 type Libro = 'FORMAL' | 'INFORMAL'
 
@@ -62,22 +63,11 @@ type Liquidacion = {
 
 const SIN_VINCULO = 'ninguna'
 
-const ETIQUETA_LIBRO: Record<Libro, string> = {
-  FORMAL: 'Formal (con BPS)',
-  INFORMAL: 'Sin aportes',
-}
-
 const LIBROS: Libro[] = ['FORMAL', 'INFORMAL']
 
 /** Lo que la liquidación paga en un libro. */
 function montoDelLibro(liquidacion: Liquidacion, libro: Libro): string {
   return libro === 'FORMAL' ? liquidacion.totalAPagarFormal : liquidacion.totalAPagarInformal
-}
-
-const ETIQUETA_TIPO: Record<string, string> = {
-  MENSUAL: 'Mensual',
-  AGUINALDO: 'Aguinaldo',
-  SALARIO_VACACIONAL: 'Salario vacacional',
 }
 
 /**
@@ -128,7 +118,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
     const base =
       elegida.tipo === 'MENSUAL'
         ? `Sueldo ${periodo}`
-        : `${ETIQUETA_TIPO[elegida.tipo] ?? elegida.tipo} ${periodo}`
+        : `${ETIQUETA_TIPO_LIQUIDACION[elegida.tipo] ?? elegida.tipo} ${periodo}`
     return deLibro === 'INFORMAL' ? `${base} (sin aportes)` : base
   }
 
@@ -201,7 +191,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
                 <SelectItem value={SIN_VINCULO}>Ninguna</SelectItem>
                 {liquidaciones.map((l) => (
                   <SelectItem key={l.id} value={l.id}>
-                    {ETIQUETA_TIPO[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
+                    {ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
                     {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
                     {l.pago === 'PAGADA' ? ' · ya pagada' : ''}
                     {l.pago === 'PARCIAL'

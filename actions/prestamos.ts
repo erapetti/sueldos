@@ -9,13 +9,35 @@ import { exigirEdicion } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
 import {
   ajusteCuentaCorriente,
-  edicionPrestamo,
+  edicionConcepto,
   idUuid,
   pagoBancario,
   prestamo as esquemaPrestamo,
 } from '@/lib/validacion/esquemas'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { parseFechaISO } from '@/lib/format/dates'
+
+/**
+ * Cómo queda el concepto de un asiento al que se lo dejaron vacío. Es obligatorio en la base
+ * (§4.9), así que el vacío se rellena con el tipo en vez de rechazarse.
+ */
+const CONCEPTO_POR_DEFECTO: Record<string, string> = {
+  PRESTAMO: 'Préstamo',
+  PAGO: 'Pago bancario',
+  AJUSTE: 'Ajuste',
+}
+
+/** El listado de cada tipo de asiento. El ajuste no tiene el suyo: se ve en la cuenta corriente. */
+const LISTADO_POR_TIPO: Record<string, string> = {
+  PRESTAMO: 'prestamos',
+  PAGO: 'pagos-bancarios',
+}
+
+/** El listado del que vino el asiento, para revalidarlo junto con la ficha. */
+function rutaDelListado(empleadoId: string, tipo: string): string {
+  const hoja = LISTADO_POR_TIPO[tipo]
+  return hoja ? `/empleados/${empleadoId}/${hoja}` : `/empleados/${empleadoId}`
+}
 
 /**
  * §7.4 — el movimiento `PRESTAMO` y las filas de `plan_pagos` se crean en una única
@@ -122,6 +144,7 @@ export async function registrarPagoBancario(entrada: unknown) {
 
     log({ entidadId: movimiento.id })
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/pagos-bancarios`)
     revalidatePath('/empleados')
     return exito({ id: movimiento.id }, 'Pago registrado.')
   })
@@ -208,39 +231,48 @@ export async function anularMovimiento(movimientoId: string) {
     })
 
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(rutaDelListado(empleado.id, original.tipo))
     revalidatePath('/empleados')
     return exito(undefined, 'Movimiento anulado con un contra-asiento.')
   })
 }
 
 /**
- * §7.4 — edita un préstamo ya registrado desde su pantalla de detalle.
+ * §7.4 y §7.5 — edita un asiento ya registrado desde su pantalla de detalle: un préstamo o un
+ * pago bancario.
  *
- * Solo el concepto. El monto y la fecha quedan fijos: el asiento `PRESTAMO` ya está en la
+ * Solo el concepto. El monto y la fecha quedan fijos: el asiento ya está en su libro de la
  * cuenta corriente (§4.9) y cambiarlo movería un saldo que puede tener liquidaciones
  * confirmadas encima. El camino para corregirlos es anular el movimiento —que deja su
  * contra-asiento— y volver a registrarlo.
+ *
+ * Los que **nacen de una liquidación** no se editan acá, igual que no se anulan acá: su
+ * concepto lo escribió el confirmar, y el camino es la liquidación.
  */
-export async function actualizarPrestamo(entrada: unknown) {
-  return ejecutar('prestamos.actualizar', async (log) => {
-    const datos = validar(edicionPrestamo, entrada)
+export async function actualizarMovimiento(entrada: unknown) {
+  return ejecutar('prestamos.actualizarMovimiento', async (log) => {
+    const datos = validar(edicionConcepto, entrada)
 
-    const prestamo = await prisma.cuentaCorriente.findUnique({ where: { id: datos.id } })
-    if (!prestamo || prestamo.tipo !== 'PRESTAMO') {
-      throw new ErrorNegocio('No se encontró el préstamo.')
+    const movimiento = await prisma.cuentaCorriente.findUnique({ where: { id: datos.id } })
+    if (!movimiento) throw new ErrorNegocio('No se encontró el movimiento.')
+    if (movimiento.tipo === 'LIQUIDACION') {
+      throw new ErrorNegocio('Este movimiento nació de una liquidación y no se edita.')
     }
 
-    const { usuario, empleado } = await exigirEdicion(prestamo.empleadoId)
-    log({ usuarioId: usuario.id, entidad: 'cuenta_corriente', entidadId: prestamo.id })
+    const { usuario, empleado } = await exigirEdicion(movimiento.empleadoId)
+    log({ usuarioId: usuario.id, entidad: 'cuenta_corriente', entidadId: movimiento.id })
 
     await prisma.cuentaCorriente.update({
-      where: { id: prestamo.id },
-      data: { concepto: datos.concepto?.trim() || 'Préstamo', modificadoPor: usuario.id },
+      where: { id: movimiento.id },
+      data: {
+        concepto: datos.concepto?.trim() || CONCEPTO_POR_DEFECTO[movimiento.tipo],
+        modificadoPor: usuario.id,
+      },
     })
 
     revalidatePath(`/empleados/${empleado.id}`)
-    revalidatePath(`/empleados/${empleado.id}/prestamos`)
-    return exito(undefined, 'Préstamo actualizado.')
+    revalidatePath(rutaDelListado(empleado.id, movimiento.tipo))
+    return exito(undefined, 'Movimiento actualizado.')
   })
 }
 

@@ -8,13 +8,18 @@
  *
  * Las otras tres acciones de a una —pago adicional, licencia y pago bancario— son el mismo
  * caso, así que este módulo está partido para que cada una entre al lado de la de acá: una
- * función de listado que devuelve filas ya formateadas y una de detalle.
+ * función de listado que devuelve filas ya formateadas y una de detalle. Están las de pago
+ * adicional y las de pago bancario; falta licencia.
+ *
+ * **El detalle siempre devuelve `null` si el id no es de esa empleada**, y no lanza: es lo que
+ * la página traduce a 404, y así el id de otra empleada no filtra ni que exista.
  */
 import 'server-only'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
-import { aDecimal } from '@/lib/db/mapeo'
-import { aISO, formatearFecha } from '@/lib/format/dates'
+import { aDecimal, type DecimalPrisma } from '@/lib/db/mapeo'
+import { aISO, formatearFecha, formatearPeriodo, primerDiaDelMes } from '@/lib/format/dates'
+import type { Libro } from '@/lib/calculo/tipos'
 
 /** Fila del listado de préstamos. Los importes viajan como string, como en el resto. */
 export type FilaPrestamo = {
@@ -137,4 +142,171 @@ export async function detalleDePrestamo(
       estado: c.estado,
     })),
   }
+}
+
+// ── §7.3 pagos adicionales ───────────────────────────────────────────────────
+
+/**
+ * §6.11 — los períodos que ya tienen una liquidación mensual confirmada.
+ *
+ * El pago adicional no es un asiento: es una novedad que entra en la liquidación del mes de su
+ * fecha (§4.7). Saber si ese mes ya está liquidado es lo que deja avisar **antes** de tocarlo,
+ * con el enlace a la pantalla de cálculo, en vez de que el aviso llegue recién al guardar.
+ */
+async function periodosLiquidados(empleadoId: string): Promise<Set<string>> {
+  const liquidaciones = await prisma.liquidacion.findMany({
+    where: { empleadoId, tipo: 'MENSUAL', estado: 'CONFIRMADA' },
+    select: { periodo: true },
+  })
+  return new Set(liquidaciones.map((l) => aISO(l.periodo)))
+}
+
+/** Fila del listado de pagos adicionales. */
+export type FilaPagoAdicional = {
+  id: string
+  fecha: string
+  fechaISO: string
+  concepto: string | null
+  monto: string
+  /** El mes en el que se liquida, que sale de la fecha (§4.7). */
+  periodo: string
+  periodoISO: string
+  /** Ese mes ya tiene una liquidación mensual confirmada (§6.11). */
+  periodoLiquidado: boolean
+}
+
+export async function listarPagosAdicionales(empleadoId: string): Promise<FilaPagoAdicional[]> {
+  const [pagos, liquidados] = await Promise.all([
+    prisma.pagoAdicional.findMany({
+      where: { empleadoId },
+      orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+    }),
+    periodosLiquidados(empleadoId),
+  ])
+
+  return pagos.map((p) => {
+    const periodo = primerDiaDelMes(p.fecha)
+    return {
+      id: p.id,
+      fecha: formatearFecha(p.fecha),
+      fechaISO: aISO(p.fecha),
+      concepto: p.concepto,
+      monto: aDecimal(p.monto).toFixed(2),
+      periodo: formatearPeriodo(periodo),
+      periodoISO: aISO(periodo),
+      periodoLiquidado: liquidados.has(aISO(periodo)),
+    }
+  })
+}
+
+export type DetallePagoAdicional = FilaPagoAdicional & { empleadoId: string }
+
+export async function detalleDePagoAdicional(
+  empleadoId: string,
+  pagoId: string,
+): Promise<DetallePagoAdicional | null> {
+  const pago = await prisma.pagoAdicional.findFirst({ where: { id: pagoId, empleadoId } })
+  if (!pago) return null
+
+  const periodo = primerDiaDelMes(pago.fecha)
+  const liquidados = await periodosLiquidados(empleadoId)
+
+  return {
+    id: pago.id,
+    empleadoId: pago.empleadoId,
+    fecha: formatearFecha(pago.fecha),
+    fechaISO: aISO(pago.fecha),
+    concepto: pago.concepto,
+    monto: aDecimal(pago.monto).toFixed(2),
+    periodo: formatearPeriodo(periodo),
+    periodoISO: aISO(periodo),
+    periodoLiquidado: liquidados.has(aISO(periodo)),
+  }
+}
+
+// ── §7.5 pagos bancarios ─────────────────────────────────────────────────────
+
+/** La liquidación que un pago cancela, cuando está vinculado (§4.14). */
+export type LiquidacionDelPago = {
+  id: string
+  periodo: string
+  periodoISO: string
+  tipo: string
+  secuencia: number
+}
+
+/** Fila del listado de pagos bancarios. */
+export type FilaPagoBancario = {
+  id: string
+  fecha: string
+  fechaISO: string
+  concepto: string
+  monto: string
+  /** §4.9 — cada pago es de un libro, y es el que decide qué queda por pagar (§4.14). */
+  libro: Libro
+  liquidacion: LiquidacionDelPago | null
+  anulado: boolean
+}
+
+/** El `include` que necesitan las dos consultas de pago bancario. */
+const INCLUIR_PAGO_BANCARIO = {
+  liquidacion: { select: { id: true, periodo: true, tipo: true, secuencia: true } },
+  reversas: { select: { id: true } },
+} as const
+
+type PagoBancarioConVinculos = {
+  id: string
+  fecha: Date
+  libro: Libro
+  debe: DecimalPrisma
+  concepto: string
+  liquidacion: { id: string; periodo: Date; tipo: string; secuencia: number } | null
+  reversas: readonly { id: string }[]
+}
+
+function aFilaDePagoBancario(pago: PagoBancarioConVinculos): FilaPagoBancario {
+  return {
+    id: pago.id,
+    fecha: formatearFecha(pago.fecha),
+    fechaISO: aISO(pago.fecha),
+    concepto: pago.concepto,
+    // §4.9 — el pago va al debe: cancela lo devengado.
+    monto: aDecimal(pago.debe).toFixed(2),
+    libro: pago.libro,
+    liquidacion: pago.liquidacion
+      ? {
+          id: pago.liquidacion.id,
+          periodo: formatearPeriodo(pago.liquidacion.periodo),
+          periodoISO: aISO(pago.liquidacion.periodo),
+          tipo: pago.liquidacion.tipo,
+          secuencia: pago.liquidacion.secuencia,
+        }
+      : null,
+    anulado: pago.reversas.length > 0,
+  }
+}
+
+export async function listarPagosBancarios(empleadoId: string): Promise<FilaPagoBancario[]> {
+  const pagos = await prisma.cuentaCorriente.findMany({
+    where: { empleadoId, tipo: 'PAGO', reversaDeId: null },
+    include: INCLUIR_PAGO_BANCARIO,
+    orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+  })
+
+  return pagos.map(aFilaDePagoBancario)
+}
+
+export type DetallePagoBancario = FilaPagoBancario & { empleadoId: string }
+
+export async function detalleDePagoBancario(
+  empleadoId: string,
+  pagoId: string,
+): Promise<DetallePagoBancario | null> {
+  const pago = await prisma.cuentaCorriente.findFirst({
+    where: { id: pagoId, empleadoId, tipo: 'PAGO', reversaDeId: null },
+    include: INCLUIR_PAGO_BANCARIO,
+  })
+  if (!pago) return null
+
+  return { ...aFilaDePagoBancario(pago), empleadoId: pago.empleadoId }
 }

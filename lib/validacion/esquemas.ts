@@ -250,11 +250,13 @@ export const prestamo = z
   })
 
 /**
- * §7.4 — lo editable de un préstamo ya registrado. El monto y la fecha no se tocan: el asiento
- * de cuenta corriente ya está en el libro y corregirlo sería reescribir la historia. Para eso
- * está anularlo con su contra-asiento y volver a registrarlo.
+ * Lo único editable de un movimiento ya registrado —préstamo, pago bancario, pago adicional—:
+ * el concepto. La fecha y el monto no se tocan, y es la misma regla en los tres. En los
+ * asientos, porque el movimiento ya está en su libro (§4.9) y corregirlo sería mover un saldo
+ * hacia atrás; en el pago adicional, porque su mes ya puede estar liquidado (§6.11). El camino
+ * para corregirlos es anular —o borrar— y registrar de nuevo.
  */
-export const edicionPrestamo = z.object({
+export const edicionConcepto = z.object({
   id: idUuid,
   concepto: z.string().trim().max(255).optional().or(z.literal('')),
 })

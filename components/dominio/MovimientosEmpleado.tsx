@@ -9,12 +9,12 @@
  * pantallas que cuelgan de ella, con el botón de donde estás parado marcado. Así se salta de
  * un movimiento a otro sin volver atrás.
  *
- * Con permiso `VER` los que registran quedan deshabilitados; Préstamos, que solo lleva al
- * listado, sigue activo.
+ * Tres de los cuatro son **links a su listado**, donde vive el alta; el único que todavía abre
+ * un diálogo es Licencia, hasta que tenga su pantalla. Con permiso `VER` el que registra queda
+ * deshabilitado y los que llevan al listado siguen activos: mirar no pide permiso de edición, y
+ * el alta la esconde la propia pantalla.
  */
 import { useState } from 'react'
-import { DialogoPagoAdicional } from './DialogoPagoAdicional'
-import { DialogoPagoBancario } from './DialogoPagoBancario'
 import { DialogoLicencia } from './DialogoLicencia'
 import { DialogoOcultar } from './DialogoOcultar'
 import { ItemSubmenu, SubmenuSeccion } from './SubmenuSeccion'
@@ -33,7 +33,7 @@ export type MovimientosEmpleadoProps = {
   activo?: string
 }
 
-type Dialogo = 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
+type Dialogo = 'LICENCIA' | 'VISIBILIDAD' | null
 
 export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
   const [dialogo, setDialogo] = useState<Dialogo>(null)
@@ -52,23 +52,24 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
     una su sección en el menú de la empleada, así que no se repiten acá.
   */
   const movimientos: Movimiento[] = [
+    /*
+      Los tres que ya tienen pantalla propia llevan al listado, y el alta vive ahí. Licencia
+      sigue abriendo su diálogo hasta que tenga la suya, así que conserva el «Registrar …»
+      —prometer un listado que todavía no existe sería peor—.
+
+      Mirar un listado no pide permiso de edición: el alta la esconde la propia pantalla.
+    */
     {
-      /*
-        Préstamos ya tiene pantalla propia: el botón lleva al listado y el alta vive ahí. Los
-        otros tres siguen abriendo su diálogo hasta que tengan la suya, así que conservan el
-        «Registrar …» —prometer un listado que todavía no existe sería peor—.
-      */
       clave: 'prestamo',
       etiqueta: 'Préstamos',
       href: `/empleados/${empleadoId}/prestamos`,
-      // Mirar el listado no pide permiso de edición; el alta la esconde la propia pantalla.
       habilitada: true,
     },
     {
       clave: 'pago-adicional',
-      etiqueta: 'Registrar pago adicional',
-      dialogo: 'PAGO_ADICIONAL',
-      habilitada: puedeEditar,
+      etiqueta: 'Pagos adicionales',
+      href: `/empleados/${empleadoId}/pagos-adicionales`,
+      habilitada: true,
     },
     {
       clave: 'licencia',
@@ -78,9 +79,9 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
     },
     {
       clave: 'pago-bancario',
-      etiqueta: 'Registrar pago bancario',
-      dialogo: 'PAGO_BANCARIO',
-      habilitada: puedeEditar,
+      etiqueta: 'Pagos bancarios',
+      href: `/empleados/${empleadoId}/pagos-bancarios`,
+      habilitada: true,
     },
   ]
 
@@ -116,20 +117,6 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
         ))}
       </SubmenuSeccion>
 
-      <DialogoPagoAdicional
-        abierto={dialogo === 'PAGO_ADICIONAL'}
-        onCerrar={() => setDialogo(null)}
-        empleadoId={empleadoId}
-        alias={alias}
-        fechaIngreso={props.fechaIngreso}
-      />
-      <DialogoPagoBancario
-        abierto={dialogo === 'PAGO_BANCARIO'}
-        onCerrar={() => setDialogo(null)}
-        empleadoId={empleadoId}
-        alias={alias}
-        fechaIngreso={props.fechaIngreso}
-      />
       <DialogoLicencia
         abierto={dialogo === 'LICENCIA'}
         onCerrar={() => setDialogo(null)}

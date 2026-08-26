@@ -11,7 +11,13 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { exigirEdicion } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
-import { loteFaltas, loteHorasExtras, pagoAdicional, idUuid } from '@/lib/validacion/esquemas'
+import {
+  edicionConcepto,
+  loteFaltas,
+  loteHorasExtras,
+  pagoAdicional,
+  idUuid,
+} from '@/lib/validacion/esquemas'
 import { aColumnaCantidad, aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
@@ -281,7 +287,42 @@ export async function guardarPagoAdicional(entrada: unknown) {
     }
 
     revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/pagos-adicionales`)
     return exito(undefined, await avisoDePeriodoLiquidado(empleado.id, primerDiaDelMes(fecha)))
+  })
+}
+
+/**
+ * §7.3 — edita un pago adicional ya registrado desde su pantalla de detalle.
+ *
+ * Solo el concepto, por el mismo motivo que en los asientos (§7.4): la fecha decide en qué mes
+ * se liquida (§4.7) y el monto puede estar dentro de una liquidación confirmada, así que
+ * corregirlos sería reescribir un período. El camino es borrarlo y registrarlo de nuevo.
+ *
+ * El concepto **sí** cambia el resultado: es la descripción de la línea de la liquidación
+ * (§6.2, paso 10). Por eso también devuelve el aviso del §6.11 si el mes ya está liquidado.
+ */
+export async function actualizarPagoAdicional(entrada: unknown) {
+  return ejecutar('novedades.actualizarPagoAdicional', async (log) => {
+    const datos = validar(edicionConcepto, entrada)
+
+    const pago = await prisma.pagoAdicional.findUnique({ where: { id: datos.id } })
+    if (!pago) throw new ErrorNegocio('No se encontró el pago adicional.')
+
+    const { usuario, empleado } = await exigirEdicion(pago.empleadoId)
+    log({ usuarioId: usuario.id, entidad: 'pagos_adicionales', entidadId: pago.id })
+
+    await prisma.pagoAdicional.update({
+      where: { id: pago.id },
+      data: { concepto: datos.concepto?.trim() || null, modificadoPor: usuario.id },
+    })
+
+    revalidatePath(`/empleados/${empleado.id}`)
+    revalidatePath(`/empleados/${empleado.id}/pagos-adicionales`)
+    return exito(
+      undefined,
+      await avisoDePeriodoLiquidado(empleado.id, primerDiaDelMes(pago.fecha)),
+    )
   })
 }
 
@@ -308,6 +349,7 @@ export async function borrarNovedad(tipo: TipoNovedad, id: string) {
     else await prisma.pagoAdicional.delete({ where: { id: identificador } })
 
     revalidatePath(`/empleados/${empleado.id}`)
+    if (tipo === 'PAGO_ADICIONAL') revalidatePath(`/empleados/${empleado.id}/pagos-adicionales`)
     return exito(
       undefined,
       await avisoDePeriodoLiquidado(empleado.id, primerDiaDelMes(registro.fecha)),

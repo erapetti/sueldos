@@ -1,16 +1,18 @@
 'use client'
 
 /**
- * §7.4 — la tabla de préstamos, con el alta arriba y el detalle a un clic de la fecha.
+ * §7.5 — la tabla de pagos bancarios, con el alta arriba y el detalle a un clic de la fecha.
  *
- * El diálogo de alta es el mismo de siempre: la pantalla no lo reemplaza, le da un lugar
- * donde volver a mirar lo que registró.
+ * La columna de la **liquidación** es la que hace falta para leer el listado: vincular el pago
+ * es lo que la marca como pagada (§4.14), y un pago sin vínculo —un adelanto, una devolución—
+ * es igual de válido pero no cancela nada. La del **libro** dice de cuál de las dos cuentas
+ * sale (§4.9): una liquidación con las dos tablas se paga con dos transferencias.
  */
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DialogoPrestamo } from '@/components/dominio/DialogoPrestamo'
+import { DialogoPagoBancario } from '@/components/dominio/DialogoPagoBancario'
 import {
   MarcoDeMovimientos,
   type EmpleadaDelMarco,
@@ -19,64 +21,77 @@ import {
   ListadoDeMovimientos,
   type ColumnaListado,
 } from '@/components/dominio/ListadoDeMovimientos'
+import { ETIQUETA_LIBRO, nombreDeLiquidacion } from '@/constants/etiquetas'
 import { formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
-import type { FilaPrestamo } from '@/lib/consultas/movimientos'
+import type { FilaPagoBancario } from '@/lib/consultas/movimientos'
 
-export function ListaPrestamos({
+export function ListaPagosBancarios({
   empleada,
-  prestamos,
+  pagos,
 }: {
   empleada: EmpleadaDelMarco
-  prestamos: FilaPrestamo[]
+  pagos: FilaPagoBancario[]
 }) {
-  // El refresh tras el alta lo hace el propio `DialogoPrestamo`, que ya llama a `router.refresh()`.
+  // El refresh tras el alta lo hace el propio diálogo, que ya llama a `router.refresh()`.
   const [alta, setAlta] = useState(false)
 
   // §1.3 de las notas — el `,00` sobra si no hay centavos en toda la columna.
-  const importe = todosEnteros(prestamos.flatMap((p) => [p.monto, p.saldo]))
+  const importe = todosEnteros(pagos.map((p) => p.monto))
     ? formatearImporteEntero
     : formatearImporte
 
-  const columnas: ColumnaListado<FilaPrestamo>[] = [
+  const columnas: ColumnaListado<FilaPagoBancario>[] = [
     // La fecha es la puerta de entrada al detalle: por ser la primera, `Tabla` la hace enlace.
     { clave: 'fecha', etiqueta: 'Fecha', celda: (p) => p.fecha },
     {
       clave: 'concepto',
-      etiqueta: 'Comentario',
+      etiqueta: 'Concepto',
       celda: (p) => (
         <span className="flex flex-wrap items-center gap-2">
           {p.concepto}
           {p.anulado ? <Badge variant="outline">Anulado</Badge> : null}
-          {!p.conPlan && !p.anulado ? (
-            <Badge variant="outline">Sin plan de devolución</Badge>
-          ) : null}
         </span>
       ),
     },
+    {
+      clave: 'libro',
+      etiqueta: 'Libro',
+      desde: 'sm',
+      celda: (p) => ETIQUETA_LIBRO[p.libro],
+    },
+    {
+      clave: 'liquidacion',
+      etiqueta: 'Cancela',
+      celda: (p) =>
+        p.liquidacion ? (
+          <span className="capitalize">{nombreDeLiquidacion(p.liquidacion)}</span>
+        ) : (
+          <span className="text-muted-foreground">Sin vincular</span>
+        ),
+    },
     { clave: 'monto', etiqueta: 'Monto', numerica: true, celda: (p) => importe(p.monto) },
-    { clave: 'saldo', etiqueta: 'Saldo', numerica: true, celda: (p) => importe(p.saldo) },
   ]
 
   return (
-    <MarcoDeMovimientos empleada={empleada} activo="prestamo">
+    <MarcoDeMovimientos empleada={empleada} activo="pago-bancario">
       <ListadoDeMovimientos
-        titulo="Préstamos"
+        titulo="Pagos bancarios"
         accion={
           empleada.soloLectura ? null : (
             <Button onClick={() => setAlta(true)}>
               <Plus className="size-4" aria-hidden />
-              Nuevo préstamo
+              Nuevo pago bancario
             </Button>
           )
         }
         columnas={columnas}
-        filas={prestamos}
-        hrefDetalle={(p) => `/empleados/${empleada.id}/prestamos/${p.id}`}
+        filas={pagos}
+        hrefDetalle={(p) => `/empleados/${empleada.id}/pagos-bancarios/${p.id}`}
         atenuada={(p) => p.anulado}
-        vacio="Todavía no hay préstamos registrados."
+        vacio="Todavía no hay pagos bancarios registrados."
       />
 
-      <DialogoPrestamo
+      <DialogoPagoBancario
         abierto={alta}
         onCerrar={() => setAlta(false)}
         empleadoId={empleada.id}

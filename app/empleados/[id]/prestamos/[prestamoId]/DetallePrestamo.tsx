@@ -3,25 +3,21 @@
 /**
  * §7.4 — detalle de un préstamo registrado.
  *
- * Se parece al formulario de alta, con dos diferencias que son de negocio y no de diseño:
+ * Se parece al formulario de alta, con dos diferencias que son de negocio y no de diseño. La
+ * primera la fija `DetalleDeMovimiento` y vale para los cuatro movimientos: **la fecha y el
+ * monto no se editan**, porque el asiento ya está en la cuenta corriente (§4.9). La otra es
+ * propia del préstamo:
  *
- * - **La fecha y el monto no se editan.** El asiento `PRESTAMO` ya está en la cuenta corriente
- *   (§4.9) y puede tener liquidaciones confirmadas encima; corregirlo sería mover un saldo
- *   hacia atrás. El camino es anular el movimiento, que deja su contra-asiento, y registrarlo
- *   de nuevo.
  * - **Las cuotas de meses pasados tampoco.** Una cuota se bloquea si su mes ya pasó o si dejó
  *   de estar `PENDIENTE`. Las dos reglas suman: la del mes es la que se pidió, y la del estado
  *   es la única que valida el servidor (§4.8), así que si la pantalla ofreciera editar una
  *   cuota aplicada la acción la rechazaría igual.
  */
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,10 +29,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
-import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
-import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
+import { DetalleDeMovimiento } from '@/components/dominio/DetalleDeMovimiento'
+import type { EmpleadaDelMarco } from '@/components/dominio/MarcoDeMovimientos'
 import { useAccion } from '@/hooks/useAccion'
-import { actualizarCuota, actualizarPrestamo, cancelarCuota } from '@/actions/prestamos'
+import { actualizarCuota, actualizarMovimiento, cancelarCuota } from '@/actions/prestamos'
 import { formatearPeriodoCapitalizado, parseFechaISO } from '@/lib/format/dates'
 import {
   formatearImporte,
@@ -57,23 +53,11 @@ function motivoDeBloqueo(cuota: CuotaDetalle, mesActual: string): string | null 
 }
 
 export function DetallePrestamo({
-  empleadoId,
-  alias,
-  nombreCompleto,
-  soloLectura,
-  fechaIngreso,
-  dadoDeBaja,
-  visible,
+  empleada,
   prestamo,
   mesActual,
 }: {
-  empleadoId: string
-  alias: string
-  nombreCompleto: string
-  soloLectura: boolean
-  fechaIngreso: string
-  dadoDeBaja: boolean
-  visible: boolean
+  empleada: EmpleadaDelMarco
   prestamo: Prestamo
   mesActual: string
 }) {
@@ -95,7 +79,7 @@ export function DetallePrestamo({
     ? formatearImporteEntero
     : formatearImporte
 
-  const editable = !soloLectura && !prestamo.anulado
+  const editable = !empleada.soloLectura && !prestamo.anulado
   const bloqueos = new Map(prestamo.cuotas.map((c) => [c.id, motivoDeBloqueo(c, mesActual)]))
 
   /** Lo que cambió respecto de lo guardado, entre lo que se puede tocar. */
@@ -113,7 +97,7 @@ export function DetallePrestamo({
     ejecutar(
       async (): Promise<Resultado<undefined>> => {
         if (concepto !== prestamo.concepto) {
-          const r = await actualizarPrestamo({ id: prestamo.id, concepto })
+          const r = await actualizarMovimiento({ id: prestamo.id, concepto })
           if (!r.ok) return r
         }
         // Las cuotas se guardan de a una porque cada una tiene su propia validación de estado
@@ -194,87 +178,49 @@ export function DetallePrestamo({
   ]
 
   return (
-    <div className="space-y-5">
-      <EncabezadoEmpleada
-        empleadoId={empleadoId}
-        alias={alias}
-        nombreCompleto={nombreCompleto}
-        activa="movimientos"
-      />
-
-      {/* El submenú acompaña como en Datos: está presente en toda la rama, no solo en su índice. */}
-      <MovimientosEmpleado
-        empleadoId={empleadoId}
-        alias={alias}
-        fechaIngreso={fechaIngreso}
-        puedeEditar={!soloLectura}
-        dadoDeBaja={dadoDeBaja}
-        mostrarVisibilidad={!visible}
-        visible={visible}
+    <>
+      <DetalleDeMovimiento
+        empleada={empleada}
         activo="prestamo"
-      />
-
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="icon" aria-label="Volver a Préstamos">
-              <Link href={`/empleados/${empleadoId}/prestamos`}>
-                <ChevronLeft className="size-4" aria-hidden />
-              </Link>
-            </Button>
-            <h2 className="text-[28px] leading-tight">Préstamo</h2>
-            {prestamo.anulado ? <Badge variant="outline">Anulado</Badge> : null}
-          </div>
-        </div>
-
-        {prestamo.anulado ? (
-          <p className="rounded-md border border-warn/35 bg-warn-soft px-3 py-2 text-sm text-warn-ink">
-            Este préstamo se anuló con un contra-asiento y sus cuotas pendientes quedaron
-            canceladas. Se muestra para consulta y no se puede modificar.
-          </p>
-        ) : null}
-
-        <div className="space-y-4 rounded-card border bg-card px-[22px] py-5 shadow-soft">
-          {/*
-            La fecha y el monto se muestran como dato, no como campo deshabilitado: un input
-            en gris invita a intentar escribirlo y después no explica por qué no se puede.
-          */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <p className="text-sm text-muted-foreground">Fecha</p>
-              <p className="tabular text-lg">{prestamo.fecha}</p>
+        titulo="Préstamo"
+        volverA="Préstamos"
+        volverHref={`/empleados/${empleada.id}/prestamos`}
+        etiquetas={prestamo.anulado ? <Badge variant="outline">Anulado</Badge> : null}
+        aviso={
+          prestamo.anulado
+            ? `Este préstamo se anuló con un contra-asiento y sus cuotas pendientes quedaron
+               canceladas. Se muestra para consulta y no se puede modificar.`
+            : null
+        }
+        datos={[
+          { etiqueta: 'Fecha', valor: prestamo.fecha },
+          { etiqueta: 'Monto', valor: importe(prestamo.monto) },
+          { etiqueta: 'Saldo', valor: importe(prestamo.saldo) },
+        ]}
+        nota="La fecha y el monto no se modifican: el asiento ya está en la cuenta corriente. Para corregirlos hay que anular el préstamo y registrarlo de nuevo."
+        concepto={{
+          etiqueta: 'Comentario',
+          valor: concepto,
+          onChange: setConcepto,
+          error: campos.concepto,
+          disabled: !editable || enviando,
+          placeholder: 'Adelanto, préstamo…',
+        }}
+        pie={
+          editable ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={guardar} disabled={enviando || !hayCambios || !!cuotaInvalida}>
+                {enviando ? 'Guardando…' : 'Guardar cambios'}
+              </Button>
+              {cuotaInvalida ? (
+                <span className="text-sm text-destructive">
+                  Hay una cuota con un monto que no es válido.
+                </span>
+              ) : null}
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Monto</p>
-              <p className="tabular text-lg">{importe(prestamo.monto)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Saldo</p>
-              <p className="tabular text-lg">{importe(prestamo.saldo)}</p>
-            </div>
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            La fecha y el monto no se modifican: el asiento ya está en la cuenta corriente. Para
-            corregirlos hay que anular el préstamo y registrarlo de nuevo.
-          </p>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="prestamo-concepto">Comentario</Label>
-            <Input
-              id="prestamo-concepto"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              disabled={!editable || enviando}
-              maxLength={255}
-              placeholder="Adelanto, préstamo…"
-            />
-            {campos.concepto ? (
-              <p className="text-sm text-destructive">{campos.concepto}</p>
-            ) : null}
-          </div>
-        </div>
-
+          ) : null
+        }
+      >
         <section className="space-y-2">
           <h3 className="text-[20px]">Plan de devolución</h3>
 
@@ -292,21 +238,9 @@ export function DetallePrestamo({
 
           {campos.cuotas ? <p className="text-sm text-destructive">{campos.cuotas}</p> : null}
         </section>
+      </DetalleDeMovimiento>
 
-        {editable ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={guardar} disabled={enviando || !hayCambios || !!cuotaInvalida}>
-              {enviando ? 'Guardando…' : 'Guardar cambios'}
-            </Button>
-            {cuotaInvalida ? (
-              <span className="text-sm text-destructive">
-                Hay una cuota con un monto que no es válido.
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
+      {/* Sigue siendo un `AlertDialog`: migrarlo a `DialogoDeAccion` es parte de la Tarea 1. */}
       <AlertDialog open={!!aCancelar} onOpenChange={(v) => !v && setACancelar(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -328,6 +262,6 @@ export function DetallePrestamo({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }
