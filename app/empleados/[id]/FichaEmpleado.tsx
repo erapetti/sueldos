@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { FormularioSeries } from './FormularioSeries'
-import { AccionesEmpleado } from '@/components/dominio/AccionesEmpleado'
+import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
 import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
@@ -362,15 +362,15 @@ export function FichaEmpleado(props: FichaProps) {
         {/*
           4 — Movimientos: el índice de las cuatro cosas que se cargan de a una. Se llamaba
           «Acciones» y era solo botonera; ahora cada una lleva a su listado, donde además se
-          da de alta. `?seccion=acciones` se sigue aceptando para no romper enlaces viejos.
+          da de alta.
         */}
-        {seccion === 'movimientos' || seccion === 'acciones' ? (
+        {seccion === 'movimientos' ? (
           <div>
             <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
               <p className="text-sm text-muted-foreground">
                 Movimientos que no se cargan en planilla: se registran de a uno, con su fecha.
               </p>
-              <AccionesEmpleado
+              <MovimientosEmpleado
                 empleadoId={props.empleadoId}
                 alias={props.empleado.alias}
                 fechaIngreso={props.empleado.fechaIngreso}
@@ -380,7 +380,6 @@ export function FichaEmpleado(props: FichaProps) {
                 // (§8.3), que es lo que resuelve el fallback a `dadoDeBaja`.
                 mostrarVisibilidad={!props.empleado.visible}
                 visible={props.empleado.visible}
-                variante="tarjeta"
               />
             </div>
           </div>

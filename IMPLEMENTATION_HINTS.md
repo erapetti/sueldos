@@ -249,9 +249,8 @@ movimiento y obligaría a migrar esa FK. El listado se arma leyendo el asiento c
 en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado.
 
 **El ítem «Acciones» del menú se llama ahora «Movimientos»** y dejó de ser solo botonera: es el
-índice desde donde se entra a cada listado. `?seccion=acciones` se sigue aceptando para no
-romper enlaces viejos. Por ahora solo «Préstamos» lleva a su pantalla; las otras tres
-conservan el «Registrar …» y su diálogo hasta que tengan la suya.
+índice desde donde se entra a cada listado. Por ahora solo «Préstamos» lleva a su pantalla; las
+otras tres conservan el «Registrar …» y su diálogo hasta que tengan la suya.
 
 Dos reglas del detalle que son de negocio y conviene no aflojar:
 
