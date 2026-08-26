@@ -743,6 +743,7 @@ desvíos deliberados.
 | El modo oscuro no es del diseño | El diseño solo entrega la variante clara; la oscura se derivó conservando la temperatura cálida. Hoy no hay `ThemeProvider`, así que no se puede activar |
 | El nombre del feriado no se muestra en la celda del calendario | §7.1 pide mostrarlo. Se decidió marcarlo con fondo y borde; el nombre quedó en el `title` y en el `aria-label`. **Divergencia abierta con el SPECS** |
 | El padding del header derecho sale de un `calc()` | El diseño lo calcula midiendo `main` con un `ResizeObserver`. La misma cuenta en CSS evita convertir el layout raíz en componente cliente y un salto de layout |
+| El botón primario no se levanta al pasar el mouse | El diseño lo sube 1 px con `hover:-translate-y-px`. Mover la caja obliga al navegador a re-rasterizar el texto en la posición nueva, y el cambio de antialias se lee como un temblor de las letras mientras el icono —vectorial— sube limpio. El hover quedó como **oscurecido** del relleno (`hover:bg-primary-deep`), que es lo que ya hacían los botones no primarios, así que la aplicación tiene un solo lenguaje de hover. La sombra sigue creciendo: no mueve nada |
 
 Ese `calc()` del header —`app/globals.css`, clase `.header-app`— es el que mantiene el bloque
 de usuario alineado con el borde derecho del contenido cuando la pantalla es más ancha que el
