@@ -403,7 +403,7 @@ verificar que `document.documentElement.scrollWidth` no supere al `clientWidth`.
 El motivo es [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx), un
 agotamiento de pila al mergear grafos recursivos. La dependencia entra por `prisma` —el CLI,
 que está en `devDependencies`— a través de `@prisma/config`, que es lo que lee
-`prisma.config.ts`. Prisma 7.9.1, la última al 18/08/2026, sigue trayendo la 7.1.5.
+`prisma.config.ts`. Prisma 7.10.0, la última al 26/08/2026, sigue trayendo la 7.1.5.
 
 **El runtime nunca la carga**: `@prisma/client`, que es lo único que va a producción, solo
 depende de `@prisma/client-runtime-utils`. Aun así conviene sacarla del árbol, porque un
