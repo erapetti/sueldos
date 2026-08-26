@@ -43,6 +43,17 @@ export function FilaConDetalle({
     <TableRow
       className={cn('cursor-pointer hover:bg-muted/5', className)}
       onClick={(e) => {
+        /*
+          El diálogo y el menú de la fila se dibujan en un portal —en el DOM cuelgan de
+          `<body>`—, pero **React los hace burbujear por el árbol de componentes**, no por el
+          DOM. Como el `<DialogoCambiarDueno>` se renderiza adentro de una celda, cerrar su
+          diálogo tocando afuera hacía llegar ese clic hasta acá y abría la empleada: cerraba
+          el diálogo y navegaba de arriba.
+
+          `contains` es sobre el DOM, así que separa las dos cosas: lo que nació adentro del
+          `<tr>` es un clic en la fila, y lo que nació en un portal, no.
+        */
+        if (!e.currentTarget.contains(e.target as Node)) return
         // El chip de estado y el menú de acciones llevan a otro lado: mandan ellos.
         if ((e.target as HTMLElement).closest(CONTROLES_PROPIOS)) return
         // Arrastrar para seleccionar texto termina en un clic sobre la fila, y no es navegar.

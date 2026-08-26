@@ -9,29 +9,16 @@
  * cuenta el ancho, dónde iba el acento y si el botón de confirmar se deshabilitaba mientras
  * se envía.
  *
- * **Hay dos familias y las dos viven acá**, porque se ven igual pero no significan lo mismo:
- *
- * - `modo="formulario"` (el default) → un `Dialog`. Es el que tiene algo que elegir antes de
- *   confirmar, y se puede abandonar tocando afuera.
- * - `modo="confirmacion"` → un `AlertDialog`. Es una pregunta que interrumpe: va como
- *   `role="alertdialog"`, que el lector de pantalla anuncia con más énfasis, y **no** se cierra
- *   tocando afuera —hay que elegir—. Es lo correcto para lo que saca algo de su lugar.
+ * Es siempre un `Dialog`, con o sin cuerpo: se cierra tocando afuera y tiene su X. Se probó
+ * distinguir las confirmaciones con `AlertDialog` —que atrapa el foco hasta que elegís— y no
+ * vale la pena: se ven igual, y trabar la salida de una pregunta que ya es reversible molesta
+ * más de lo que protege.
  *
  * `peligrosa` mueve el acento: en una acción que saca algo de su lugar, el botón lleno es
  * **Cancelar** y el de confirmar va en rojo. En una que devuelve las cosas a donde estaban, el
  * acento se queda en la acción.
  */
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import {
   Dialog,
   DialogContent,
@@ -54,8 +41,6 @@ export type PropsDialogoDeAccion = {
   confirmarDeshabilitado?: boolean
   /** Saca algo de su lugar: el acento pasa a Cancelar y confirmar va en rojo. */
   peligrosa?: boolean
-  /** Ver el comentario de arriba. Con cuerpo, `formulario`; sin cuerpo, casi siempre el otro. */
-  modo?: 'formulario' | 'confirmacion'
   /** Lo que haya que elegir antes de confirmar. Sin esto, el diálogo es solo la pregunta. */
   children?: React.ReactNode
 }
@@ -70,40 +55,8 @@ export function DialogoDeAccion({
   enviando,
   confirmarDeshabilitado,
   peligrosa,
-  modo = 'formulario',
   children,
 }: PropsDialogoDeAccion) {
-  const varianteCancelar = peligrosa ? 'default' : 'outline'
-  const varianteConfirmar = peligrosa ? 'destructive' : 'default'
-
-  if (modo === 'confirmacion') {
-    return (
-      <AlertDialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{titulo}</AlertDialogTitle>
-            <AlertDialogDescription>{descripcion}</AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {children}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel variant={varianteCancelar} disabled={enviando}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant={varianteConfirmar}
-              onClick={onConfirmar}
-              disabled={enviando || confirmarDeshabilitado}
-            >
-              {etiquetaConfirmar}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    )
-  }
-
   return (
     <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
       <DialogContent className="sm:max-w-md">
@@ -115,11 +68,15 @@ export function DialogoDeAccion({
         {children}
 
         <DialogFooter>
-          <Button variant={varianteCancelar} onClick={onCerrar} disabled={enviando}>
+          <Button
+            variant={peligrosa ? 'default' : 'outline'}
+            onClick={onCerrar}
+            disabled={enviando}
+          >
             Cancelar
           </Button>
           <Button
-            variant={varianteConfirmar}
+            variant={peligrosa ? 'destructive' : 'default'}
             onClick={onConfirmar}
             disabled={enviando || confirmarDeshabilitado}
           >

@@ -298,11 +298,20 @@ cuanto alguien agregaba una columna. Ahora sale de `columnas.length`.
 Solo `Tabla` y `FilaConDetalle` importan de `components/ui/table`; ninguna pantalla arma su
 propio andamio.
 
-**Los diálogos de confirmar una acción son `DialogoDeAccion`**, con las dos familias adentro
-porque se ven igual y no significan lo mismo: `modo="formulario"` es un `Dialog` —tiene algo
-que elegir y se puede abandonar tocando afuera— y `modo="confirmacion"` es un `AlertDialog`
-—`role="alertdialog"`, que el lector de pantalla anuncia con más énfasis, y no se cierra
-tocando afuera—. `peligrosa` mueve el acento al botón que no cambia nada.
+**Los diálogos de confirmar una acción son `DialogoDeAccion`**, siempre un `Dialog`, con
+cuerpo o sin él. `peligrosa` mueve el acento al botón que no cambia nada.
+
+Se probó distinguir las confirmaciones con `AlertDialog` —que atrapa el foco hasta que elegís
+y no ofrece la X— y **se descartó por decisión del usuario**: se ven igual, y trabar la salida
+de una pregunta que ya es reversible molesta más de lo que protege.
+
+**Una fila con detalle ignora los clics que nacen en un portal.** El diálogo y el menú de la
+fila cuelgan de `<body>` en el DOM, pero React los hace burbujear **por el árbol de
+componentes**: como `DialogoCambiarDueno` se renderiza adentro de una celda, cerrar su diálogo
+tocando afuera llegaba al `onClick` del `<tr>` y abría la empleada —cerraba el diálogo y
+navegaba de arriba—. `FilaConDetalle` lo corta con `e.currentTarget.contains(e.target)`, que
+es sobre el DOM y por eso separa las dos cosas. Cualquier fila que sume un control con portal
+—un `Select`, un `Popover`— queda cubierta por la misma guarda.
 
 Los usan los tres del menú de «Todo el Personal» y el de visibilidad. **Los cuatro diálogos de
 alta** —préstamo, pago adicional, licencia, pago bancario— y las siete confirmaciones sueltas

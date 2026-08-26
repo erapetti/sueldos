@@ -75,8 +75,6 @@ export function DialogoOcultar({
       enviando={enviando}
       // Ocultar saca a la empleada del listado; mostrar la devuelve, así que ahí no hay peligro.
       peligrosa={visible}
-      // No hay nada que elegir: es una pregunta que hay que contestar, no un formulario.
-      modo="confirmacion"
     />
   )
 }
