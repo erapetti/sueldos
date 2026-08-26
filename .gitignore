@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Claude
 .claude
+
+# Notas de trabajo pendiente, locales
+PENDIENTES.md
