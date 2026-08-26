@@ -29,6 +29,8 @@ export default async function PaginaPrestamos({ params }: { params: Promise<{ id
       nombreCompleto={acceso.empleado.nombreCompleto}
       fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       soloLectura={!puedeEditar(acceso.nivel)}
+      dadoDeBaja={!acceso.empleado.activo}
+      visible={acceso.empleado.visible}
       prestamos={prestamos}
     />
   )

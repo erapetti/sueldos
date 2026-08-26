@@ -14,7 +14,7 @@ import {
 } from '@/lib/calculo/cuentaCorriente'
 import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
 import { periodoDe } from '@/lib/format/dates'
-import { D, entradaBase, f, horaExtra } from './helpers'
+import { cuotaPlan, D, entradaBase, f, horaExtra } from './helpers'
 
 const debe = (monto: number) => ({ debe: D(monto), haber: D(0) })
 const haber = (monto: number) => ({ debe: D(0), haber: D(monto) })
@@ -130,7 +130,7 @@ describe('20. complementaria con cuotas del plan ya aplicadas', () => {
   it('la cuota se considera en el paso 8 pero no se descuenta dos veces', () => {
     const conCuota = () =>
       entradaBase({
-        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(2000), yaAplicada: true }],
+        cuotasPlan: [cuotaPlan('2026-04-01', D(2000), { yaAplicada: true })],
       })
 
     const original = calcularLiquidacionMensual(conCuota())
@@ -152,7 +152,7 @@ describe('20. complementaria con cuotas del plan ya aplicadas', () => {
   it('el recálculo emite una sola línea por cuota, sin duplicar', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(2000), yaAplicada: true }],
+        cuotasPlan: [cuotaPlan('2026-04-01', D(2000), { yaAplicada: true })],
         totalYaLiquidado: D(65200),
       }),
     )

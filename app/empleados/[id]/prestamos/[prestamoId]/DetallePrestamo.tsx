@@ -40,7 +40,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { useAccion } from '@/hooks/useAccion'
 import { actualizarCuota, actualizarPrestamo, cancelarCuota } from '@/actions/prestamos'
 import { formatearPeriodoCapitalizado, parseFechaISO } from '@/lib/format/dates'
@@ -67,6 +69,9 @@ export function DetallePrestamo({
   alias,
   nombreCompleto,
   soloLectura,
+  fechaIngreso,
+  dadoDeBaja,
+  visible,
   prestamo,
   mesActual,
 }: {
@@ -74,6 +79,9 @@ export function DetallePrestamo({
   alias: string
   nombreCompleto: string
   soloLectura: boolean
+  fechaIngreso: string
+  dadoDeBaja: boolean
+  visible: boolean
   prestamo: Prestamo
   mesActual: string
 }) {
@@ -143,12 +151,24 @@ export function DetallePrestamo({
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <EncabezadoEmpleada
         empleadoId={empleadoId}
         alias={alias}
         nombreCompleto={nombreCompleto}
         activa="movimientos"
+      />
+
+      {/* El submenú acompaña como en Datos: está presente en toda la rama, no solo en su índice. */}
+      <MovimientosEmpleado
+        empleadoId={empleadoId}
+        alias={alias}
+        fechaIngreso={fechaIngreso}
+        puedeEditar={!soloLectura}
+        dadoDeBaja={dadoDeBaja}
+        mostrarVisibilidad={!visible}
+        visible={visible}
+        activo="prestamo"
       />
 
       <div className="space-y-5">
@@ -223,7 +243,8 @@ export function DetallePrestamo({
             <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  {/* Sin el resaltado de fila de shadcn, por lo mismo que el listado. */}
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Mes</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead>Estado</TableHead>
@@ -238,7 +259,10 @@ export function DetallePrestamo({
                     return (
                       <TableRow
                         key={cuota.id}
-                        className={cuota.estado === 'CANCELADA' ? 'opacity-60' : undefined}
+                        className={cn(
+                          'hover:bg-transparent',
+                          cuota.estado === 'CANCELADA' && 'opacity-60',
+                        )}
                       >
                         <TableCell>
                           {formatearPeriodoCapitalizado(parseFechaISO(cuota.fechaISO))}

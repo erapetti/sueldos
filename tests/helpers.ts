@@ -6,6 +6,7 @@ import type {
   ConceptoBpsResuelto,
   FaltaCalculo,
   HoraExtraCalculo,
+  CuotaPlanCalculo,
 } from '@/lib/calculo/tipos'
 
 export const D = (v: number | string) => new Decimal(v)
@@ -100,6 +101,27 @@ export function entradaBase(over: Partial<EntradaLiquidacion> = {}): EntradaLiqu
     feriados: [],
     diasLicencia: [],
     totalYaLiquidado: D(0),
+    ...over,
+  }
+}
+
+/**
+ * Cuota del plan de pagos para el cálculo. `ordinal`, `deTotal` y `fechaPrestamo` son lo que
+ * la línea usa para nombrarse —«Cuota 2 de 5 del préstamo de 25/03»— y casi ningún test los
+ * mira, así que traen un plan de una sola cuota por defecto.
+ */
+export function cuotaPlan(
+  fechaISO: string,
+  monto: Decimal,
+  over: Partial<CuotaPlanCalculo> = {},
+): CuotaPlanCalculo {
+  return {
+    fecha: f(fechaISO),
+    monto,
+    yaAplicada: false,
+    fechaPrestamo: f('2026-03-25'),
+    ordinal: 1,
+    deTotal: 1,
     ...over,
   }
 }

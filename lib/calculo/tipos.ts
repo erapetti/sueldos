@@ -49,6 +49,12 @@ export type CuotaPlanCalculo = {
   monto: Decimal
   /** El recálculo de un período considera también las cuotas ya aplicadas (§7.6.1). */
   yaAplicada: boolean
+  /** Fecha del préstamo que originó el plan, para nombrar la línea de la liquidación. */
+  fechaPrestamo: Date
+  /** Qué número de cuota es dentro de su plan, empezando en 1. */
+  ordinal: number
+  /** Cuántas cuotas tiene el plan completo. */
+  deTotal: number
 }
 
 /** Concepto de BPS ya resuelto para el período y el empleado (§4.11). */

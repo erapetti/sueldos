@@ -6,12 +6,12 @@
  * El diálogo de alta es el mismo de siempre: la pantalla no lo reemplaza, le da un lugar
  * donde volver a mirar lo que registró.
  */
-import Link from 'next/link'
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { DialogoPrestamo } from '@/components/dominio/DialogoPrestamo'
 import {
   ListadoDeMovimientos,
@@ -26,6 +26,8 @@ export function ListaPrestamos({
   nombreCompleto,
   fechaIngreso,
   soloLectura,
+  dadoDeBaja,
+  visible,
   prestamos,
 }: {
   empleadoId: string
@@ -33,6 +35,8 @@ export function ListaPrestamos({
   nombreCompleto: string
   fechaIngreso: string
   soloLectura: boolean
+  dadoDeBaja: boolean
+  visible: boolean
   prestamos: FilaPrestamo[]
 }) {
   // El refresh tras el alta lo hace el propio `DialogoPrestamo`, que ya llama a `router.refresh()`.
@@ -44,19 +48,8 @@ export function ListaPrestamos({
     : formatearImporte
 
   const columnas: ColumnaListado<FilaPrestamo>[] = [
-    {
-      clave: 'fecha',
-      etiqueta: 'Fecha',
-      celda: (p) => (
-        // La fecha es el enlace al detalle, como el período en la lista de liquidaciones.
-        <Link
-          href={`/empleados/${empleadoId}/prestamos/${p.id}`}
-          className="tabular hover:underline"
-        >
-          {p.fecha}
-        </Link>
-      ),
-    },
+    // La fecha es la puerta de entrada al detalle; el `<Link>` y su estilo los pone la plantilla.
+    { clave: 'fecha', etiqueta: 'Fecha', principal: true, celda: (p) => p.fecha },
     {
       clave: 'concepto',
       etiqueta: 'Comentario',
@@ -75,12 +68,23 @@ export function ListaPrestamos({
   ]
 
   return (
-    <div>
+    <div className="space-y-5">
       <EncabezadoEmpleada
         empleadoId={empleadoId}
         alias={alias}
         nombreCompleto={nombreCompleto}
         activa="movimientos"
+      />
+
+      <MovimientosEmpleado
+        empleadoId={empleadoId}
+        alias={alias}
+        fechaIngreso={fechaIngreso}
+        puedeEditar={!soloLectura}
+        dadoDeBaja={dadoDeBaja}
+        mostrarVisibilidad={!visible}
+        visible={visible}
+        activo="prestamo"
       />
 
       <ListadoDeMovimientos
@@ -95,6 +99,7 @@ export function ListaPrestamos({
         }
         columnas={columnas}
         filas={prestamos}
+        hrefDetalle={(p) => `/empleados/${empleadoId}/prestamos/${p.id}`}
         atenuada={(p) => p.anulado}
         vacio="Todavía no hay préstamos registrados."
       />

@@ -252,6 +252,24 @@ en `lib/consultas/movimientos.ts`, que está partido para que las otras tres ent
 índice desde donde se entra a cada listado. Por ahora solo «Préstamos» lleva a su pantalla; las
 otras tres conservan el «Registrar …» y su diálogo hasta que tengan la suya.
 
+**Los dos submenús se dibujan con `SubmenuSeccion`.** «Datos» y «Movimientos» son lo mismo —una
+rama del menú de la empleada con varias hojas— y se dibujaban distinto: Datos como una fila de
+botones siempre presente, Movimientos como una tarjeta con un texto explicativo arriba. Queda
+la forma de Datos, que es la que se comporta como submenú: está a la vista en toda la rama
+—incluidas las pantallas propias, no solo el índice— y el botón de donde estás parado va en
+`default` con `aria-current="page"`.
+
+Es un **`<nav>`** y no un `<div>`: un submenú es navegación, y el landmark le da al lector de
+pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salvedad de hoy es que
+en Movimientos tres de los cuatro abren un diálogo en vez de navegar; se corrige solo cuando
+tengan su pantalla.
+
+**Las tablas de préstamos no resaltan la fila al pasar por encima.** `TableRow` de shadcn trae
+`hover:bg-muted/50` y lo tienen todas las tablas de la aplicación, pero acá la fila entera se
+pintaba como si fuera clickeable cuando lo único que enlaza es la columna principal. Esa
+columna se dibuja como el alias en «Mi Personal» —`text-lg font-medium hover:underline`—, y el
+`<Link>` lo pone `ListadoDeMovimientos`, no cada pantalla, para que las cuatro queden iguales.
+
 Dos reglas del detalle que son de negocio y conviene no aflojar:
 
 - **La fecha y el monto no se editan.** El asiento ya está en el libro y puede tener
@@ -268,6 +286,14 @@ préstamo sin plan muestra el monto entero, y uno anulado muestra cero.
 
 `actualizarCuota` y `cancelarCuota` ya existían en `actions/prestamos.ts` desde el §4.8 y no
 las llamaba nadie: esta pantalla es la que les da uso.
+
+**La línea de la cuota en la liquidación dice de cuál se trata**: «Cuota 2 de 5 del préstamo de
+25/03». Decía «Cuota del plan de pagos», y con dos préstamos abiertos en el mismo mes las dos
+líneas quedaban idénticas. El ordinal cuenta **todas** las cuotas del plan, canceladas
+incluidas: si cancelar la cuarta convirtiera la quinta en «4 de 4», la misma cuota cambiaría de
+nombre entre una liquidación y la siguiente. Como `lib/calculo` es puro (§2.1), el ordinal, el
+total y la fecha del préstamo se resuelven en `lib/liquidacion/datos.ts` y entran por
+`CuotaPlanCalculo`.
 
 ### 1.11 El loopback del cron no se puede implementar como está escrito
 

@@ -28,6 +28,9 @@ export default async function PaginaDetallePrestamo({
       alias={acceso.empleado.alias}
       nombreCompleto={acceso.empleado.nombreCompleto}
       soloLectura={!puedeEditar(acceso.nivel)}
+      fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
+      dadoDeBaja={!acceso.empleado.activo}
+      visible={acceso.empleado.visible}
       prestamo={prestamo}
       // El mes en curso se decide en el servidor: es lo que separa las cuotas que todavía se
       // pueden tocar de las de meses ya pasados, y no puede depender del reloj del navegador.

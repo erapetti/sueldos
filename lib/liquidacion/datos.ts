@@ -92,6 +92,18 @@ export async function armarContextoLiquidacion(
     prisma.planPago.findMany({
       where: { empleadoId, fecha: rangoDelMes, estado: { in: ['PENDIENTE', 'APLICADA'] } },
       orderBy: { fecha: 'asc' },
+      /*
+        El plan entero del préstamo, para poder decir «cuota 2 de 5» en la línea. La cuota
+        sola no alcanza: no sabe cuántas hermanas tiene ni en qué lugar de la fila está.
+      */
+      include: {
+        prestamo: {
+          select: {
+            fecha: true,
+            cuotas: { select: { id: true }, orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }] },
+          },
+        },
+      },
     }),
     prisma.feriado.findMany({ where: { fecha: rangoDelMes } }),
     // Una licencia puede empezar antes del mes y terminar después.
@@ -178,14 +190,25 @@ export async function armarContextoLiquidacion(
       monto: aDecimal(p.monto),
       concepto: p.concepto,
     })),
-    cuotasPlan: cuotas.map((c) => ({
-      id: c.id,
-      fecha: c.fecha,
-      // Se redondea acá y no solo en la línea, para que el importe que descuenta la
-      // liquidación y el que se suma al devengado bruto del asiento (§4.9) sean el mismo.
-      monto: redondearPesos(aDecimal(c.monto)),
-      yaAplicada: c.estado === 'APLICADA',
-    })),
+    cuotasPlan: cuotas.map((c) => {
+      /*
+        La numeración cuenta **todas** las cuotas del plan, incluidas las canceladas: si
+        cancelar la cuarta convirtiera la quinta en «4 de 4», la misma cuota cambiaría de
+        nombre entre una liquidación y la siguiente.
+      */
+      const hermanas = c.prestamo.cuotas
+      return {
+        id: c.id,
+        fecha: c.fecha,
+        // Se redondea acá y no solo en la línea, para que el importe que descuenta la
+        // liquidación y el que se suma al devengado bruto del asiento (§4.9) sean el mismo.
+        monto: redondearPesos(aDecimal(c.monto)),
+        yaAplicada: c.estado === 'APLICADA',
+        fechaPrestamo: c.prestamo.fecha,
+        ordinal: hermanas.findIndex((h) => h.id === c.id) + 1,
+        deTotal: hermanas.length,
+      }
+    }),
     feriados: feriados.map((f) => ({ fecha: f.fecha, noLaborable: f.noLaborable })),
     diasLicencia,
     totalYaLiquidado,

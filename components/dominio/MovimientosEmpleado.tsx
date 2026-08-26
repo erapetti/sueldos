@@ -1,18 +1,23 @@
 'use client'
 
 /**
- * §8.3 — sección «Movimientos» de la ficha: un botón con etiqueta por cada movimiento que se
- * carga de a uno, con su fecha, y no en la planilla. Con permiso `VER` los de registro quedan
- * deshabilitados; Préstamos, que solo lleva al listado, sigue activo.
+ * §8.3 — submenú de «Movimientos»: los que se cargan de a uno, con su fecha, y no en la
+ * planilla.
+ *
+ * Se dibuja con la misma plantilla que el submenú de «Datos» y, como aquél, **está siempre
+ * presente mientras estás en esta rama**: en la sección de la ficha y también en las
+ * pantallas que cuelgan de ella, con el botón de donde estás parado marcado. Así se salta de
+ * un movimiento a otro sin volver atrás.
+ *
+ * Con permiso `VER` los que registran quedan deshabilitados; Préstamos, que solo lleva al
+ * listado, sigue activo.
  */
-import Link from 'next/link'
 import { useState } from 'react'
-import { Eye, EyeOff, HandCoins, Landmark, Palmtree, PlusCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { DialogoPagoAdicional } from './DialogoPagoAdicional'
 import { DialogoPagoBancario } from './DialogoPagoBancario'
 import { DialogoLicencia } from './DialogoLicencia'
 import { DialogoOcultar } from './DialogoOcultar'
+import { ItemSubmenu, SubmenuSeccion } from './SubmenuSeccion'
 
 export type MovimientosEmpleadoProps = {
   empleadoId: string
@@ -24,27 +29,27 @@ export type MovimientosEmpleadoProps = {
   /** §8.7 — en el listado de todos, además se puede volver a mostrar. */
   mostrarVisibilidad?: boolean
   visible?: boolean
+  /** Clave del movimiento donde estás parado, cuando el submenú se dibuja sobre su pantalla. */
+  activo?: string
 }
 
 type Dialogo = 'PAGO_ADICIONAL' | 'PAGO_BANCARIO' | 'LICENCIA' | 'VISIBILIDAD' | null
 
 export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
   const [dialogo, setDialogo] = useState<Dialogo>(null)
-  const { empleadoId, alias, puedeEditar, dadoDeBaja } = props
+  const { empleadoId, alias, puedeEditar, dadoDeBaja, activo } = props
 
   type Movimiento = {
     clave: string
     etiqueta: string
-    icono: React.ComponentType<{ className?: string }>
     href?: string
     dialogo?: Exclude<Dialogo, null>
     habilitada: boolean
   }
 
   /*
-    Los cuatro que se cargan de a uno. Horas extras, inasistencias y liquidación estaban acá
-    cuando esto era la botonera de «Acciones»; ahora cada una tiene su sección en el menú de
-    la empleada, así que no se repiten.
+    Los cuatro que se cargan de a uno. Horas extras, inasistencias y liquidación tienen cada
+    una su sección en el menú de la empleada, así que no se repiten acá.
   */
   const movimientos: Movimiento[] = [
     {
@@ -55,7 +60,6 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
       */
       clave: 'prestamo',
       etiqueta: 'Préstamos',
-      icono: HandCoins,
       href: `/empleados/${empleadoId}/prestamos`,
       // Mirar el listado no pide permiso de edición; el alta la esconde la propia pantalla.
       habilitada: true,
@@ -63,21 +67,18 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
     {
       clave: 'pago-adicional',
       etiqueta: 'Registrar pago adicional',
-      icono: PlusCircle,
       dialogo: 'PAGO_ADICIONAL',
       habilitada: puedeEditar,
     },
     {
       clave: 'licencia',
       etiqueta: 'Registrar licencia',
-      icono: Palmtree,
       dialogo: 'LICENCIA',
       habilitada: puedeEditar,
     },
     {
       clave: 'pago-bancario',
       etiqueta: 'Registrar pago bancario',
-      icono: Landmark,
       dialogo: 'PAGO_BANCARIO',
       habilitada: puedeEditar,
     },
@@ -87,15 +88,13 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
     §8.3 / §8.7 — ocultar del listado, o volver a mostrarlo. No es un movimiento, pero desde
     que los listados no tienen fila de acciones este es el único lugar donde se puede cambiar.
   */
-  const puedeCambiarVisibilidad =
-    puedeEditar && (props.mostrarVisibilidad ? true : dadoDeBaja)
+  const puedeCambiarVisibilidad = puedeEditar && (props.mostrarVisibilidad ? true : dadoDeBaja)
 
   if (puedeCambiarVisibilidad) {
     const ocultando = props.visible !== false
     movimientos.push({
       clave: 'visibilidad',
       etiqueta: ocultando ? 'Ocultar del listado' : 'Volver a mostrar en el listado',
-      icono: ocultando ? EyeOff : Eye,
       dialogo: 'VISIBILIDAD',
       habilitada: ocultando ? dadoDeBaja : true,
     })
@@ -103,57 +102,19 @@ export function MovimientosEmpleado(props: MovimientosEmpleadoProps) {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        {movimientos.map((movimiento) => {
-          const Icono = movimiento.icono
-          const contenido = (
-            <>
-              <Icono className="size-4" aria-hidden />
-              {movimiento.etiqueta}
-            </>
-          )
-          /*
-            Abajo de `sm` cada botón ocupa el ancho completo y su etiqueta envuelve: los
-            botones vienen con `whitespace-nowrap` y `shrink-0`, y «Aguinaldo (solo
-            disponible en junio y diciembre)» se iba 28px afuera de la pantalla y hacía
-            scrollear la página en horizontal. De paso, apilados son más fáciles de tocar.
-          */
-          const clases =
-            'h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:w-auto'
-
-          // Con `asChild` el `disabled` se pierde: un `<a>` no lo tiene. Cuando el movimiento
-          // no está habilitado se dibuja el botón sin link.
-          return movimiento.href && movimiento.habilitada ? (
-            <Button
-              key={movimiento.clave}
-              asChild
-              variant="outline"
-              className={clases}
-            >
-              <Link href={movimiento.href}>{contenido}</Link>
-            </Button>
-          ) : movimiento.href ? (
-            <Button
-              key={movimiento.clave}
-              variant="outline"
-              disabled
-              className={clases}
-            >
-              {contenido}
-            </Button>
-          ) : (
-            <Button
-              key={movimiento.clave}
-              variant="outline"
-              disabled={!movimiento.habilitada}
-              onClick={() => setDialogo(movimiento.dialogo!)}
-              className={clases}
-            >
-              {contenido}
-            </Button>
-          )
-        })}
-      </div>
+      <SubmenuSeccion etiqueta="Movimientos">
+        {movimientos.map((movimiento) => (
+          <ItemSubmenu
+            key={movimiento.clave}
+            activo={activo === movimiento.clave}
+            href={movimiento.href}
+            disabled={!movimiento.habilitada}
+            onClick={movimiento.dialogo ? () => setDialogo(movimiento.dialogo!) : undefined}
+          >
+            {movimiento.etiqueta}
+          </ItemSubmenu>
+        ))}
+      </SubmenuSeccion>
 
       <DialogoPagoAdicional
         abierto={dialogo === 'PAGO_ADICIONAL'}

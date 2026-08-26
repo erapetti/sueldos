@@ -197,6 +197,13 @@ export function formatearFecha(f: Date | null | undefined): string {
   return `${d}/${m}/${f.getUTCFullYear()}`
 }
 
+/** `dd/mm`, sin el año; para textos donde el año se sobreentiende por el contexto. */
+export function formatearDiaMes(f: Date): string {
+  const d = f.getUTCDate().toString().padStart(2, '0')
+  const m = (f.getUTCMonth() + 1).toString().padStart(2, '0')
+  return `${d}/${m}`
+}
+
 /** `enero 2026`. */
 export function formatearPeriodo(f: Date): string {
   return `${MESES[f.getUTCMonth()]} ${f.getUTCFullYear()}`

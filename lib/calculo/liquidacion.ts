@@ -17,6 +17,7 @@ import {
   aISO,
   diasCorridos,
   diasDelMes,
+  formatearDiaMes,
   formatearPeriodo,
   maxFecha,
   minFecha,
@@ -336,7 +337,14 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     lineas.push({
       orden: (orden += 1),
       codigo: CODIGOS.CUOTA_PLAN,
-      descripcion: 'Cuota del plan de pagos',
+      /*
+        «Cuota 2 de 5 del préstamo de 25/08». Decía «Cuota del plan de pagos» y con dos
+        préstamos abiertos en el mismo mes las dos líneas quedaban idénticas, sin forma de
+        saber cuál era cuál ni cuánto faltaba de cada uno.
+      */
+      descripcion: `Cuota ${cuota.ordinal} de ${cuota.deTotal} del préstamo de ${formatearDiaMes(
+        cuota.fechaPrestamo,
+      )}`,
       cantidad: null,
       valorUnitario: null,
       importe,

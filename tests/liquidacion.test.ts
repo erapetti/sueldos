@@ -19,6 +19,7 @@ import { periodoDe } from '@/lib/format/dates'
 import {
   D,
   conceptoBps,
+  cuotaPlan,
   entradaBase,
   f,
   falta,
@@ -59,7 +60,7 @@ describe('1. liquidación simple sin novedades', () => {
         faltas: [falta('2026-04-08', 3)],
         horasExtras: [horaExtra('2026-04-09', 1, true, 0), horaExtra('2026-04-10', 1, false, 0)],
         pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D(1000), concepto: 'Premio' }],
-        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(500), yaAplicada: false }],
+        cuotasPlan: [cuotaPlan('2026-04-01', D(500))],
       }),
     )
 
@@ -424,12 +425,54 @@ describe('10. feriados', () => {
 describe('11. plan de pagos', () => {
   it('la cuota del mes se descuenta después del subtotal', () => {
     const r = calcularLiquidacionMensual(
-      entradaBase({ cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(2000), yaAplicada: false }] }),
+      entradaBase({ cuotasPlan: [cuotaPlan('2026-04-01', D(2000))] }),
     )
     expect(r.totalRecalculado.toFixed(2)).toBe('65200.00') // 67.200 − 2.000
     const cuota = r.lineas.find((l) => l.codigo === CODIGOS.CUOTA_PLAN)!
     expect(cuota.signo).toBe(-1)
     expect(cuota.orden).toBeGreaterThan(r.lineas.find((l) => l.codigo === CODIGOS.SUBTOTAL)!.orden)
+  })
+
+  it('la línea dice qué cuota es y de qué préstamo viene', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        cuotasPlan: [
+          cuotaPlan('2026-04-01', D(2000), {
+            fechaPrestamo: f('2026-02-08'),
+            ordinal: 2,
+            deTotal: 5,
+          }),
+        ],
+      }),
+    )
+    const cuota = r.lineas.find((l) => l.codigo === CODIGOS.CUOTA_PLAN)!
+    expect(cuota.descripcion).toBe('Cuota 2 de 5 del préstamo de 08/02')
+  })
+
+  it('dos préstamos en el mismo mes dan dos líneas distinguibles', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        cuotasPlan: [
+          cuotaPlan('2026-04-01', D(2000), {
+            fechaPrestamo: f('2026-02-08'),
+            ordinal: 2,
+            deTotal: 5,
+          }),
+          cuotaPlan('2026-04-01', D(1000), {
+            fechaPrestamo: f('2026-03-25'),
+            ordinal: 1,
+            deTotal: 3,
+          }),
+        ],
+      }),
+    )
+    const descripciones = r.lineas
+      .filter((l) => l.codigo === CODIGOS.CUOTA_PLAN)
+      .map((l) => l.descripcion)
+    expect(descripciones).toEqual([
+      'Cuota 2 de 5 del préstamo de 08/02',
+      'Cuota 1 de 3 del préstamo de 25/03',
+    ])
   })
 
   it('sin cuota del mes el total no cambia', () => {
@@ -474,7 +517,7 @@ describe('13. redondeo: las líneas suman exactamente el total (§6.7)', () => {
           horaExtra('2026-04-11', 1.5, false, 170),
         ],
         pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D('1234.57'), concepto: 'Premio' }],
-        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D('333.33'), yaAplicada: false }],
+        cuotasPlan: [cuotaPlan('2026-04-01', D('333.33'))],
         valorBoleto: D('47.35'),
       }),
     )
@@ -520,7 +563,7 @@ describe('13. redondeo: las líneas suman exactamente el total (§6.7)', () => {
           horaExtra('2026-04-11', 1.5, false, 170),
         ],
         pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D('1234.57'), concepto: 'Premio' }],
-        cuotasPlan: [{ fecha: f('2026-04-01'), monto: D(333), yaAplicada: false }],
+        cuotasPlan: [cuotaPlan('2026-04-01', D(333))],
         valorHoraNegro: D(317),
         valorBoleto: D(47),
       }),

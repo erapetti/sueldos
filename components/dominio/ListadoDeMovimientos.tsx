@@ -1,12 +1,13 @@
 /**
- * Listado de una de las acciones que se cargan de a una: préstamos, y en su momento pagos
+ * Listado de uno de los movimientos que se cargan de a uno: préstamos, y en su momento pagos
  * adicionales, licencias y pagos bancarios.
  *
  * Es el patrón de «Mi Personal» (§8.3) llevado adentro de la empleada: título, el botón que
- * da de alta uno nuevo, y la tabla donde una columna enlaza al detalle. Las cuatro pantallas
- * se diferencian en las columnas y en el diálogo de alta, así que eso entra por props y la
- * cáscara se escribe una sola vez.
+ * da de alta uno nuevo, y la tabla donde la **columna principal** enlaza al detalle. Las
+ * cuatro pantallas se diferencian en las columnas y en el diálogo de alta, así que eso entra
+ * por props y la cáscara se escribe una sola vez.
  */
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -20,6 +21,12 @@ import { cn } from '@/lib/utils'
 export type ColumnaListado<T> = {
   clave: string
   etiqueta: string
+  /**
+   * La columna que enlaza al detalle. Se dibuja con el mismo tratamiento que el alias en «Mi
+   * Personal», que es el otro listado donde una columna es la puerta de entrada a la ficha.
+   * Va exactamente una por tabla.
+   */
+  principal?: boolean
   /** Alinea a la derecha y usa la tipografía tabular; para importes y cantidades. */
   numerica?: boolean
   celda: (fila: T) => React.ReactNode
@@ -30,6 +37,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
   accion,
   columnas,
   filas,
+  hrefDetalle,
   vacio,
   atenuada,
 }: {
@@ -38,6 +46,8 @@ export function ListadoDeMovimientos<T extends { id: string }>({
   accion?: React.ReactNode
   columnas: ColumnaListado<T>[]
   filas: T[]
+  /** A dónde lleva la columna principal. El `<Link>` lo pone la plantilla, no cada pantalla. */
+  hrefDetalle: (fila: T) => string
   /** Qué decir cuando no hay ninguno todavía. */
   vacio: React.ReactNode
   /** Filas que van en gris, como las anuladas. */
@@ -53,7 +63,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
       <div className="overflow-x-auto rounded-card border bg-card shadow-soft">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent">
               {columnas.map((c) => (
                 <TableHead key={c.clave} className={cn(c.numerica && 'text-right')}>
                   {c.etiqueta}
@@ -63,7 +73,7 @@ export function ListadoDeMovimientos<T extends { id: string }>({
           </TableHeader>
           <TableBody>
             {filas.length === 0 ? (
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableCell
                   colSpan={columnas.length}
                   className="py-8 text-center text-muted-foreground"
@@ -73,13 +83,30 @@ export function ListadoDeMovimientos<T extends { id: string }>({
               </TableRow>
             ) : (
               filas.map((fila) => (
-                <TableRow key={fila.id} className={cn(atenuada?.(fila) && 'opacity-60')}>
+                <TableRow
+                  key={fila.id}
+                  /*
+                    Sin el resaltado al pasar por encima que trae `TableRow` de shadcn: la
+                    fila entera se pintaba como si fuera clickeable y lo único que enlaza es
+                    la columna principal, así que prometía un blanco que no existe.
+                  */
+                  className={cn('hover:bg-transparent', atenuada?.(fila) && 'opacity-60')}
+                >
                   {columnas.map((c) => (
                     <TableCell
                       key={c.clave}
                       className={cn(c.numerica && 'text-right tabular')}
                     >
-                      {c.celda(fila)}
+                      {c.principal ? (
+                        <Link
+                          href={hrefDetalle(fila)}
+                          className="text-lg font-medium hover:underline"
+                        >
+                          {c.celda(fila)}
+                        </Link>
+                      ) : (
+                        c.celda(fila)
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>

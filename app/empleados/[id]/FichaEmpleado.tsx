@@ -3,10 +3,8 @@
 /**
  * §8.4 — ficha del empleado, con sus ocho secciones.
  */
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -18,6 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 import { FormularioSeries } from './FormularioSeries'
 import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
+import { ItemSubmenu, SubmenuSeccion } from '@/components/dominio/SubmenuSeccion'
 import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
 import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
@@ -187,25 +186,19 @@ export function FichaEmpleado(props: FichaProps) {
           marcado. Estas cuatro no están en el menú de arriba para no dejarlo con diez ítems.
         */}
         {esDeDatos ? (
-          <div className="flex flex-wrap gap-2">
+          <SubmenuSeccion etiqueta="Datos">
             {SUBMENU_DATOS.filter((sub) => sub.clave !== 'compartido' || props.esDueno).map(
               (sub) => (
-                <Button
+                <ItemSubmenu
                   key={sub.clave}
-                  asChild
-                  variant={seccion === sub.clave ? 'default' : 'outline'}
-                  size="sm"
+                  activo={seccion === sub.clave}
+                  href={`/empleados/${props.empleadoId}?seccion=${sub.clave}`}
                 >
-                  <Link
-                    href={`/empleados/${props.empleadoId}?seccion=${sub.clave}`}
-                    aria-current={seccion === sub.clave ? 'page' : undefined}
-                  >
-                    {sub.etiqueta}
-                  </Link>
-                </Button>
+                  {sub.etiqueta}
+                </ItemSubmenu>
               ),
             )}
-          </div>
+          </SubmenuSeccion>
         ) : null}
 
         {seccion === 'datos' ? (
@@ -365,24 +358,17 @@ export function FichaEmpleado(props: FichaProps) {
           da de alta.
         */}
         {seccion === 'movimientos' ? (
-          <div>
-            <div className="space-y-3 rounded-card border bg-card px-[22px] py-5 shadow-soft">
-              <p className="text-sm text-muted-foreground">
-                Movimientos que no se cargan en planilla: se registran de a uno, con su fecha.
-              </p>
-              <MovimientosEmpleado
-                empleadoId={props.empleadoId}
-                alias={props.empleado.alias}
-                fechaIngreso={props.empleado.fechaIngreso}
-                puedeEditar={!props.soloLectura}
-                dadoDeBaja={!props.empleado.activo}
-                // Oculta se puede volver a mostrar siempre; ocultar, solo si está de baja
-                // (§8.3), que es lo que resuelve el fallback a `dadoDeBaja`.
-                mostrarVisibilidad={!props.empleado.visible}
-                visible={props.empleado.visible}
-              />
-            </div>
-          </div>
+          <MovimientosEmpleado
+            empleadoId={props.empleadoId}
+            alias={props.empleado.alias}
+            fechaIngreso={props.empleado.fechaIngreso}
+            puedeEditar={!props.soloLectura}
+            dadoDeBaja={!props.empleado.activo}
+            // Oculta se puede volver a mostrar siempre; ocultar, solo si está de baja
+            // (§8.3), que es lo que resuelve el fallback a `dadoDeBaja`.
+            mostrarVisibilidad={!props.empleado.visible}
+            visible={props.empleado.visible}
+          />
         ) : null}
 
         {/* 5 — Cuenta corriente */}
