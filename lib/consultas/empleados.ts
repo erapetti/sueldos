@@ -105,7 +105,12 @@ function sqlEstado(m0: string, m1: string, diaDeHoy: number) {
 
 /**
  * Subconsulta agregada de liquidaciones por empleado: si hay liquidación confirmada de M0 y
- * de M-1, y si queda alguna confirmada sin ningún movimiento de tipo PAGO vinculado.
+ * de M-1, y si queda algo por pagar.
+ *
+ * §4.9 — «impaga» se mira **libro por libro**, igual que `estadoDePago`: una liquidación con el
+ * sueldo formal ya transferido y las horas en negro pendientes sigue debiendo algo, así que la
+ * empleada tiene que seguir apareciendo en «Falta pagar». Cuentan solo los libros con importe
+ * positivo: una diferencia negativa se compensa contra el saldo de su libro, no con un pago.
  */
 function sqlLiquidaciones(m0: string, m1: string) {
   return Prisma.sql`
@@ -113,12 +118,22 @@ function sqlLiquidaciones(m0: string, m1: string) {
       l.empleado_id,
       MAX(CASE WHEN l.tipo = 'MENSUAL' AND l.periodo = ${m0} THEN 1 ELSE 0 END) AS tiene_m0,
       MAX(CASE WHEN l.tipo = 'MENSUAL' AND l.periodo = ${m1} THEN 1 ELSE 0 END) AS tiene_m1,
-      MAX(CASE WHEN pagos.liquidacion_id IS NULL THEN 1 ELSE 0 END)             AS hay_impaga
+      MAX(
+        CASE
+          WHEN l.total_a_pagar_formal > 0 AND COALESCE(pagos.pago_formal, 0) = 0 THEN 1
+          WHEN l.total_a_pagar_informal > 0 AND COALESCE(pagos.pago_informal, 0) = 0 THEN 1
+          ELSE 0
+        END
+      ) AS hay_impaga
     FROM liquidaciones l
     LEFT JOIN (
-      SELECT DISTINCT liquidacion_id
+      SELECT
+        liquidacion_id,
+        MAX(libro = 'FORMAL')   AS pago_formal,
+        MAX(libro = 'INFORMAL') AS pago_informal
       FROM cuenta_corriente
       WHERE tipo = 'PAGO' AND liquidacion_id IS NOT NULL
+      GROUP BY liquidacion_id
     ) pagos ON pagos.liquidacion_id = l.id
     WHERE l.estado = 'CONFIRMADA'
     GROUP BY l.empleado_id`

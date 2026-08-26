@@ -23,6 +23,7 @@ import { registrarPagoBancario, registrarPrestamo } from '@/actions/prestamos'
 import { guardarHorasExtras, guardarFaltas, guardarPagoAdicional } from '@/actions/novedades'
 import { registrarLicencia } from '@/actions/licencias'
 import { cambiarVisibilidad } from '@/actions/empleados'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 
 let dueno: UsuarioDePrueba
 let otro: UsuarioDePrueba
@@ -86,6 +87,7 @@ describe('18. cuenta corriente: préstamo + liquidación + pago bancario', () =>
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: '65100',
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo 2026',
       liquidacionId: guardada.id,
     })
@@ -150,6 +152,95 @@ describe('18. cuenta corriente: préstamo + liquidación + pago bancario', () =>
   })
 })
 
+describe('§4.9 — los dos libros de la cuenta corriente', () => {
+  it('una liquidación con las dos tablas emite un asiento por libro', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+
+    // 2 h extras sin BPS un lunes de mayo: $600 al valor hora sin aportes.
+    const extras = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: '2026-05',
+      renglones: [{ fecha: '2026-05-04', horas: 2, conBps: false, recargoPct: 0 }],
+      borrar: [],
+    })
+    expect(extras.ok).toBe(true)
+
+    expect((await liquidar(empleado.id, '2026-05')).ok).toBe(true)
+
+    const guardada = await prisma.liquidacion.findFirstOrThrow({
+      where: { empleadoId: empleado.id },
+    })
+    expect(guardada.totalAPagarFormal.toString()).toBe('67100')
+    expect(guardada.totalAPagarInformal.toString()).toBe('600')
+
+    const asientos = await prisma.cuentaCorriente.findMany({
+      where: { liquidacionId: guardada.id },
+      orderBy: { libro: 'asc' },
+    })
+    expect(asientos.map((a) => [a.libro, a.haber.toString()])).toEqual([
+      ['FORMAL', '67100'],
+      ['INFORMAL', '600'],
+    ])
+
+    // Pagar solo el formal deja la liquidación a medias, no pagada.
+    const pago = await registrarPagoBancario({
+      empleadoId: empleado.id,
+      fecha: '2026-06-05',
+      monto: '67100',
+      libro: 'FORMAL',
+      concepto: 'Sueldo mayo 2026',
+      liquidacionId: guardada.id,
+    })
+    expect(pago.ok).toBe(true)
+
+    const conUnPago = await prisma.liquidacion.findFirstOrThrow({
+      where: { id: guardada.id },
+      include: INCLUIR_PAGOS,
+    })
+    expect(pagoDeLiquidacion(conUnPago).estado).toBe('PARCIAL')
+    expect(pagoDeLiquidacion(conUnPago).faltan).toEqual(['INFORMAL'])
+
+    // El libro formal quedó cancelado y el informal sigue con su saldo, aparte.
+    const porLibro = await prisma.cuentaCorriente.groupBy({
+      by: ['libro'],
+      where: { empleadoId: empleado.id },
+      _sum: { debe: true, haber: true },
+    })
+    const saldoDe = (libro: string) => {
+      const fila = porLibro.find((f) => f.libro === libro)!
+      return Number(fila._sum.haber) - Number(fila._sum.debe)
+    }
+    expect(saldoDe('FORMAL')).toBe(0)
+    expect(saldoDe('INFORMAL')).toBe(600)
+  })
+
+  it('el préstamo de una empleada sin aportes va al libro informal', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: false })
+
+    const prestamo = await registrarPrestamo({
+      empleadoId: empleado.id,
+      fecha: '2026-04-15',
+      monto: '4000',
+      concepto: 'Adelanto',
+      conPlan: true,
+      cuotas: [{ fecha: '2026-05-01', monto: '4000' }],
+    })
+    expect(prestamo.ok).toBe(true)
+
+    const movimiento = await prisma.cuentaCorriente.findFirstOrThrow({
+      where: { empleadoId: empleado.id, tipo: 'PRESTAMO' },
+    })
+    expect(movimiento.libro).toBe('INFORMAL')
+
+    // Y su cuota descuenta en la misma tabla, que para ella es la única.
+    expect((await liquidar(empleado.id, '2026-05')).ok).toBe(true)
+    const lineas = await prisma.liquidacionLinea.findMany({
+      where: { liquidacion: { empleadoId: empleado.id }, codigo: 'CUOTA_PLAN' },
+    })
+    expect(lineas.map((l) => l.tabla)).toEqual(['INFORMAL'])
+  })
+})
+
 describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
   it('con diferencia positiva genera un único asiento por la diferencia', async () => {
     const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
@@ -160,6 +251,7 @@ describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: original.totalAPagar.toString(),
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo',
       liquidacionId: original.id,
     })
@@ -217,6 +309,7 @@ describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: '71100',
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo',
       liquidacionId: original.id,
     })
@@ -255,6 +348,7 @@ describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: primera.totalAPagar.toString(),
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo',
       liquidacionId: primera.id,
     })
@@ -312,6 +406,7 @@ describe('20. complementaria con cuotas ya aplicadas', () => {
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: '65100',
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo',
       liquidacionId: primera.id,
     })
@@ -489,6 +584,7 @@ describe('43. no se puede anular una liquidación pagada (§7.6.1)', () => {
       empleadoId: empleado.id,
       fecha: '2026-06-05',
       monto: liquidacion.totalAPagar.toString(),
+      libro: 'FORMAL',
       concepto: 'Sueldo mayo',
       liquidacionId: liquidacion.id,
     })

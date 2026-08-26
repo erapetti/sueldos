@@ -181,8 +181,10 @@ export async function registrarLicencia(entrada: unknown) {
             en la tabla que le corresponde a la empleada. La formal si aporta BPS; la informal
             si no, porque entonces todo lo suyo es informal.
           */
-          totalFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
-          totalInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
+          totalRecalculadoFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
+          totalRecalculadoInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
+          totalAPagarFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
+          totalAPagarInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
           ukVigente: 1,
           confirmadaEn: new Date(),
           confirmadaPor: usuario.id,
@@ -238,6 +240,8 @@ export async function registrarLicencia(entrada: unknown) {
           empleadoId: empleado.id,
           fecha: hoy(),
           tipo: 'LIQUIDACION',
+          // Una sola partida, en el libro de la empleada: el mismo de sus líneas (§6.2).
+          libro: tabla,
           debe: '0',
           haber: aColumnaImporte(salarioVacacional),
           concepto: `Salario vacacional ${formatearPeriodo(periodo)}`,

@@ -259,10 +259,14 @@ export const edicionPrestamo = z.object({
   concepto: z.string().trim().max(255).optional().or(z.literal('')),
 })
 
+/** §4.9 — el libro al que va el movimiento. */
+export const libro = z.enum(['FORMAL', 'INFORMAL'])
+
 export const pagoBancario = z.object({
   empleadoId: idUuid,
   fecha: fechaNoFutura,
   monto: importePositivo,
+  libro,
   concepto: z.string().trim().min(1, 'El concepto es obligatorio').max(255),
   liquidacionId: idUuid.nullable().optional(),
 })
@@ -271,6 +275,7 @@ export const ajusteCuentaCorriente = z.object({
   empleadoId: idUuid,
   fecha: fechaNoFutura,
   monto: importePositivo,
+  libro,
   lado: z.enum(['DEBE', 'HABER']),
   concepto: z.string().trim().min(1, 'El concepto es obligatorio').max(255),
 })

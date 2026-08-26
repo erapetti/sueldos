@@ -13,13 +13,15 @@ import { redondearPesos } from '@/lib/format/money'
 import { resolverConceptosBps } from '@/lib/calculo/bps'
 import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
 import type { EntradaLiquidacion, ResultadoLiquidacion } from '@/lib/calculo/tipos'
+import type { EstadoDePago } from '@/lib/calculo/cuentaCorriente'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from './pago'
 import { primerDiaDelMes, sumarDias, ultimoDiaDelMes } from '@/lib/format/dates'
 
 export type ContextoLiquidacion = {
   entrada: EntradaLiquidacion
   /** Cuotas del período que todavía están PENDIENTE: son las que se marcan APLICADA (§7.6.1). */
   cuotasPendientesIds: string[]
-  /** Suma de las cuotas consideradas en el paso 8, para el devengado bruto (§4.9). */
+  /** Suma de las cuotas consideradas en el paso 7, para el devengado bruto (§4.9). */
   totalCuotas: Decimal
   /** Secuencia que le tocaría a una liquidación nueva de este período (§4.14). */
   proximaSecuencia: number
@@ -28,7 +30,8 @@ export type ContextoLiquidacion = {
     id: string
     secuencia: number
     totalAPagar: Decimal
-    pagada: boolean
+    /** §4.14 — qué libros de esta liquidación ya se pagaron. */
+    pago: EstadoDePago
     confirmadaEn: Date | null
   }[]
 }
@@ -100,6 +103,9 @@ export async function armarContextoLiquidacion(
         prestamo: {
           select: {
             fecha: true,
+            // §4.9 — la cuota descuenta en el libro donde quedó el préstamo, no en el que le
+            // tocaría hoy a la empleada.
+            libro: true,
             cuotas: { select: { id: true }, orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }] },
           },
         },
@@ -118,7 +124,7 @@ export async function armarContextoLiquidacion(
         estado: { not: 'ANULADA' },
       },
       orderBy: { secuencia: 'asc' },
-      include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+      include: INCLUIR_PAGOS,
     }),
   ])
 
@@ -136,14 +142,17 @@ export async function armarContextoLiquidacion(
     id: l.id,
     secuencia: l.secuencia,
     totalAPagar: aDecimal(l.totalAPagar),
-    pagada: l.movimientos.length > 0,
+    pago: pagoDeLiquidacion(l),
     confirmadaEn: l.confirmadaEn,
   }))
 
   // §7.6.1 — solo cuentan las confirmadas; un borrador todavía no liquidó nada.
-  const totalYaLiquidado = previas
-    .filter((l) => l.estado === 'CONFIRMADA')
-    .reduce((acc, l) => acc.plus(aDecimal(l.totalAPagar)), new Decimal(0))
+  const confirmadas = previas.filter((l) => l.estado === 'CONFIRMADA')
+  const yaLiquidado = (columna: 'totalAPagarFormal' | 'totalAPagarInformal') =>
+    confirmadas.reduce((acc, l) => acc.plus(aDecimal(l[columna])), new Decimal(0))
+
+  const totalYaLiquidadoFormal = yaLiquidado('totalAPagarFormal')
+  const totalYaLiquidadoInformal = yaLiquidado('totalAPagarInformal')
 
   const entrada: EntradaLiquidacion = {
     periodo: desde,
@@ -205,13 +214,15 @@ export async function armarContextoLiquidacion(
         monto: redondearPesos(aDecimal(c.monto)),
         yaAplicada: c.estado === 'APLICADA',
         fechaPrestamo: c.prestamo.fecha,
+        libro: c.prestamo.libro,
         ordinal: hermanas.findIndex((h) => h.id === c.id) + 1,
         deTotal: hermanas.length,
       }
     }),
     feriados: feriados.map((f) => ({ fecha: f.fecha, noLaborable: f.noLaborable })),
     diasLicencia,
-    totalYaLiquidado,
+    totalYaLiquidadoFormal,
+    totalYaLiquidadoInformal,
   }
 
   return {

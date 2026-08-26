@@ -51,6 +51,13 @@ export type CuotaPlanCalculo = {
   yaAplicada: boolean
   /** Fecha del préstamo que originó el plan, para nombrar la línea de la liquidación. */
   fechaPrestamo: Date
+  /**
+   * §4.9 — el libro del préstamo que originó la cuota. La cuota descuenta **ahí**, y no en el
+   * libro que le tocaría hoy a la empleada: si pidió el préstamo antes de empezar a aportar,
+   * lo sigue devolviendo contra el libro informal. Es lo que hace que el préstamo amortice
+   * dentro de su propio libro.
+   */
+  libro: Libro
   /** Qué número de cuota es dentro de su plan, empezando en 1. */
   ordinal: number
   /** Cuántas cuotas tiene el plan completo. */
@@ -99,27 +106,36 @@ export type EntradaLiquidacion = {
   /** Días comprendidos en algún período de licencia gozada (§4.15.2). */
   diasLicencia: Date[]
   /**
-   * §7.6.1 — suma de `total_a_pagar` de las liquidaciones vigentes anteriores del mismo
+   * §7.6.1 — lo ya liquidado del período **por libro**: suma de `total_a_pagar_formal` y de
+   * `total_a_pagar_informal` de las liquidaciones vigentes anteriores del mismo
    * (empleado, período, tipo). 0 en la secuencia 1.
+   *
+   * Va por libro porque la complementaria puede ser parcial: si el libro formal ya se pagó y
+   * el informal no, un cambio que solo toca el informal tiene que dar diferencia cero en el
+   * formal y no volver a mover un asiento ya pagado.
    */
-  totalYaLiquidado: Decimal
+  totalYaLiquidadoFormal: Decimal
+  totalYaLiquidadoInformal: Decimal
 }
 
 /** Signo de una línea: suma, resta, o subtotal/informativa. */
 export type SignoLinea = 1 | -1 | 0
 
 /**
- * §6.2 — en qué tabla de la liquidación va la línea.
+ * §4.9 y §6.2 — el corte entre lo que pasa por el BPS y lo que no.
  *
- * `FORMAL` es lo que pasa por el BPS y cierra en su propio total a pagar; `INFORMAL` es lo
- * que se paga sin aportes —las horas extras sin BPS y los boletos que generan— y cierra en
- * otro. Una empleada con `aportaBps = false` no tiene tabla formal: todo lo suyo es informal.
+ * `FORMAL` es lo que lleva aportes y cierra en su propio total a pagar; `INFORMAL` es lo que
+ * se paga sin ellos —las horas extras sin BPS y los boletos que generan— y cierra en otro.
+ * Una empleada con `aportaBps = false` solo se relaciona con el informal.
+ *
+ * El mismo corte nombra la tabla de la liquidación y el libro de la cuenta corriente, porque
+ * son la misma cosa: cada tabla cierra en su libro.
  */
-export type TablaLiquidacion = 'FORMAL' | 'INFORMAL'
+export type Libro = 'FORMAL' | 'INFORMAL'
 
 export type LineaLiquidacion = {
   orden: number
-  tabla: TablaLiquidacion
+  tabla: Libro
   codigo: string
   descripcion: string
   cantidad: Decimal | null
@@ -151,14 +167,22 @@ export type ResultadoLiquidacion = {
   totalDescuentosBps: Decimal
   subtotal: Decimal
   boletos: DetalleBoletos | null
-  /** §6.2 — total a pagar de la tabla formal. Cero si la empleada no aporta BPS. */
-  totalFormal: Decimal
-  /** §6.2 — total a pagar de la tabla informal. Cero si no hay ninguna línea informal. */
-  totalInformal: Decimal
-  /** Total del período según el cálculo completo (§4.14): `totalFormal + totalInformal`. */
+  /** §6.2 — total de la tabla formal, que es lo que muestra su línea TOTAL. */
+  totalRecalculadoFormal: Decimal
+  /** §6.2 — ídem para la tabla informal. */
+  totalRecalculadoInformal: Decimal
+  /** Total del período según el cálculo completo (§4.14): la suma de los dos de arriba. */
   totalRecalculado: Decimal
+  totalYaLiquidadoFormal: Decimal
+  totalYaLiquidadoInformal: Decimal
   totalYaLiquidado: Decimal
-  /** totalRecalculado − totalYaLiquidado. Puede ser negativo en una complementaria. */
+  /**
+   * Lo que se paga en cada libro: recalculado − ya liquidado **de ese libro**. Cualquiera de
+   * los dos puede ser negativo en una complementaria, y cada uno es el importe de su asiento.
+   */
+  totalAPagarFormal: Decimal
+  totalAPagarInformal: Decimal
+  /** La suma de los dos. Puede ser negativo en una complementaria. */
   totalAPagar: Decimal
   /** Avisos no bloqueantes (liquidación final incompleta, empleado sin vínculo, …). */
   avisos: string[]

@@ -7,8 +7,9 @@ import { prisma } from '@/lib/db/prisma'
 import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { horasSemanalesDelRegimen } from '@/lib/calculo/boletos'
-import { conSaldoAcumulado } from '@/lib/calculo/cuentaCorriente'
+import { conSaldoAcumulado, LIBROS } from '@/lib/calculo/cuentaCorriente'
 import { saldoDiasLicencia } from '@/lib/calculo/licencias'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { aISO, formatearFecha, formatearPeriodo, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
 
 export async function datosDeFicha(empleadoId: string) {
@@ -59,7 +60,7 @@ export async function datosDeFicha(empleadoId: string) {
     }),
     prisma.liquidacion.findMany({
       where: { empleadoId },
-      include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+      include: INCLUIR_PAGOS,
       orderBy: [{ periodo: 'desc' }, { tipo: 'asc' }, { secuencia: 'asc' }],
     }),
     prisma.empleadoPermiso.findMany({
@@ -68,17 +69,40 @@ export async function datosDeFicha(empleadoId: string) {
     }),
   ])
 
-  const movimientosConSaldo = conSaldoAcumulado(
-    movimientos.map((m) => ({
-      id: m.id,
-      fecha: formatearFecha(m.fecha),
-      tipo: m.tipo,
-      concepto: m.concepto,
-      debe: aDecimal(m.debe),
-      haber: aDecimal(m.haber),
-      esReversa: m.reversaDeId !== null,
-    })),
-  )
+  /*
+    §4.9 — la cuenta corriente se lleva en dos libros, así que se listan por separado y cada
+    uno acumula su propio saldo. Un saldo corrido que mezclara los dos no diría cuánto falta
+    de ninguno: el formal se cancela con los pagos formales y el informal con los otros.
+
+    Solo se devuelve el libro que tenga movimientos. Una empleada que nunca tocó uno de los
+    dos ve una sola lista, como antes.
+  */
+  const librosDeCuenta = LIBROS.map((libro) => {
+    const conSaldo = conSaldoAcumulado(
+      movimientos
+        .filter((m) => m.libro === libro)
+        .map((m) => ({
+          id: m.id,
+          fecha: formatearFecha(m.fecha),
+          tipo: m.tipo,
+          concepto: m.concepto,
+          debe: aDecimal(m.debe),
+          haber: aDecimal(m.haber),
+          esReversa: m.reversaDeId !== null,
+        })),
+    )
+
+    return {
+      libro,
+      movimientos: conSaldo.map((m) => ({
+        ...m,
+        debe: m.debe.toFixed(2),
+        haber: m.haber.toFixed(2),
+        saldoAcumulado: m.saldoAcumulado.toFixed(2),
+      })),
+      saldo: conSaldo.at(-1)?.saldoAcumulado ?? new Decimal(0),
+    }
+  }).filter((l) => l.movimientos.length > 0)
 
   // §8.4 punto 5 — el saldo solo es correcto si las liquidaciones están confirmadas.
   const periodosConfirmados = new Set(
@@ -141,13 +165,9 @@ export async function datosDeFicha(empleadoId: string) {
         total: horasSemanalesDelRegimen(horas).toString(),
       }
     }),
-    cuentaCorriente: movimientosConSaldo.map((m) => ({
-      ...m,
-      debe: m.debe.toFixed(2),
-      haber: m.haber.toFixed(2),
-      saldoAcumulado: m.saldoAcumulado.toFixed(2),
-    })),
-    saldo: movimientosConSaldo.at(-1)?.saldoAcumulado.toFixed(2) ?? '0.00',
+    librosDeCuenta: librosDeCuenta.map((l) => ({ ...l, saldo: l.saldo.toFixed(2) })),
+    // El saldo de la empleada es la suma de los dos libros: lo que se le debe en total.
+    saldo: librosDeCuenta.reduce((acc, l) => acc.plus(l.saldo), new Decimal(0)).toFixed(2),
     mesesSinLiquidar,
     cuotas: cuotas.map((c) => ({
       id: c.id,
@@ -191,7 +211,7 @@ export async function datosDeFicha(empleadoId: string) {
       secuencia: l.secuencia,
       estado: l.estado,
       totalAPagar: aDecimal(l.totalAPagar).toFixed(2),
-      pagada: l.movimientos.length > 0,
+      pago: pagoDeLiquidacion(l).estado,
     })),
     permisos: permisos.map((p) => ({
       usuarioId: p.usuarioId,
@@ -212,7 +232,7 @@ export type DatosFicha = Awaited<ReturnType<typeof datosDeFicha>>
 export async function listarLiquidaciones(empleadoId: string): Promise<DatosFicha['liquidaciones']> {
   const liquidaciones = await prisma.liquidacion.findMany({
     where: { empleadoId },
-    include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+    include: INCLUIR_PAGOS,
     orderBy: [{ periodo: 'desc' }, { tipo: 'asc' }, { secuencia: 'asc' }],
   })
 
@@ -224,7 +244,7 @@ export async function listarLiquidaciones(empleadoId: string): Promise<DatosFich
     secuencia: l.secuencia,
     estado: l.estado,
     totalAPagar: aDecimal(l.totalAPagar).toFixed(2),
-    pagada: l.movimientos.length > 0,
+    pago: pagoDeLiquidacion(l).estado,
   }))
 }
 

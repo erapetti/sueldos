@@ -101,11 +101,11 @@ describe('1. liquidación simple sin novedades', () => {
       }),
     )
 
-    expect(r.totalFormal.plus(r.totalInformal).toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
+    expect(r.totalRecalculadoFormal.plus(r.totalRecalculadoInformal).toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
     // Cada total coincide con la línea TOTAL de su tabla.
     for (const tabla of ['FORMAL', 'INFORMAL'] as const) {
       const total = r.lineas.find((l) => l.tabla === tabla && l.codigo === CODIGOS.TOTAL)!
-      const esperado = tabla === 'FORMAL' ? r.totalFormal : r.totalInformal
+      const esperado = tabla === 'FORMAL' ? r.totalRecalculadoFormal : r.totalRecalculadoInformal
       expect(total.importe.toFixed(2)).toBe(esperado.toFixed(2))
     }
   })
@@ -377,14 +377,15 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
         empleado: { ...entradaBase().empleado, aportaBps: false },
         // Un sábado, para que además haya boletos por horas extras.
         horasExtras: [horaExtra('2026-04-08', 2, true, 0), horaExtra('2026-04-11', 4, false, 100)],
-        cuotasPlan: [cuotaPlan('2026-04-01', D(500))],
+        // El préstamo lo pidió sin aportar, así que su cuota también es informal (§4.9).
+        cuotasPlan: [cuotaPlan('2026-04-01', D(500), { libro: 'INFORMAL' })],
         pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D(1000), concepto: 'Premio' }],
       }),
     )
 
     expect(r.lineas.every((l) => l.tabla === 'INFORMAL')).toBe(true)
-    expect(r.totalFormal.toFixed(2)).toBe('0.00')
-    expect(r.totalInformal.toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
+    expect(r.totalRecalculadoFormal.toFixed(2)).toBe('0.00')
+    expect(r.totalRecalculadoInformal.toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
     expect(lineasCon(r.lineas, CODIGOS.TOTAL)).toBe(1)
   })
 
@@ -400,6 +401,28 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
     expect(boletos).toHaveLength(1)
     expect(boletos[0].descripcion).toBe('Boletos (22 días + 1 por horas extras, ida y vuelta)')
     expect(boletos[0].cantidad!.toString()).toBe('46')
+  })
+
+  /*
+    §4.9 — el caso cruzado: pidió el préstamo cuando aportaba y ahora no. La cuota sigue
+    descontando en el libro formal, que es donde el préstamo tiene que amortizar, así que le
+    aparece una tabla formal con una sola línea y un total negativo. Es lo que el usuario pidió
+    expresamente: la cuota mira dónde quedó el préstamo, no el aporte de hoy.
+  */
+  it('la cuota de un préstamo formal le abre tabla formal aunque no aporte (§4.9)', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        empleado: { ...entradaBase().empleado, aportaBps: false },
+        cuotasPlan: [cuotaPlan('2026-04-01', D(500), { libro: 'FORMAL' })],
+      }),
+    )
+
+    const formales = r.lineas.filter((l) => l.tabla === 'FORMAL')
+    expect(formales.map((l) => l.codigo)).toEqual([CODIGOS.CUOTA_PLAN, CODIGOS.TOTAL])
+    expect(r.totalRecalculadoFormal.toFixed(2)).toBe('-500.00')
+    // El salario y sus boletos siguen enteros en la informal.
+    expect(r.totalRecalculadoInformal.toFixed(2)).toBe('67200.00')
+    expect(r.totalRecalculado.toFixed(2)).toBe('66700.00')
   })
 })
 
@@ -450,7 +473,7 @@ describe('§6.2 — el reparto de los boletos entre las dos tablas', () => {
     const r = calcularLiquidacionMensual(entradaBase())
 
     expect(r.lineas.every((l) => l.tabla === 'FORMAL')).toBe(true)
-    expect(r.totalInformal.toFixed(2)).toBe('0.00')
+    expect(r.totalRecalculadoInformal.toFixed(2)).toBe('0.00')
     expect(lineasCon(r.lineas, CODIGOS.TOTAL)).toBe(1)
   })
 })

@@ -8,6 +8,9 @@
  *   saldo < 0  el empleado adeuda: es el saldo pendiente de préstamos
  */
 import Decimal from 'decimal.js'
+import type { Libro } from './tipos'
+
+export const LIBROS: readonly Libro[] = ['FORMAL', 'INFORMAL']
 
 export type MovimientoCalculo = {
   debe: Decimal
@@ -29,6 +32,48 @@ export function conSaldoAcumulado<T extends MovimientoCalculo>(
     acumulado = acumulado.plus(m.haber).minus(m.debe)
     return { ...m, saldoAcumulado: acumulado }
   })
+}
+
+/**
+ * §4.14 — en qué anda el pago de una liquidación, mirando **libro por libro**.
+ *
+ * Con dos libros «pagada» ya no es «existe algún movimiento PAGO»: una liquidación puede tener
+ * el sueldo formal transferido y las horas en negro todavía no. Los tres estados son
+ * `SIN_PAGAR`, `PARCIAL` y `PAGADA`, y `faltan` dice qué libro queda, que es lo que el diálogo
+ * de pago necesita para precargar el monto correcto.
+ *
+ * Cuentan solo los libros **con importe positivo**: son los que se pagan con una
+ * transferencia. Un importe negativo —la diferencia a favor de la empresa de una
+ * complementaria (§7.6.1)— no se paga, se compensa contra el saldo de su libro, así que no
+ * deja la liquidación esperando un pago que no va a existir. Una liquidación sin ningún libro
+ * a pagar no tiene nada pendiente: cuenta como `PAGADA`.
+ */
+export type EstadoDePago = {
+  /** Libros que esta liquidación paga. */
+  libros: Libro[]
+  /** De esos, los que ya tienen al menos un movimiento `PAGO`. */
+  pagados: Libro[]
+  /** Los que todavía no. */
+  faltan: Libro[]
+  estado: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
+}
+
+export function estadoDePago(
+  totalAPagar: Record<'formal' | 'informal', Decimal>,
+  pagos: readonly { libro: Libro }[],
+): EstadoDePago {
+  const libros = LIBROS.filter((libro) =>
+    (libro === 'FORMAL' ? totalAPagar.formal : totalAPagar.informal).greaterThan(0),
+  )
+  const pagados = libros.filter((libro) => pagos.some((p) => p.libro === libro))
+  const faltan = libros.filter((libro) => !pagados.includes(libro))
+
+  return {
+    libros,
+    pagados,
+    faltan,
+    estado: faltan.length === 0 ? 'PAGADA' : pagados.length === 0 ? 'SIN_PAGAR' : 'PARCIAL',
+  }
 }
 
 /**

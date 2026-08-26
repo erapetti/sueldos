@@ -12,7 +12,8 @@ import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado
 import { anularLiquidacion as esquemaAnular, confirmarLiquidacion } from '@/lib/validacion/esquemas'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { aColumnaImporte } from '@/lib/db/mapeo'
-import type { ResultadoLiquidacion } from '@/lib/calculo/tipos'
+import { LIBROS } from '@/lib/calculo/cuentaCorriente'
+import type { Libro, ResultadoLiquidacion } from '@/lib/calculo/tipos'
 import { formatearPeriodo, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
 
 /** Snapshot completo del cálculo, para que reimprimir la liquidación dé lo mismo (§4.14). */
@@ -30,10 +31,14 @@ function armarSnapshot(resultado: ResultadoLiquidacion, entrada: unknown) {
       totalDescuentosBps: resultado.totalDescuentosBps.toFixed(2),
       subtotal: resultado.subtotal.toFixed(2),
       boletos: resultado.boletos,
-      totalFormal: resultado.totalFormal.toFixed(2),
-      totalInformal: resultado.totalInformal.toFixed(2),
+      totalRecalculadoFormal: resultado.totalRecalculadoFormal.toFixed(2),
+      totalRecalculadoInformal: resultado.totalRecalculadoInformal.toFixed(2),
       totalRecalculado: resultado.totalRecalculado.toFixed(2),
+      totalYaLiquidadoFormal: resultado.totalYaLiquidadoFormal.toFixed(2),
+      totalYaLiquidadoInformal: resultado.totalYaLiquidadoInformal.toFixed(2),
       totalYaLiquidado: resultado.totalYaLiquidado.toFixed(2),
+      totalAPagarFormal: resultado.totalAPagarFormal.toFixed(2),
+      totalAPagarInformal: resultado.totalAPagarInformal.toFixed(2),
       totalAPagar: resultado.totalAPagar.toFixed(2),
       avisos: resultado.avisos,
       lineas: resultado.lineas.map((l) => ({
@@ -76,7 +81,9 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
     const { contexto, resultado } = await calcularPeriodo(empleado.id, periodo)
 
     const previasConfirmadas = contexto.liquidacionesPrevias.filter((l) => l.confirmadaEn !== null)
-    const hayPagada = previasConfirmadas.some((l) => l.pagada)
+    // §7.6.1 — alcanza con que **algún** libro de alguna previa esté pagado: ese asiento ya
+    // no se puede tocar, y el camino es la complementaria.
+    const hayPagada = previasConfirmadas.some((l) => l.pago.estado !== 'SIN_PAGAR')
     const esComplementaria = previasConfirmadas.length > 0
 
     if (hayPagada && !datos.aceptaComplementaria) {
@@ -91,14 +98,26 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
       )
     }
 
-    // §4.9 — el asiento va por el devengado bruto: total a pagar + cuotas descontadas.
-    // En una complementaria la diferencia ya viene neta de las cuotas que se descontaron en
-    // la liquidación previa, así que solo se suman las que se aplican ahora.
-    const cuotasAplicadasAhora = contexto.entrada.cuotasPlan
-      .filter((c) => !c.yaAplicada)
-      .reduce((acc, c) => acc.plus(c.monto), new Decimal(0))
+    /*
+      §4.9 — un asiento **por libro**, cada uno por el devengado bruto de ese libro: lo que
+      paga más las cuotas que descuenta. En una complementaria la diferencia ya viene neta de
+      las cuotas que descontó la liquidación previa, así que solo se suman las que se aplican
+      ahora.
 
-    const montoAsiento = resultado.totalAPagar.plus(cuotasAplicadasAhora)
+      El libro cuyo devengado da cero no genera asiento: es el caso de la complementaria
+      parcial —cambió el informal y el formal quedó igual— y el de la empleada que no toca uno
+      de los dos libros.
+    */
+    const totalAPagarDe = (libro: Libro) =>
+      libro === 'FORMAL' ? resultado.totalAPagarFormal : resultado.totalAPagarInformal
+
+    const asientos = LIBROS.map((libro) => {
+      const cuotasAplicadasAhora = contexto.entrada.cuotasPlan
+        .filter((c) => !c.yaAplicada && c.libro === libro)
+        .reduce((acc, c) => acc.plus(c.monto), new Decimal(0))
+
+      return { libro, monto: totalAPagarDe(libro).plus(cuotasAplicadasAhora) }
+    }).filter((a) => !a.monto.isZero())
 
     const liquidacion = await prisma.$transaction(async (tx) => {
       const creada = await tx.liquidacion.create({
@@ -111,8 +130,10 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
           totalRecalculado: aColumnaImporte(resultado.totalRecalculado),
           totalYaLiquidado: aColumnaImporte(resultado.totalYaLiquidado),
           totalAPagar: aColumnaImporte(resultado.totalAPagar),
-          totalFormal: aColumnaImporte(resultado.totalFormal),
-          totalInformal: aColumnaImporte(resultado.totalInformal),
+          totalRecalculadoFormal: aColumnaImporte(resultado.totalRecalculadoFormal),
+          totalRecalculadoInformal: aColumnaImporte(resultado.totalRecalculadoInformal),
+          totalAPagarFormal: aColumnaImporte(resultado.totalAPagarFormal),
+          totalAPagarInformal: aColumnaImporte(resultado.totalAPagarInformal),
           snapshot: armarSnapshot(resultado, contexto.entrada),
           ukVigente: 1,
           confirmadaEn: new Date(),
@@ -147,22 +168,25 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
         })
       }
 
-      // Un único asiento, al haber si la diferencia es positiva y al debe si es negativa.
-      await tx.cuentaCorriente.create({
-        data: {
-          empleadoId: empleado.id,
-          fecha: hoy(),
-          tipo: 'LIQUIDACION',
-          debe: montoAsiento.isNegative() ? aColumnaImporte(montoAsiento.abs()) : '0',
-          haber: montoAsiento.isNegative() ? '0' : aColumnaImporte(montoAsiento),
-          concepto: esComplementaria
-            ? `Liquidación complementaria ${formatearPeriodo(periodo)} (#${contexto.proximaSecuencia})`
-            : `Liquidación ${formatearPeriodo(periodo)}`,
-          liquidacionId: creada.id,
-          creadoPor: usuario.id,
-          modificadoPor: usuario.id,
-        },
-      })
+      // Un asiento por libro, al haber si el devengado es positivo y al debe si es negativo.
+      for (const asiento of asientos) {
+        await tx.cuentaCorriente.create({
+          data: {
+            empleadoId: empleado.id,
+            fecha: hoy(),
+            tipo: 'LIQUIDACION',
+            libro: asiento.libro,
+            debe: asiento.monto.isNegative() ? aColumnaImporte(asiento.monto.abs()) : '0',
+            haber: asiento.monto.isNegative() ? '0' : aColumnaImporte(asiento.monto),
+            concepto: esComplementaria
+              ? `Liquidación complementaria ${formatearPeriodo(periodo)} (#${contexto.proximaSecuencia})`
+              : `Liquidación ${formatearPeriodo(periodo)}`,
+            liquidacionId: creada.id,
+            creadoPor: usuario.id,
+            modificadoPor: usuario.id,
+          },
+        })
+      }
 
       await auditar(
         {
@@ -279,6 +303,7 @@ export async function anularLiquidacionConfirmada(entrada: unknown) {
             empleadoId: liquidacion.empleadoId,
             fecha: hoy(),
             tipo: 'LIQUIDACION',
+            libro: movimiento.libro,
             debe: movimiento.haber,
             haber: movimiento.debe,
             concepto: `Anulación: ${movimiento.concepto}`,

@@ -18,6 +18,7 @@ import {
 } from '@/lib/consultas/empleados'
 import { confirmarLiquidacionMensual } from '@/actions/liquidaciones'
 import { registrarPagoBancario } from '@/actions/prestamos'
+import { guardarHorasExtras } from '@/actions/novedades'
 import { aPeriodoISO, fecha, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
 
 let dueno: UsuarioDePrueba
@@ -50,6 +51,7 @@ async function liquidarYPagar(empleadoId: string, periodo: string, pagar: boolea
     empleadoId,
     fecha: '2026-01-05',
     monto: liquidacion.totalAPagar.toString(),
+    libro: 'FORMAL',
     concepto: 'Pago',
     liquidacionId: liquidacion.id,
   })
@@ -115,6 +117,44 @@ describe('estado derivado en la consulta única (§4.2.3, §11)', () => {
       data: { activo: false, fechaEgreso: sumarMeses(primerDiaDelMes(hoy()), -1) },
     })
     expect(await estadoDe(empleado.id)).toBe('BAJA')
+  })
+
+  it('§4.9 pagado solo el libro formal sigue dando Falta pagar', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+
+    // Unas horas extras sin BPS le abren la tabla informal, que queda sin cobrar.
+    const extras = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: mesAnterior(),
+      renglones: [
+        { fecha: `${mesAnterior()}-02`, horas: 2, conBps: false, recargoPct: 0 },
+      ],
+      borrar: [],
+    })
+    expect(extras.ok).toBe(true)
+
+    const resultado = await confirmarLiquidacionMensual({
+      empleadoId: empleado.id,
+      periodo: mesAnterior(),
+    })
+    expect(resultado.ok).toBe(true)
+
+    const liquidacion = await prisma.liquidacion.findFirstOrThrow({
+      where: { empleadoId: empleado.id, estado: 'CONFIRMADA' },
+    })
+    expect(Number(liquidacion.totalAPagarInformal)).toBeGreaterThan(0)
+
+    const pago = await registrarPagoBancario({
+      empleadoId: empleado.id,
+      fecha: `${mesActual()}-05`,
+      monto: liquidacion.totalAPagarFormal.toString(),
+      libro: 'FORMAL',
+      concepto: 'Pago del formal',
+      liquidacionId: liquidacion.id,
+    })
+    expect(pago.ok).toBe(true)
+
+    expect(await estadoDe(empleado.id)).toBe('FALTA_PAGAR')
   })
 
   it('41. dado de baja hace meses: no se le exigen liquidaciones posteriores al egreso', async () => {

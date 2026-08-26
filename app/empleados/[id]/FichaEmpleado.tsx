@@ -72,16 +72,22 @@ export type FichaProps = {
   salarios: Salario[]
   valoresHoraNegro: ValorHoraNegro[]
   regimenes: Regimen[]
-  cuentaCorriente: {
-    id: string
-    fecha: string
-    tipo: string
-    concepto: string
-    debe: string
-    haber: string
-    saldoAcumulado: string
-    esReversa: boolean
+  /** §4.9 — un listado por libro, con su propio saldo. Solo los que tienen movimientos. */
+  librosDeCuenta: {
+    libro: 'FORMAL' | 'INFORMAL'
+    movimientos: {
+      id: string
+      fecha: string
+      tipo: string
+      concepto: string
+      debe: string
+      haber: string
+      saldoAcumulado: string
+      esReversa: boolean
+    }[]
+    saldo: string
   }[]
+  /** La suma de los saldos de los dos libros. */
   saldo: string
   mesesSinLiquidar: string[]
   cuotas: { id: string; fecha: string; fechaISO: string; monto: string; estado: string }[]
@@ -112,10 +118,16 @@ export type FichaProps = {
     secuencia: number
     estado: string
     totalAPagar: string
-    pagada: boolean
+    pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
   }[]
   totalesPorPeriodo: Record<string, string>
   permisos: { usuarioId: string; nombre: string; email: string; permiso: string }[]
+}
+
+/** §4.9 — cómo se rotula cada libro de la cuenta corriente. */
+const ETIQUETA_LIBRO: Record<'FORMAL' | 'INFORMAL', string> = {
+  FORMAL: 'Formal (con BPS)',
+  INFORMAL: 'Sin aportes',
 }
 
 /** Las cuatro secciones que cuelgan de «Datos», en el orden en que se muestran. */
@@ -140,7 +152,10 @@ export function FichaEmpleado(props: FichaProps) {
    */
   const importesDeCuenta = [
     props.saldo,
-    ...props.cuentaCorriente.flatMap((m) => [m.debe, m.haber, m.saldoAcumulado]),
+    ...props.librosDeCuenta.flatMap((l) => [
+      l.saldo,
+      ...l.movimientos.flatMap((m) => [m.debe, m.haber, m.saldoAcumulado]),
+    ]),
     ...props.cuotas.map((c) => c.monto),
   ]
   const cuentaSinCentavos = todosEnteros(importesDeCuenta)
@@ -193,7 +208,9 @@ export function FichaEmpleado(props: FichaProps) {
     { clave: 'total', etiqueta: 'Total', numerica: true, className: 'font-medium', celda: (r) => `${r.total} h` },
   ]
 
-  const columnasDeCuenta: Columna<FichaProps['cuentaCorriente'][number]>[] = [
+  const columnasDeCuenta: Columna<
+    FichaProps['librosDeCuenta'][number]['movimientos'][number]
+  >[] = [
     { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (m) => m.fecha },
     { clave: 'concepto', etiqueta: 'Concepto', celda: (m) => m.concepto },
     { clave: 'debe', etiqueta: 'Debe', numerica: true, celda: (m) => (Number(m.debe) > 0 ? importeCuenta(m.debe) : '') },
@@ -382,7 +399,9 @@ export function FichaEmpleado(props: FichaProps) {
         {seccion === 'cuenta' ? (
           <div className="space-y-4">
           <div className="flex flex-wrap items-baseline gap-3">
-            <span className="text-sm text-muted-foreground">Saldo</span>
+            <span className="text-sm text-muted-foreground">
+              {props.librosDeCuenta.length > 1 ? 'Saldo total' : 'Saldo'}
+            </span>
             <span
               className={cn(
                 'text-2xl font-semibold tabular',
@@ -411,12 +430,40 @@ export function FichaEmpleado(props: FichaProps) {
             </p>
           ) : null}
 
-          <Tabla
-            columnas={columnasDeCuenta}
-            filas={props.cuentaCorriente}
-            claseDeFila={(m) => (m.esReversa ? 'text-muted-foreground' : undefined)}
-            vacio="Todavía no hay movimientos."
-          />
+          {/*
+            §4.9 — un listado por libro, cada uno con su saldo. Con un solo libro no se rotula
+            ni se repite el saldo: sería el mismo que el de arriba.
+          */}
+          {props.librosDeCuenta.length === 0 ? (
+            <Tabla columnas={columnasDeCuenta} filas={[]} vacio="Todavía no hay movimientos." />
+          ) : (
+            props.librosDeCuenta.map((l) => (
+              <section key={l.libro} className="space-y-2">
+                {props.librosDeCuenta.length > 1 ? (
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <h2 className="text-[20px]">{ETIQUETA_LIBRO[l.libro]}</h2>
+                    <span className="text-sm text-muted-foreground">
+                      Saldo{' '}
+                      <span
+                        className={cn(
+                          'font-semibold tabular',
+                          Number(l.saldo) < 0 && 'text-destructive',
+                        )}
+                      >
+                        {importeCuenta(l.saldo)}
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
+                <Tabla
+                  columnas={columnasDeCuenta}
+                  filas={l.movimientos}
+                  claseDeFila={(m) => (m.esReversa ? 'text-muted-foreground' : undefined)}
+                  vacio="Todavía no hay movimientos."
+                />
+              </section>
+            ))
+          )}
 
           {props.cuotas.length > 0 ? (
             <section className="space-y-2">

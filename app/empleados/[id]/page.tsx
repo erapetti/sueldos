@@ -74,7 +74,7 @@ export default async function PaginaFicha({
       salarios={datos.salarios}
       valoresHoraNegro={datos.valoresHoraNegro}
       regimenes={datos.regimenes}
-      cuentaCorriente={datos.cuentaCorriente}
+      librosDeCuenta={datos.librosDeCuenta}
       saldo={datos.saldo}
       mesesSinLiquidar={datos.mesesSinLiquidar}
       cuotas={datos.cuotas}

@@ -4,6 +4,10 @@
  * §7.5 — pago bancario. Opcionalmente se vincula a una liquidación confirmada, y en ese caso
  * precarga el monto con el total a pagar. El vínculo es lo que marca la liquidación como
  * pagada (§4.14).
+ *
+ * §4.9 — cada pago pertenece a un libro. Una liquidación con las dos tablas se paga con **dos
+ * transferencias**, así que el diálogo se abre una vez por libro: al elegir la liquidación
+ * ofrece el libro que todavía falta y precarga el monto de ese libro.
  */
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,16 +43,36 @@ import {
 } from '@/lib/format/dates'
 import { formatearImporte } from '@/lib/format/money'
 
+type Libro = 'FORMAL' | 'INFORMAL'
+
 type Liquidacion = {
   id: string
   periodo: string
   tipo: string
   secuencia: number
   totalAPagar: string
-  pagada: boolean
+  totalAPagarFormal: string
+  totalAPagarInformal: string
+  /** Libros que esta liquidación paga. */
+  libros: Libro[]
+  /** Los que todavía no tienen pago. */
+  faltan: Libro[]
+  pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
 }
 
 const SIN_VINCULO = 'ninguna'
+
+const ETIQUETA_LIBRO: Record<Libro, string> = {
+  FORMAL: 'Formal (con BPS)',
+  INFORMAL: 'Sin aportes',
+}
+
+const LIBROS: Libro[] = ['FORMAL', 'INFORMAL']
+
+/** Lo que la liquidación paga en un libro. */
+function montoDelLibro(liquidacion: Liquidacion, libro: Libro): string {
+  return libro === 'FORMAL' ? liquidacion.totalAPagarFormal : liquidacion.totalAPagarInformal
+}
 
 const ETIQUETA_TIPO: Record<string, string> = {
   MENSUAL: 'Mensual',
@@ -82,17 +106,31 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   )
   const [liquidacionId, setLiquidacionId] = useState<string>(SIN_VINCULO)
   const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([])
+  const [libro, setLibro] = useState<Libro>('FORMAL')
 
   // Sincronización con el servidor: el setState va en el callback, no en el cuerpo del efecto.
   useEffect(() => {
     let vigente = true
     liquidacionesParaPago(empleadoId).then((r) => {
-      if (vigente && r.ok) setLiquidaciones(r.datos)
+      if (!vigente || !r.ok) return
+      setLiquidaciones(r.datos.liquidaciones)
+      // Sin liquidación vinculada, el libro por defecto es el que le toca a la empleada.
+      setLibro(r.datos.aportaBps ? 'FORMAL' : 'INFORMAL')
     })
     return () => {
       vigente = false
     }
   }, [empleadoId])
+
+  /** El concepto por defecto del pago: el período y, si es del otro libro, que no lleva BPS. */
+  function conceptoDe(elegida: Liquidacion, deLibro: Libro): string {
+    const periodo = formatearPeriodoCapitalizado(parseFechaISO(elegida.periodo))
+    const base =
+      elegida.tipo === 'MENSUAL'
+        ? `Sueldo ${periodo}`
+        : `${ETIQUETA_TIPO[elegida.tipo] ?? elegida.tipo} ${periodo}`
+    return deLibro === 'INFORMAL' ? `${base} (sin aportes)` : base
+  }
 
   function elegirLiquidacion(valor: string) {
     setLiquidacionId(valor)
@@ -101,14 +139,25 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
     const elegida = liquidaciones.find((l) => l.id === valor)
     if (!elegida) return
 
-    setMonto(elegida.totalAPagar)
-    const periodo = formatearPeriodoCapitalizado(parseFechaISO(elegida.periodo))
-    setConcepto(
-      elegida.tipo === 'MENSUAL'
-        ? `Sueldo ${periodo}`
-        : `${ETIQUETA_TIPO[elegida.tipo] ?? elegida.tipo} ${periodo}`,
-    )
+    // El libro que falta pagar; si no falta ninguno, el primero que la liquidación paga.
+    const sugerido = elegida.faltan[0] ?? elegida.libros[0] ?? libro
+    setLibro(sugerido)
+    setMonto(montoDelLibro(elegida, sugerido))
+    setConcepto(conceptoDe(elegida, sugerido))
   }
+
+  /** Cambiar de libro reprecarga el monto y el concepto de ese libro. */
+  function elegirLibro(valor: string) {
+    const nuevo = valor as Libro
+    setLibro(nuevo)
+
+    const elegida = liquidaciones.find((l) => l.id === liquidacionId)
+    if (!elegida) return
+    setMonto(montoDelLibro(elegida, nuevo))
+    setConcepto(conceptoDe(elegida, nuevo))
+  }
+
+  const vinculada = liquidaciones.find((l) => l.id === liquidacionId) ?? null
 
   function guardar() {
     ejecutar(
@@ -117,6 +166,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
           empleadoId,
           fecha,
           monto,
+          libro,
           concepto,
           liquidacionId: liquidacionId === SIN_VINCULO ? null : liquidacionId,
         }),
@@ -153,7 +203,10 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
                   <SelectItem key={l.id} value={l.id}>
                     {ETIQUETA_TIPO[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
                     {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
-                    {l.pagada ? ' · ya pagada' : ''}
+                    {l.pago === 'PAGADA' ? ' · ya pagada' : ''}
+                    {l.pago === 'PARCIAL'
+                      ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
+                      : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -161,6 +214,33 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
             <p className="text-sm text-muted-foreground">
               Vincularla es lo que la marca como pagada.
             </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-banc-libro">Libro</Label>
+            <Select value={libro} onValueChange={elegirLibro} disabled={enviando}>
+              <SelectTrigger id="pago-banc-libro">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LIBROS.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {ETIQUETA_LIBRO[l]}
+                    {vinculada && vinculada.libros.includes(l)
+                      ? ` — ${formatearImporte(montoDelLibro(vinculada, l))}`
+                      : ''}
+                    {vinculada && vinculada.libros.includes(l) && !vinculada.faltan.includes(l)
+                      ? ' · ya pagado'
+                      : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {vinculada && vinculada.libros.length > 1 ? (
+              <p className="text-sm text-muted-foreground">
+                Esta liquidación se paga en dos transferencias, una por libro.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">

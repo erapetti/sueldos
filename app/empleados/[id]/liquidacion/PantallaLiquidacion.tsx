@@ -43,11 +43,27 @@ export type LineaVista = {
   destacada: boolean
 }
 
+type Libro = 'FORMAL' | 'INFORMAL'
+
+/** Cómo se nombra cada libro: como título de columna y dentro de una oración. */
+const TITULO_LIBRO: Record<Libro, string> = {
+  FORMAL: 'Con BPS',
+  INFORMAL: 'Sin aportes',
+}
+
+const ETIQUETA_LIBRO: Record<Libro, string> = {
+  FORMAL: 'con BPS',
+  INFORMAL: 'sin aportes',
+}
+
 type Previa = {
   id: string
   secuencia: number
   totalAPagar: string
-  pagada: boolean
+  /** §4.14 — el pago se mira libro por libro. */
+  pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
+  /** Los libros que le faltan cobrar. */
+  faltan: Libro[]
   confirmadaEn: string | null
 }
 
@@ -66,6 +82,8 @@ export function PantallaLiquidacion(props: {
   totalRecalculado: string
   totalYaLiquidado: string
   totalAPagar: string
+  /** §7.6.1 — el cierre de la complementaria se calcula libro por libro. */
+  porLibro: Record<Libro, { recalculado: string; yaLiquidado: string; aPagar: string }>
   avisos: string[]
   aportaBps: boolean
   liquidaciones: FilaLiquidacion[]
@@ -97,7 +115,9 @@ export function PantallaLiquidacion(props: {
   const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
 
   const ultima = props.previas.at(-1) ?? null
-  const hayPagada = props.previas.some((p) => p.pagada)
+  // §7.6.1 — alcanza con que un libro esté pagado: ese asiento ya no se toca.
+  const hayPagada = props.previas.some((p) => p.pago !== 'SIN_PAGAR')
+  const pagadaEntera = props.previas.length > 0 && props.previas.every((p) => p.pago === 'PAGADA')
   const esComplementaria = props.previas.length > 0
   const diferencia = Number(props.totalAPagar)
 
@@ -133,6 +153,41 @@ export function PantallaLiquidacion(props: {
     (acc, t) => acc + Number(t.lineas.find((l) => l.codigo === 'TOTAL')?.importe ?? 0),
     0,
   )
+
+  /**
+   * §7.6.1 — los libros que participan del cierre: los que tienen algo recalculado o algo ya
+   * liquidado. Con uno solo, el bloque se lee igual que cuando no había libros.
+   */
+  const librosDelCierre = (['FORMAL', 'INFORMAL'] as const).filter((libro) => {
+    const l = props.porLibro[libro]
+    return Number(l.recalculado) !== 0 || Number(l.yaLiquidado) !== 0
+  })
+  const dosLibrosEnElCierre = librosDelCierre.length > 1
+
+  /** Una celda por libro y, si hay dos, la del total. */
+  function celdasDelCierre(
+    campo: 'recalculado' | 'yaLiquidado' | 'aPagar',
+    total: string,
+    negativoEnRojo = false,
+  ) {
+    const celda = (valor: string, clave: string, borde: boolean) => (
+      <td
+        key={clave}
+        className={cn(
+          'pl-4 text-right tabular',
+          borde && 'border-t pt-2',
+          negativoEnRojo && Number(valor) < 0 && 'text-destructive',
+        )}
+      >
+        {formatearImporteEntero(valor)}
+      </td>
+    )
+    const borde = campo === 'aPagar'
+    return [
+      ...librosDelCierre.map((libro) => celda(props.porLibro[libro][campo], libro, borde)),
+      ...(dosLibrosEnElCierre ? [celda(total, 'total', borde)] : []),
+    ]
+  }
 
   /**
    * §7.6 — aviso de que los parámetros actuales darían un resultado distinto. Se compara el
@@ -219,7 +274,13 @@ export function PantallaLiquidacion(props: {
             {esComplementaria && props.previas.length > 1
               ? `Este período tiene ${props.previas.length} liquidaciones confirmadas.`
               : 'Este período ya tiene una liquidación confirmada.'}{' '}
-            {hayPagada ? 'Ya fue pagada.' : 'Todavía no está pagada.'}
+            {pagadaEntera
+              ? 'Ya fue pagada.'
+              : hayPagada
+                ? `Está pagada en parte: falta el pago ${(ultima?.faltan ?? [])
+                    .map((l) => ETIQUETA_LIBRO[l])
+                    .join(' y el pago ')}.`
+                : 'Todavía no está pagada.'}
             {parametrosCambiaron
               ? ' Los parámetros actuales darían un resultado distinto: para aplicarlo hay que recalcular el período.'
               : ''}
@@ -341,30 +402,57 @@ export function PantallaLiquidacion(props: {
           ) : null}
         </div>
 
-        {/* §7.6.1 — bloque de cierre de la complementaria */}
+        {/*
+          §7.6.1 — bloque de cierre de la complementaria. La diferencia se calcula **por
+          libro**, porque cada uno tiene su propio asiento y su propio pago: si el formal ya se
+          pagó y el cambio del mes fue en el informal, la columna formal cierra en cero y ese
+          asiento no se vuelve a tocar.
+
+          Con un solo libro en juego se muestra una sola columna, como antes.
+        */}
         {esComplementaria ? (
-          <div className="rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
-            <dl className="space-y-1 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt>Total recalculado del período</dt>
-                <dd className="tabular">{formatearImporteEntero(props.totalRecalculado)}</dd>
-              </div>
-              <div className="flex justify-between gap-4 text-muted-foreground">
-                <dt>
-                  − Ya liquidado{' '}
-                  {props.previas.length === 1
-                    ? '(liquidación #1)'
-                    : `(${props.previas.length} liquidaciones)`}
-                </dt>
-                <dd className="tabular">{formatearImporteEntero(props.totalYaLiquidado)}</dd>
-              </div>
-              <div className="mt-2 flex justify-between gap-4 border-t pt-2 text-base font-semibold">
-                <dt>{diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}</dt>
-                <dd className={cn('tabular', diferencia < 0 && 'text-destructive')}>
-                  {formatearImporteEntero(props.totalAPagar)}
-                </dd>
-              </div>
-            </dl>
+          <div className="overflow-x-auto rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Cierre de la liquidación complementaria</caption>
+              <thead>
+                <tr className="text-right text-muted-foreground">
+                  <th scope="col" className="text-left font-normal"></th>
+                  {librosDelCierre.map((libro) => (
+                    <th scope="col" key={libro} className="pl-4 font-normal">
+                      {dosLibrosEnElCierre ? TITULO_LIBRO[libro] : ''}
+                    </th>
+                  ))}
+                  {dosLibrosEnElCierre ? (
+                    <th scope="col" className="pl-4 font-normal">
+                      Total
+                    </th>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row" className="text-left font-normal">
+                    Total recalculado del período
+                  </th>
+                  {celdasDelCierre('recalculado', props.totalRecalculado)}
+                </tr>
+                <tr className="text-muted-foreground">
+                  <th scope="row" className="text-left font-normal">
+                    − Ya liquidado{' '}
+                    {props.previas.length === 1
+                      ? '(liquidación #1)'
+                      : `(${props.previas.length} liquidaciones)`}
+                  </th>
+                  {celdasDelCierre('yaLiquidado', props.totalYaLiquidado)}
+                </tr>
+                <tr className="font-semibold">
+                  <th scope="row" className="border-t pt-2 text-left">
+                    {diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}
+                  </th>
+                  {celdasDelCierre('aPagar', props.totalAPagar, true)}
+                </tr>
+              </tbody>
+            </table>
 
             {diferencia < 0 ? (
               <p className="mt-2 text-sm text-destructive">

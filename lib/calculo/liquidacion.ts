@@ -31,8 +31,8 @@ import {
   type EntradaLiquidacion,
   type LineaLiquidacion,
   type ResultadoLiquidacion,
+  type Libro,
   type SalarioVigente,
-  type TablaLiquidacion,
 } from './tipos'
 
 /**
@@ -152,7 +152,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
    * La tabla de todo lo que no es específicamente informal. Con `aportaBps = false` no hay
    * tabla formal: el salario, sus descuentos, sus cuotas y sus boletos son todos informales.
    */
-  const tablaBase: TablaLiquidacion = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
+  const tablaBase: Libro = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
 
   const vhc = valorHoraCalculado(salario)
 
@@ -327,12 +327,15 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   // ── Paso 7: cuotas del plan de pagos del mes (§4.8) ──────────────────────────────────
   //
-  // Van en la misma tabla que el salario. Cuando exista el libro informal (§4.9) la cuota va
-  // a descontar en la tabla del libro donde quedó el préstamo, que no siempre es el que le
-  // toca hoy a la empleada: puede haber pedido el préstamo antes de empezar a aportar.
+  // La cuota descuenta en la tabla del libro donde quedó el préstamo (§4.9), que no siempre
+  // es el que le toca hoy a la empleada: si pidió el préstamo antes de empezar a aportar, lo
+  // sigue devolviendo contra el informal. Es lo que hace que el préstamo amortice dentro de su
+  // propio libro, en vez de dejar un saldo que no baja nunca.
+  //
+  // Por eso una empleada sin aportes puede tener tabla formal con una sola línea, la cuota.
   for (const cuota of entrada.cuotasPlan) {
     lineas.push({
-      tabla: tablaBase,
+      tabla: cuota.libro,
       codigo: CODIGOS.CUOTA_PLAN,
       /*
         «Cuota 2 de 5 del préstamo de 25/08». Decía «Cuota del plan de pagos» y con dos
@@ -374,7 +377,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     const { diasATrabajar, diasExtraConBps, diasExtraSinBps } = detalleBoletos
 
     /** Un día de trabajo son dos boletos: ida y vuelta. */
-    const lineaBoletos = (tabla: TablaLiquidacion, dias: number, diasExtra: number) => {
+    const lineaBoletos = (tabla: Libro, dias: number, diasExtra: number) => {
       const boletos = (dias + diasExtra) * 2
       if (boletos === 0) return
 
@@ -460,33 +463,32 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // Cada total es la suma **con signo** de las líneas de su tabla. Las de signo 0 —materia
   // gravada y subtotal— no suman: son informativas, y su importe ya está en las líneas que
   // las componen.
-  const sumarTabla = (tabla: TablaLiquidacion) =>
+  const sumarTabla = (tabla: Libro) =>
     lineas
       .filter((l) => l.tabla === tabla)
       .reduce((acc, l) => acc.plus(l.importe.times(l.signo)), new Decimal(0))
 
-  const totalFormal = sumarTabla('FORMAL')
-  const totalInformal = sumarTabla('INFORMAL')
-  const hayInformal = lineas.some((l) => l.tabla === 'INFORMAL')
+  const totalRecalculadoFormal = sumarTabla('FORMAL')
+  const totalRecalculadoInformal = sumarTabla('INFORMAL')
 
-  const totalAPagarDe = (tabla: TablaLiquidacion, importe: Decimal) =>
+  // Cada tabla cierra en su total si tiene alguna línea. La formal existe siempre que la
+  // empleada aporte —como mínimo tiene el salario base— y también, sin aportes, cuando queda
+  // una cuota de un préstamo formal. La informal, solo si algo cayó en ella.
+  for (const tabla of ['FORMAL', 'INFORMAL'] as const) {
+    if (!lineas.some((l) => l.tabla === tabla)) continue
     lineas.push({
       tabla,
       codigo: CODIGOS.TOTAL,
       descripcion: 'Total a pagar',
       cantidad: null,
       valorUnitario: null,
-      importe,
+      importe: tabla === 'FORMAL' ? totalRecalculadoFormal : totalRecalculadoInformal,
       signo: 0,
       destacada: true,
     })
+  }
 
-  // La formal existe siempre que la empleada aporte: como mínimo tiene el salario base. La
-  // informal solo si algo cayó en ella; un mes sin horas extras sin BPS no la muestra.
-  if (empleado.aportaBps) totalAPagarDe('FORMAL', totalFormal)
-  if (hayInformal) totalAPagarDe('INFORMAL', totalInformal)
-
-  const totalRecalculado = totalFormal.plus(totalInformal)
+  const totalRecalculado = totalRecalculadoFormal.plus(totalRecalculadoInformal)
 
   // §6.9 / §13.1 — la liquidación del mes de egreso está incompleta hasta que se especifique
   // el cálculo del despido y de la licencia no gozada.
@@ -498,7 +500,15 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     avisos.push('Liquidación final: falta calcular despido y licencia no gozada.')
   }
 
-  const totalAPagar = totalRecalculado.minus(entrada.totalYaLiquidado)
+  /*
+    §7.6.1 — lo que se paga en cada libro es su recalculado menos lo ya liquidado **de ese
+    libro**. Así una complementaria que solo cambia el informal da diferencia cero en el
+    formal, y el asiento del libro ya pagado no se toca.
+  */
+  const totalAPagarFormal = totalRecalculadoFormal.minus(entrada.totalYaLiquidadoFormal)
+  const totalAPagarInformal = totalRecalculadoInformal.minus(entrada.totalYaLiquidadoInformal)
+  const totalYaLiquidado = entrada.totalYaLiquidadoFormal.plus(entrada.totalYaLiquidadoInformal)
+  const totalAPagar = totalAPagarFormal.plus(totalAPagarInformal)
 
   /**
    * El `orden` se asigna acá: numera la tabla formal y sigue con la informal. Es el orden de
@@ -520,10 +530,14 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     totalDescuentosBps,
     subtotal,
     boletos: detalleBoletos,
-    totalFormal,
-    totalInformal,
+    totalRecalculadoFormal,
+    totalRecalculadoInformal,
     totalRecalculado,
-    totalYaLiquidado: entrada.totalYaLiquidado,
+    totalYaLiquidadoFormal: entrada.totalYaLiquidadoFormal,
+    totalYaLiquidadoInformal: entrada.totalYaLiquidadoInformal,
+    totalYaLiquidado,
+    totalAPagarFormal,
+    totalAPagarInformal,
     totalAPagar,
     avisos,
   }

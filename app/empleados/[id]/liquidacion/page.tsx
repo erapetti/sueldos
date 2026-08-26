@@ -126,7 +126,8 @@ export default async function PaginaLiquidacion({
       id: l.id,
       secuencia: l.secuencia,
       totalAPagar: l.totalAPagar.toFixed(2),
-      pagada: l.pagada,
+      pago: l.pago.estado,
+      faltan: l.pago.faltan,
       confirmadaEn: l.confirmadaEn ? l.confirmadaEn.toISOString() : null,
     }))
 
@@ -151,6 +152,18 @@ export default async function PaginaLiquidacion({
       totalRecalculado={resultado.totalRecalculado.toFixed(2)}
       totalYaLiquidado={resultado.totalYaLiquidado.toFixed(2)}
       totalAPagar={resultado.totalAPagar.toFixed(2)}
+      porLibro={{
+        FORMAL: {
+          recalculado: resultado.totalRecalculadoFormal.toFixed(2),
+          yaLiquidado: resultado.totalYaLiquidadoFormal.toFixed(2),
+          aPagar: resultado.totalAPagarFormal.toFixed(2),
+        },
+        INFORMAL: {
+          recalculado: resultado.totalRecalculadoInformal.toFixed(2),
+          yaLiquidado: resultado.totalYaLiquidadoInformal.toFixed(2),
+          aPagar: resultado.totalAPagarInformal.toFixed(2),
+        },
+      }}
       avisos={resultado.avisos}
       aportaBps={acceso.empleado.aportaBps}
       liquidaciones={liquidacionesDeLaEmpleada}

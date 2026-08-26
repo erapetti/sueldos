@@ -19,7 +19,8 @@ export type FilaLiquidacion = {
   secuencia: number
   estado: string
   totalAPagar: string
-  pagada: boolean
+  /** §4.14 — el pago se mira libro por libro: puede faltar solo uno de los dos. */
+  pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
 }
 
 const ETIQUETA_TIPO: Record<string, string> = {
@@ -65,8 +66,10 @@ export function ListaLiquidaciones({
       celda: (l) =>
         l.estado === 'ANULADA' ? (
           <Badge variant="outline">Anulada</Badge>
-        ) : l.pagada ? (
+        ) : l.pago === 'PAGADA' ? (
           <Badge variant="secondary">Pagada</Badge>
+        ) : l.pago === 'PARCIAL' ? (
+          <Badge variant="outline">Pago parcial</Badge>
         ) : (
           <Badge variant="outline">Sin pagar</Badge>
         ),

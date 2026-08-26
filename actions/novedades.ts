@@ -14,6 +14,7 @@ import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado
 import { loteFaltas, loteHorasExtras, pagoAdicional, idUuid } from '@/lib/validacion/esquemas'
 import { aColumnaCantidad, aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { normalizarDescuenta } from '@/constants/causales'
 import {
   aISO,
@@ -35,14 +36,15 @@ async function avisoDePeriodoLiquidado(
 ): Promise<string | undefined> {
   const confirmada = await prisma.liquidacion.findFirst({
     where: { empleadoId, periodo, tipo: 'MENSUAL', estado: 'CONFIRMADA' },
-    include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+    include: INCLUIR_PAGOS,
     orderBy: { secuencia: 'desc' },
   })
 
   if (!confirmada) return undefined
 
   const base = `Esta novedad corresponde a ${formatearPeriodo(periodo)}, que ya tiene una liquidación confirmada. Para que se refleje hay que recalcular el período.`
-  return confirmada.movimientos.length > 0
+  // Alcanza con que se haya pagado un libro: ese asiento ya no se toca (§7.6.1).
+  return pagoDeLiquidacion(confirmada).estado !== 'SIN_PAGAR'
     ? `${base} Como ya está pagada, el recálculo genera una liquidación complementaria por la diferencia.`
     : base
 }

@@ -9,12 +9,13 @@ import Decimal from 'decimal.js'
 import {
   conSaldoAcumulado,
   devengadoBruto,
+  estadoDePago,
   repartirEnCuotas,
   saldo,
 } from '@/lib/calculo/cuentaCorriente'
 import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
 import { periodoDe } from '@/lib/format/dates'
-import { cuotaPlan, D, entradaBase, f, horaExtra } from './helpers'
+import { cuotaPlan, D, entradaBase, f, horaExtra, yaLiquidado } from './helpers'
 
 const debe = (monto: number) => ({ debe: D(monto), haber: D(0) })
 const haber = (monto: number) => ({ debe: D(0), haber: D(monto) })
@@ -70,7 +71,7 @@ describe('19. liquidación complementaria (§7.6.1)', () => {
     // Se cargan 4 h extras al 100 % (4 × 500 × 2 = 4.000) y se recalcula.
     const complementaria = calcularLiquidacionMensual({
       ...conHorasExtras(),
-      totalYaLiquidado: original.totalAPagar,
+      ...yaLiquidado(original),
     })
 
     expect(complementaria.totalRecalculado.toFixed(2)).toBe('71200.00')
@@ -83,7 +84,7 @@ describe('19. liquidación complementaria (§7.6.1)', () => {
     const original = calcularLiquidacionMensual(conHorasExtras())
     const complementaria = calcularLiquidacionMensual({
       ...entradaBase(),
-      totalYaLiquidado: original.totalAPagar,
+      ...yaLiquidado(original),
     })
 
     expect(complementaria.totalAPagar.toFixed(2)).toBe('-4000.00')
@@ -94,7 +95,7 @@ describe('19. liquidación complementaria (§7.6.1)', () => {
     const original = calcularLiquidacionMensual(entradaBase())
     const complementaria = calcularLiquidacionMensual({
       ...conHorasExtras(),
-      totalYaLiquidado: original.totalAPagar,
+      ...yaLiquidado(original),
     })
 
     // Camino real: asiento de la original + un único asiento por la diferencia.
@@ -113,7 +114,7 @@ describe('19. liquidación complementaria (§7.6.1)', () => {
     const original = calcularLiquidacionMensual(conHorasExtras())
     const complementaria = calcularLiquidacionMensual({
       ...entradaBase(),
-      totalYaLiquidado: original.totalAPagar,
+      ...yaLiquidado(original),
     })
 
     // Una diferencia negativa se asienta al debe.
@@ -140,7 +141,7 @@ describe('20. complementaria con cuotas del plan ya aplicadas', () => {
     const complementaria = calcularLiquidacionMensual({
       ...conCuota(),
       horasExtras: [horaExtra('2026-04-08', 4, true, 100)],
-      totalYaLiquidado: original.totalAPagar,
+      ...yaLiquidado(original),
     })
 
     // La cuota entra una sola vez en el recálculo total.
@@ -153,7 +154,8 @@ describe('20. complementaria con cuotas del plan ya aplicadas', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
         cuotasPlan: [cuotaPlan('2026-04-01', D(2000), { yaAplicada: true })],
-        totalYaLiquidado: D(65200),
+        totalYaLiquidadoFormal: D(65200),
+        totalYaLiquidadoInformal: D(0),
       }),
     )
     expect(r.lineas.filter((l) => l.codigo === 'CUOTA_PLAN')).toHaveLength(1)
@@ -169,7 +171,7 @@ describe('21. dos complementarias sucesivas sobre el mismo período', () => {
     // Secuencia 2: aparecen 4 h extras al 100 %.
     const s2 = calcularLiquidacionMensual({
       ...entradaBase({ horasExtras: [horaExtra('2026-04-08', 4, true, 100)] }),
-      totalYaLiquidado: s1.totalAPagar,
+      ...yaLiquidado(s1),
     })
     expect(s2.totalAPagar.toFixed(2)).toBe('4000.00')
 
@@ -179,7 +181,7 @@ describe('21. dos complementarias sucesivas sobre el mismo período', () => {
         horasExtras: [horaExtra('2026-04-08', 4, true, 100)],
         pagosAdicionales: [{ fecha: f('2026-04-20'), monto: D(1500), concepto: 'Premio' }],
       }),
-      totalYaLiquidado: s1.totalAPagar.plus(s2.totalAPagar),
+      ...yaLiquidado(s1, s2),
     })
 
     expect(s3.totalYaLiquidado.toFixed(2)).toBe('71200.00')
@@ -197,11 +199,11 @@ describe('21. dos complementarias sucesivas sobre el mismo período', () => {
     )
     const s2 = calcularLiquidacionMensual({
       ...entradaBase(),
-      totalYaLiquidado: s1.totalAPagar,
+      ...yaLiquidado(s1),
     })
     const s3 = calcularLiquidacionMensual({
       ...entradaBase({ pagosAdicionales: [{ fecha: f('2026-04-20'), monto: D(900), concepto: null }] }),
-      totalYaLiquidado: s1.totalAPagar.plus(s2.totalAPagar),
+      ...yaLiquidado(s1, s2),
     })
 
     expect(s2.totalAPagar.toFixed(2)).toBe('-4000.00')
@@ -209,6 +211,61 @@ describe('21. dos complementarias sucesivas sobre el mismo período', () => {
     expect(
       s1.totalAPagar.plus(s2.totalAPagar).plus(s3.totalAPagar).toFixed(2),
     ).toBe(s3.totalRecalculado.toFixed(2))
+  })
+})
+
+describe('§4.9 y §7.6.1 — los dos libros', () => {
+  /*
+    Lo que hace falta para que un libro ya pagado no se vuelva a mover: la diferencia se
+    calcula libro contra libro, no sobre el total del período.
+  */
+  it('un cambio en el informal deja la diferencia del formal en cero', () => {
+    const conExtras = (horas: number) =>
+      entradaBase({ horasExtras: [horaExtra('2026-04-08', horas, false, 0)] })
+
+    // Secuencia 1: 2 h sin BPS → $600 informales, más los $67.200 formales de siempre.
+    const s1 = calcularLiquidacionMensual(conExtras(2))
+    expect(s1.totalAPagarFormal.toFixed(2)).toBe('67200.00')
+    expect(s1.totalAPagarInformal.toFixed(2)).toBe('600.00')
+
+    // Secuencia 2: aparecen 3 h sin BPS más. El formal no cambió.
+    const s2 = calcularLiquidacionMensual({ ...conExtras(5), ...yaLiquidado(s1) })
+
+    expect(s2.totalRecalculadoFormal.toFixed(2)).toBe('67200.00')
+    expect(s2.totalAPagarFormal.toFixed(2)).toBe('0.00')
+    expect(s2.totalAPagarInformal.toFixed(2)).toBe('900.00')
+    // El total de la complementaria es la suma de los dos libros.
+    expect(s2.totalAPagar.toFixed(2)).toBe('900.00')
+  })
+
+  it('el estado de pago se mira libro por libro (§4.14)', () => {
+    const totales = { formal: D(50000), informal: D(1200) }
+
+    expect(estadoDePago(totales, []).estado).toBe('SIN_PAGAR')
+    expect(estadoDePago(totales, []).faltan).toEqual(['FORMAL', 'INFORMAL'])
+
+    const soloFormal = estadoDePago(totales, [{ libro: 'FORMAL' }])
+    expect(soloFormal.estado).toBe('PARCIAL')
+    expect(soloFormal.faltan).toEqual(['INFORMAL'])
+
+    const losDos = estadoDePago(totales, [{ libro: 'FORMAL' }, { libro: 'INFORMAL' }])
+    expect(losDos.estado).toBe('PAGADA')
+    expect(losDos.faltan).toEqual([])
+  })
+
+  it('el libro sin nada a pagar no deja la liquidación esperando un pago', () => {
+    // Una empleada sin horas extras sin BPS no tiene nada informal que cobrar.
+    const soloFormal = estadoDePago({ formal: D(50000), informal: D(0) }, [{ libro: 'FORMAL' }])
+    expect(soloFormal.libros).toEqual(['FORMAL'])
+    expect(soloFormal.estado).toBe('PAGADA')
+
+    /*
+      Y una diferencia negativa tampoco: no se paga con una transferencia, queda como saldo a
+      favor de la empresa en su libro (§7.6.1).
+    */
+    const negativa = estadoDePago({ formal: D(-4000), informal: D(0) }, [])
+    expect(negativa.libros).toEqual([])
+    expect(negativa.estado).toBe('PAGADA')
   })
 })
 

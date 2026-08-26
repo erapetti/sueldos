@@ -100,7 +100,8 @@ export function entradaBase(over: Partial<EntradaLiquidacion> = {}): EntradaLiqu
     cuotasPlan: [],
     feriados: [],
     diasLicencia: [],
-    totalYaLiquidado: D(0),
+    totalYaLiquidadoFormal: D(0),
+    totalYaLiquidadoInformal: D(0),
     ...over,
   }
 }
@@ -109,6 +110,9 @@ export function entradaBase(over: Partial<EntradaLiquidacion> = {}): EntradaLiqu
  * Cuota del plan de pagos para el cálculo. `ordinal`, `deTotal` y `fechaPrestamo` son lo que
  * la línea usa para nombrarse —«Cuota 2 de 5 del préstamo de 25/03»— y casi ningún test los
  * mira, así que traen un plan de una sola cuota por defecto.
+ *
+ * El `libro` por defecto es el formal, que es donde queda el préstamo de una empleada que
+ * aporta (§4.9); el test que le importa lo pasa explícito.
  */
 export function cuotaPlan(
   fechaISO: string,
@@ -120,9 +124,24 @@ export function cuotaPlan(
     monto,
     yaAplicada: false,
     fechaPrestamo: f('2026-03-25'),
+    libro: 'FORMAL',
     ordinal: 1,
     deTotal: 1,
     ...over,
+  }
+}
+
+/**
+ * §7.6.1 — lo ya liquidado del período, **por libro**, a partir de las liquidaciones previas.
+ * Es lo que hace `armarContextoLiquidacion` con las secuencias anteriores: suma el total a
+ * pagar de cada libro por separado, porque la complementaria puede ser parcial.
+ */
+export function yaLiquidado(
+  ...previas: readonly { totalAPagarFormal: Decimal; totalAPagarInformal: Decimal }[]
+): { totalYaLiquidadoFormal: Decimal; totalYaLiquidadoInformal: Decimal } {
+  return {
+    totalYaLiquidadoFormal: previas.reduce((acc, p) => acc.plus(p.totalAPagarFormal), D(0)),
+    totalYaLiquidadoInformal: previas.reduce((acc, p) => acc.plus(p.totalAPagarInformal), D(0)),
   }
 }
 

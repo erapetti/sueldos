@@ -222,18 +222,63 @@ boletos: la tabla informal se lee «las horas que fue a hacer, y el viaje que co
 **El salario vacacional** (§7.11) no se parte: cae entero en la tabla que le corresponde al
 empleado, la formal si aporta y la informal si no.
 
-**Lo que todavía no está: los dos libros.** La contabilidad sigue con un solo asiento
-`LIQUIDACION` por el devengado bruto y un solo `total_a_pagar` (§4.9). El plan acordado con el
-usuario es una segunda etapa: una columna `libro: FORMAL | INFORMAL` en `cuenta_corriente`, dos
-asientos por liquidación, cada `PAGO` con su libro, y el estado «pagada» por libro. Cuando eso
-exista hay dos cosas que cambian acá:
+La contabilidad de las dos tablas está en la nota que sigue.
 
-- la **cuota** del plan de pagos va a descontar en la tabla del libro donde quedó el préstamo,
-  no en la del aporte actual del empleado. Hoy es lo mismo salvo que el empleado haya cambiado
-  de régimen de aporte con cuotas pendientes. El libro sale de `plan_pagos.prestamo_id`, que ya
-  apunta al movimiento del préstamo: no hace falta guardarlo aparte;
-- la **complementaria** va a poder ser parcial: si un libro está pagado y el otro no, la
-  diferencia se calcula por libro y el libro que no cambió no emite asiento.
+### 1.7.2 La cuenta corriente se lleva en dos libros
+
+Segunda etapa de lo anterior, también pedida por el usuario: cada tabla de la liquidación
+cierra en su propio **libro** de la cuenta corriente. Es una columna
+`libro: FORMAL | INFORMAL` en `cuenta_corriente`, no una tabla nueva: la mecánica de libro
+—debe, haber, contra-asiento, saldo acumulado— es la misma para los dos, y duplicarla no
+habría ganado nada. El enum es **uno solo** para las dos cosas, `Libro`, porque el corte es el
+mismo: la tabla `FORMAL` de la liquidación cierra en el libro `FORMAL`.
+
+**Qué va a cada libro.** Todo lo que pasa por el BPS —el salario de quien aporta, sus
+descuentos, sus boletos, sus préstamos— al formal. Las horas extras sin BPS y los boletos que
+generan, al informal. Una empleada con `aporta_bps = false` solo se relaciona con el informal.
+
+**Dos asientos por liquidación**, uno por libro, cada uno por el devengado bruto de ese libro:
+lo que paga más las cuotas que descuenta. El libro cuyo devengado da cero no emite asiento, que
+es el caso de la complementaria parcial y el de la empleada que solo toca un libro. Anular hace
+el contra-asiento de los dos, en su libro.
+
+**Los totales de `liquidaciones`** quedaron en dos juegos por libro:
+`total_recalculado_formal/informal` es el total de cada tabla, y `total_a_pagar_formal/informal`
+es lo que ese libro paga —recalculado menos lo ya liquidado **de ese libro**—, que es el importe
+de su asiento. Lo ya liquidado por libro no tiene columna: sale de la resta. En una liquidación
+normal los dos juegos coinciden; en una complementaria, no.
+
+**La complementaria es por libro.** Si el formal ya se pagó y el cambio del mes fue en el
+informal, la diferencia del formal da cero y su asiento no se vuelve a tocar. La guarda del
+§7.6.1 sigue siendo conservadora: alcanza con que **algún** libro esté pagado para que el
+recálculo exija complementaria.
+
+**La cuota del préstamo descuenta en el libro donde quedó el préstamo**, no en el que le tocaría
+hoy a la empleada. Si pidió el préstamo antes de empezar a aportar, lo sigue devolviendo contra
+el informal; si lo pidió aportando y después dejó de hacerlo, le aparece una tabla formal con
+una sola línea —la cuota— y un total negativo. Es a propósito: es lo que hace que el préstamo
+amortice dentro de su propio libro en vez de dejar un saldo que no baja nunca. El libro sale de
+`plan_pagos.prestamo_id`, que ya apunta al movimiento del préstamo, así que no hace falta
+guardarlo aparte.
+
+**«Pagada» pasó a ser tres estados.** Antes era «existe algún movimiento `PAGO`»; ahora es
+`SIN_PAGAR`, `PARCIAL` o `PAGADA`, mirando libro por libro (`estadoDePago`, en
+`lib/calculo/cuentaCorriente`). Cuentan solo los libros con importe **positivo**: una diferencia
+negativa no se paga con una transferencia, se compensa contra el saldo de su libro, y si contara
+dejaría la liquidación esperando para siempre un pago que no va a existir. La lectura desde la
+base está en un solo lugar, `lib/liquidacion/pago.ts`, porque la miran seis pantallas y todas
+tienen que responder lo mismo. La única excepción es el listado de empleados, que resuelve el
+estado en una consulta SQL única (§11): ahí la misma regla está escrita a mano en
+`sqlLiquidaciones`, y `FALTA_PAGAR` incluye las parciales. Si la regla cambia, hay que tocar los
+dos lugares.
+
+**El pago es uno por libro.** El diálogo del §7.5 pide el libro y precarga el monto de ese
+libro; una liquidación con las dos tablas se paga con dos transferencias, cada una con su fecha.
+El ajuste manual también pide libro.
+
+**La cuenta corriente de la ficha se muestra en dos listados**, cada uno con su saldo acumulado,
+y arriba el saldo total. Un saldo corrido que mezclara los dos libros no diría cuánto falta de
+ninguno. La empleada que solo tocó un libro ve un solo listado sin rótulo, como antes.
 
 ### 1.8 «Con aviso» también puede no descontar
 

@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db/prisma'
 import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { aISO, diasDelPeriodo, primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
 import type { DiaContexto, MarcaDia } from '@/components/dominio/PlanillaMensual'
 
@@ -43,7 +44,7 @@ export async function contextoDePlanilla(
     prisma.feriado.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
     prisma.liquidacion.findFirst({
       where: { empleadoId, periodo: desde, tipo: 'MENSUAL', estado: 'CONFIRMADA' },
-      include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+      include: INCLUIR_PAGOS,
       orderBy: { secuencia: 'desc' },
     }),
     // §7.1 y §7.2 — las dos planillas muestran la misma celda, así que las dos necesitan las
@@ -110,7 +111,9 @@ export async function contextoDePlanilla(
     valorHoraNegro: valorHoraNegro ? aDecimal(valorHoraNegro.valor).toFixed(2) : null,
     estadoLiquidacion: !liquidacion
       ? 'SIN_LIQUIDAR'
-      : liquidacion.movimientos.length > 0
+      // §4.14 — «pagada» es que no falte ningún libro: con el formal transferido y las horas
+      // en negro pendientes, el mes sigue mostrándose como liquidado y no como pagado.
+      : pagoDeLiquidacion(liquidacion).estado === 'PAGADA'
         ? 'LIQUIDADA_Y_PAGADA'
         : 'LIQUIDADA',
     hayRegimen: regimen !== null,

@@ -14,6 +14,7 @@ import {
   pagoBancario,
   prestamo as esquemaPrestamo,
 } from '@/lib/validacion/esquemas'
+import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { parseFechaISO } from '@/lib/format/dates'
 
 /**
@@ -34,6 +35,13 @@ export async function registrarPrestamo(entrada: unknown) {
           empleadoId: empleado.id,
           fecha: parseFechaISO(datos.fecha),
           tipo: 'PRESTAMO',
+          /*
+            §4.9 — el préstamo va al libro que le corresponde a la empleada hoy: el formal si
+            aporta BPS, el informal si no. Queda grabado ahí y **no se recalcula**: sus cuotas
+            van a descontar en ese libro aunque después cambie el aporte, que es lo que hace
+            que el préstamo amortice donde nació.
+          */
+          libro: empleado.aportaBps ? 'FORMAL' : 'INFORMAL',
           // §4.9 — el préstamo va al debe: el empleado pasa a adeudar.
           debe: datos.monto,
           haber: '0',
@@ -100,6 +108,8 @@ export async function registrarPagoBancario(entrada: unknown) {
         empleadoId: empleado.id,
         fecha: parseFechaISO(datos.fecha),
         tipo: 'PAGO',
+        // §4.9 — cada pago es de un libro: es el que decide qué queda por pagar (§4.14).
+        libro: datos.libro,
         // §4.9 — el pago va al debe: cancela lo devengado.
         debe: datos.monto,
         haber: '0',
@@ -129,6 +139,7 @@ export async function registrarAjuste(entrada: unknown) {
         empleadoId: empleado.id,
         fecha: parseFechaISO(datos.fecha),
         tipo: 'AJUSTE',
+        libro: datos.libro,
         debe: datos.lado === 'DEBE' ? datos.monto : '0',
         haber: datos.lado === 'HABER' ? datos.monto : '0',
         concepto: datos.concepto.trim(),
@@ -174,6 +185,8 @@ export async function anularMovimiento(movimientoId: string) {
           empleadoId: empleado.id,
           fecha: original.fecha,
           tipo: original.tipo,
+          // El contra-asiento vive en el mismo libro que el movimiento que anula.
+          libro: original.libro,
           // Contra-asiento: mismo monto al lado opuesto.
           debe: original.haber,
           haber: original.debe,
@@ -279,8 +292,10 @@ export async function cancelarCuota(cuotaId: string) {
 }
 
 /**
- * §7.5 — liquidaciones confirmadas del empleado, para poder vincular el pago. Se marcan las
- * que ya tienen un pago registrado (§4.14).
+ * §7.5 — liquidaciones confirmadas del empleado, para poder vincular el pago.
+ *
+ * Cada una viaja con lo que paga en cada libro y con los libros que le faltan (§4.14): es lo
+ * que le permite al diálogo ofrecer el libro pendiente y precargar su monto.
  */
 export async function liquidacionesParaPago(empleadoId: string) {
   return ejecutar('prestamos.liquidacionesParaPago', async (log) => {
@@ -289,20 +304,28 @@ export async function liquidacionesParaPago(empleadoId: string) {
 
     const liquidaciones = await prisma.liquidacion.findMany({
       where: { empleadoId: empleado.id, estado: 'CONFIRMADA' },
-      include: { movimientos: { where: { tipo: 'PAGO' }, select: { id: true } } },
+      include: INCLUIR_PAGOS,
       orderBy: [{ periodo: 'desc' }, { secuencia: 'desc' }],
       take: 24,
     })
 
-    return exito(
-      liquidaciones.map((l) => ({
-        id: l.id,
-        periodo: l.periodo.toISOString().slice(0, 10),
-        tipo: l.tipo,
-        secuencia: l.secuencia,
-        totalAPagar: l.totalAPagar.toString(),
-        pagada: l.movimientos.length > 0,
-      })),
-    )
+    return exito({
+      aportaBps: empleado.aportaBps,
+      liquidaciones: liquidaciones.map((l) => {
+        const pago = pagoDeLiquidacion(l)
+        return {
+          id: l.id,
+          periodo: l.periodo.toISOString().slice(0, 10),
+          tipo: l.tipo,
+          secuencia: l.secuencia,
+          totalAPagar: l.totalAPagar.toString(),
+          totalAPagarFormal: l.totalAPagarFormal.toString(),
+          totalAPagarInformal: l.totalAPagarInformal.toString(),
+          libros: pago.libros,
+          faltan: pago.faltan,
+          pago: pago.estado,
+        }
+      }),
+    })
   })
 }
