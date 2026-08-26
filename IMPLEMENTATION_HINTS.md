@@ -500,6 +500,16 @@ shadcn **no es una dependencia**: es un generador que copia el código, así que
 Si agregás una modificación a `ui/`, **listala en el README**. Un comentario dentro del
 archivo no sirve: nadie lee un archivo que está por sobrescribir.
 
+### 2.7 El SPECS.md no se edita sin permiso
+
+Hay más de una persona trabajando con el SPECS como referencia, así que **editarlo obliga a
+avisarle al equipo que lo vuelva a leer**. Por eso la especificación se toca solo cuando el
+dueño del proyecto lo pide explícitamente.
+
+El lugar de las divergencias es **este archivo**: para eso existe la sección 1. Si al
+implementar algo parece que el SPECS debería cambiar, se documenta acá y se le plantea a él,
+que decide.
+
 ---
 
 ## 3. Trampas que ya costaron tiempo
