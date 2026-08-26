@@ -5,7 +5,7 @@
  * No se muestra el salario: está en la ficha del empleado.
  */
 import Link from 'next/link'
-import { Eye, Plus, Users } from 'lucide-react'
+import { Eye, Plus, Share2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
@@ -75,13 +75,12 @@ export default async function PantallaEmpleados() {
                   <ChipEstado estado={empleado.estado} empleadoId={empleado.id} />
                   {compartidoConmigo ? (
                     <Badge variant="secondary">
-                      <TextoDeChip>Compartido conmigo</TextoDeChip>
+                      <TextoDeChip icono={Share2}>Compartido conmigo</TextoDeChip>
                     </Badge>
                   ) : null}
                   {soloLectura ? (
                     <Badge variant="outline" className="gap-1">
-                      <Eye className="size-3" aria-hidden />
-                      <TextoDeChip>Solo lectura</TextoDeChip>
+                      <TextoDeChip icono={Eye}>Solo lectura</TextoDeChip>
                     </Badge>
                   ) : null}
                 </div>

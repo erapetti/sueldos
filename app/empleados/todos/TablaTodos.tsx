@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
+import { TextoDeChip } from '@/components/dominio/TextoDeChip'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
 import { DialogoCambiarDueno } from '@/components/dominio/DialogoCambiarDueno'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
@@ -128,8 +129,7 @@ export function TablaTodos({
           <ChipEstado estado={f.estado} empleadoId={f.id} />
           {!f.visible ? (
             <Badge variant="outline" className="gap-1">
-              <EyeOff className="size-3" aria-hidden />
-              Oculto
+              <TextoDeChip icono={EyeOff}>Oculto</TextoDeChip>
             </Badge>
           ) : null}
         </span>

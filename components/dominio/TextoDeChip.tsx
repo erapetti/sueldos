@@ -1,22 +1,29 @@
 /**
- * Texto de chip de dos palabras, partido en dos renglones.
+ * Contenido de un chip de listado: el icono siempre, y el texto cuando hay ancho para él.
  *
- * En los listados los chips van al lado del alias y compiten por el ancho con todo lo demás.
- * «Falta liquidación» en un renglón es el elemento más ancho de la fila; apilado ocupa poco
- * más que la palabra más larga, que es la mitad. Abajo de `sm`, donde el chip empujaba el
- * nombre a envolver, es la diferencia entre una fila de dos renglones y una de tres.
+ * En los listados el chip compite por el espacio con el alias y el nombre, y «Falta
+ * liquidación» era el elemento más ancho de la fila. Antes se probó partirlo en dos renglones
+ * y quedaba feo; el icono dice lo mismo en 12px.
  *
- * Solo parte lo de **exactamente dos palabras**: una sola no tiene dónde partirse, y de tres
- * para arriba la columna de texto queda tan angosta que se lee peor de lo que ahorra.
+ * **El texto está siempre en el DOM**, nunca se quita: abajo de `lg` va con `sr-only`, que lo
+ * saca de la pantalla pero lo deja para el lector de pantalla. Un chip que abajo de `lg` fuera
+ * solo un dibujo no diría nada.
+ *
+ * Y como ahí el texto no se ve, el icono lleva `title`: el que está en una pantalla mediana
+ * —con mouse pero sin lugar para el texto— lo averigua pasando por encima. Va en un envoltorio
+ * porque un `title` como atributo de `<svg>` no muestra nada; el tooltip de SVG pide un
+ * elemento `<title>` adentro.
  */
-export function TextoDeChip({ children }: { children: string }) {
-  const palabras = children.split(' ')
-  if (palabras.length !== 2) return <>{children}</>
+import type { LucideIcon } from 'lucide-react'
 
+export function TextoDeChip({ icono: Icono, children }: { icono: LucideIcon; children: string }) {
   return (
-    <span className="flex flex-col items-center leading-[1.2]">
-      <span>{palabras[0]}</span>
-      <span>{palabras[1]}</span>
-    </span>
+    <>
+      <span title={children} className="inline-flex shrink-0">
+        <Icono className="size-3" aria-hidden />
+      </span>
+      {/* Las clases van literales: Tailwind lee el código como texto y no resuelve variables. */}
+      <span className="sr-only lg:not-sr-only">{children}</span>
+    </>
   )
 }

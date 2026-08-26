@@ -7,10 +7,25 @@
  * a ninguna parte enseña a desconfiar de los que sí llevan.
  */
 import Link from 'next/link'
+import { CircleCheck, CircleSlash, Coins, Receipt, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
 import { cn } from '@/lib/utils'
 import { TextoDeChip } from './TextoDeChip'
+
+/**
+ * El icono de cada estado. En pantallas angostas es lo único que se ve, así que tiene que
+ * distinguirse solo: la plata que falta pagar, el comprobante que falta emitir.
+ *
+ * `BAJA` y `ACTIVO` llevan el suyo aunque sean de una palabra y entren igual. Si la mitad de
+ * la columna fueran iconos y la otra mitad palabras sueltas, no se leería como una columna.
+ */
+const ICONOS: Record<EstadoEmpleado, LucideIcon> = {
+  FALTA_PAGAR: Coins,
+  FALTA_LIQUIDACION: Receipt,
+  BAJA: CircleSlash,
+  ACTIVO: CircleCheck,
+}
 
 const CLASES: Record<EstadoEmpleado, string> = {
   FALTA_PAGAR:
@@ -52,7 +67,7 @@ export function ChipEstado({
   if (!href) {
     return (
       <Badge variant="outline" className={clases}>
-        <TextoDeChip>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
+        <TextoDeChip icono={ICONOS[estado]}>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
       </Badge>
     )
   }
@@ -60,7 +75,7 @@ export function ChipEstado({
   return (
     <Badge asChild variant="outline" className={cn(clases, 'transition-opacity hover:opacity-80')}>
       <Link href={href}>
-        <TextoDeChip>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
+        <TextoDeChip icono={ICONOS[estado]}>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
       </Link>
     </Badge>
   )
