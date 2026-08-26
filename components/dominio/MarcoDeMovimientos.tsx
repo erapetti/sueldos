@@ -4,10 +4,12 @@
  * El marco de una pantalla de la rama «Movimientos»: el encabezado de la empleada arriba y su
  * submenú debajo, con el ítem de donde estás parado marcado.
  *
- * Las seis pantallas de la rama —el listado y el detalle de cada movimiento— empiezan igual, y
- * los siete datos de la empleada que necesitan esas dos piezas viajaban repetidos prop por
- * prop en cada una. Acá viajan en un solo objeto, que la página arma con `empleadaDelMarco`
- * (`lib/auth/guards.ts`) desde el mismo `accesoAEmpleado` que ya resolvió el permiso.
+ * Las pantallas de la rama —el listado y el detalle de cada movimiento— empiezan igual, y los
+ * datos de la empleada que necesitan esas dos piezas viajaban repetidos prop por prop en cada
+ * una. Acá viajan en un solo objeto, que la página arma con `empleadaDelMarco`
+ * (`lib/auth/guards.ts`) desde el mismo `accesoAEmpleado` que ya resolvió el permiso. La
+ * `fechaIngreso` no la usa el marco: la usan los diálogos de alta de cada pantalla, para no
+ * ofrecer fechas anteriores al ingreso.
  */
 import { EncabezadoEmpleada } from './EncabezadoEmpleada'
 import { MovimientosEmpleado } from './MovimientosEmpleado'
@@ -46,7 +48,6 @@ export function MarcoDeMovimientos({
       <MovimientosEmpleado
         empleadoId={empleada.id}
         alias={empleada.alias}
-        fechaIngreso={empleada.fechaIngreso}
         puedeEditar={!empleada.soloLectura}
         dadoDeBaja={empleada.dadoDeBaja}
         mostrarVisibilidad={!empleada.visible}
