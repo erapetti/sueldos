@@ -3,22 +3,17 @@
 /**
  * §8.3 — ocultar del listado, y §8.7 — volver a mostrar.
  *
- * Al ocultar, el toast de confirmación incluye Deshacer y aclara dónde volver a encontrarlo.
+ * Se usa desde dos lados —la hoja «Movimientos» de la ficha y el menú de cada fila de «Todo el
+ * Personal»— y es el mismo diálogo en los dos: la visibilidad es una sola propiedad de la
+ * empleada, así que no tendría sentido preguntarla distinto según desde dónde se entre.
+ *
+ * Al ocultar, el toast de confirmación incluye Deshacer y aclara dónde volver a encontrarla.
  */
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { useAccion } from '@/hooks/useAccion'
 import { cambiarVisibilidad } from '@/actions/empleados'
+import { DialogoDeAccion } from './DialogoDeAccion'
 
 export function DialogoOcultar({
   abierto,
@@ -49,7 +44,7 @@ export function DialogoOcultar({
         router.refresh()
 
         if (visible) {
-          toast.success(`${alias} ya no aparece en el listado. Está en «Todos los empleados».`, {
+          toast.success(`${alias} ya no aparece en el listado. Está en «Todo el Personal».`, {
             action: { label: 'Deshacer', onClick: deshacer },
             duration: 12_000,
           })
@@ -61,36 +56,27 @@ export function DialogoOcultar({
   }
 
   return (
-    <AlertDialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {visible ? `¿Ocultar a ${alias} del listado?` : `¿Volver a mostrar a ${alias}?`}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {visible
-              ? 'Deja de aparecer en «Mi Personal». Sigue disponible en «Todo el Personal», que es desde donde se lo puede volver a mostrar. No se borra nada.'
-              : 'Vuelve a aparecer en la pantalla «Mi Personal».'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {/*
-          El acento va en la opción que no cambia nada. Ocultar saca al empleado del listado
-          —es reversible, pero es el lado que hay que confirmar—; mostrar lo devuelve, así que
-          ahí el acento se queda en la acción.
-        */}
-        <AlertDialogFooter>
-          <AlertDialogCancel variant={visible ? 'default' : 'outline'} disabled={enviando}>
-            Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant={visible ? 'destructive' : 'default'}
-            onClick={confirmar}
-            disabled={enviando}
-          >
-            {visible ? 'Ocultar' : 'Mostrar'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DialogoDeAccion
+      abierto={abierto}
+      onCerrar={onCerrar}
+      titulo={visible ? `¿Ocultar a ${alias} del listado?` : `¿Volver a mostrar a ${alias}?`}
+      /*
+        La visibilidad es una columna de la empleada, no una preferencia de quien la esconde:
+        `listarEmpleadosVisibles` filtra por `visible` para cualquiera que la tenga a la vista.
+        Decirlo importa, porque «ocultar del listado» se lee como algo propio.
+      */
+      descripcion={
+        visible
+          ? 'Deja de aparecer en «Mi Personal» para todos los usuarios de la aplicación, no solo para vos. Sigue disponible en «Todo el Personal», que es desde donde se la puede volver a mostrar. No se borra nada.'
+          : 'Vuelve a aparecer en «Mi Personal» para todos los usuarios de la aplicación que tengan acceso a ella.'
+      }
+      etiquetaConfirmar={visible ? 'Ocultar' : 'Mostrar'}
+      onConfirmar={confirmar}
+      enviando={enviando}
+      // Ocultar saca a la empleada del listado; mostrar la devuelve, así que ahí no hay peligro.
+      peligrosa={visible}
+      // No hay nada que elegir: es una pregunta que hay que contestar, no un formulario.
+      modo="confirmacion"
+    />
   )
 }

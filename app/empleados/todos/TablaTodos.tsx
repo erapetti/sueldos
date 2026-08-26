@@ -144,6 +144,8 @@ export function TablaTodos({
             duenoActualId={fila.duenoId}
             puedeAutocompartirse={ajeno && esAdmin}
             esAjena={ajeno}
+            activa={fila.activo}
+            visible={fila.visible}
           />
         ) : null
       },

@@ -248,6 +248,15 @@ describe como «préstamo que originó el plan». Darle tabla propia duplicaría
 movimiento y obligaría a migrar esa FK. El listado se arma leyendo el asiento con sus cuotas,
 en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado.
 
+**El menú de fila de «Todo el Personal» no ofrece «abrir la ficha».** La fila entera ya enlaza
+a la empleada desde que las tablas siguen el criterio de arriba, así que era ofrecer dos
+caminos a lo mismo, y el peor de los dos: escondido dentro de un menú. Sí ofrece cambiar la
+visibilidad, que antes solo se alcanzaba desde la ficha. Es el mismo `DialogoOcultar` en los
+dos lados —la visibilidad es una columna de la empleada, no una preferencia de quien la
+esconde, y el texto lo aclara: el cambio vale para todos los usuarios—. La opción se
+deshabilita sobre una empleada ajena, porque `cambiarVisibilidad` pasa por `exigirEdicion` y
+un administrador primero tiene que compartírsela (§8.7).
+
 **El ítem «Acciones» del menú se llama ahora «Movimientos»** y dejó de ser solo botonera: es el
 índice desde donde se entra a cada listado. Por ahora solo «Préstamos» lleva a su pantalla; las
 otras tres conservan el «Registrar …» y su diálogo hasta que tengan la suya.
@@ -287,7 +296,19 @@ quince lugares y cada estado vacío llevaba su `colSpan` escrito a mano, que que
 cuanto alguien agregaba una columna. Ahora sale de `columnas.length`.
 
 Solo `Tabla` y `FilaConDetalle` importan de `components/ui/table`; ninguna pantalla arma su
-propio andamio. Si una tabla necesita algo que la plantilla no da, **agregalo a la plantilla**:
+propio andamio.
+
+**Los diálogos de confirmar una acción son `DialogoDeAccion`**, con las dos familias adentro
+porque se ven igual y no significan lo mismo: `modo="formulario"` es un `Dialog` —tiene algo
+que elegir y se puede abandonar tocando afuera— y `modo="confirmacion"` es un `AlertDialog`
+—`role="alertdialog"`, que el lector de pantalla anuncia con más énfasis, y no se cierra
+tocando afuera—. `peligrosa` mueve el acento al botón que no cambia nada.
+
+Los usan los tres del menú de «Todo el Personal» y el de visibilidad. **Los cuatro diálogos de
+alta** —préstamo, pago adicional, licencia, pago bancario— y las siete confirmaciones sueltas
+que quedan —en `FormularioDatos`, `DetallePrestamo`, `PantallaUsuarios`, `PantallaLiquidacion`
+y `PlanillaMensual`— todavía arman el suyo; encajan en `DialogoDeAccion` y conviene migrarlas
+cuando se las toque. Si una tabla necesita algo que la plantilla no da, **agregalo a la plantilla**:
 las columnas ya soportan alineación a la derecha, tipografía tabular, esconderse por
 breakpoint y clases propias, y la primera columna tiene `alLado` y `debajo` para lo que no
 debe quedar adentro del enlace —si el chip de estado y el nombre completo cayeran dentro del
