@@ -80,15 +80,10 @@ export function TablaTodos({
       clave: 'alias',
       etiqueta: 'Alias',
       celda: (fila) => fila.alias,
-      // El chip y el nombre van fuera del enlace: si no, el enlace se llamaría «Ana Ana
-      // Pereyra Gómez». Abajo de `md` la columna del nombre completo no está, así que baja acá.
-      alLado: (fila) =>
-        !fila.visible ? (
-          <Badge variant="outline" className="gap-1">
-            <EyeOff className="size-3" aria-hidden />
-            Oculto
-          </Badge>
-        ) : null,
+      /*
+        El nombre va fuera del enlace: si no, el enlace se llamaría «Ana Ana Pereyra Gómez».
+        Abajo de `md` la columna del nombre completo no está, así que baja acá.
+      */
       debajo: (fila) => (
         <p className="text-sm text-muted-foreground md:hidden">{fila.nombreCompleto}</p>
       ),
@@ -123,7 +118,22 @@ export function TablaTodos({
     {
       clave: 'estado',
       etiqueta: 'Estado',
-      celda: (f) => <ChipEstado estado={f.estado} empleadoId={f.id} />,
+      /*
+        «Oculto» estaba al lado del alias y en pantallas angostas quedaba encajado entre el
+        alias y el nombre, partiendo en dos lo que es un solo dato. Acá va con el otro chip,
+        que es lo que en definitiva es: parte del estado de la empleada.
+      */
+      celda: (f) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <ChipEstado estado={f.estado} empleadoId={f.id} />
+          {!f.visible ? (
+            <Badge variant="outline" className="gap-1">
+              <EyeOff className="size-3" aria-hidden />
+              Oculto
+            </Badge>
+          ) : null}
+        </span>
+      ),
     },
     {
       clave: 'acciones',

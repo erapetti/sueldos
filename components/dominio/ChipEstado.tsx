@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { ETIQUETAS_ESTADO, type EstadoEmpleado } from '@/lib/calculo/estado'
 import { cn } from '@/lib/utils'
+import { TextoDeChip } from './TextoDeChip'
 
 const CLASES: Record<EstadoEmpleado, string> = {
   FALTA_PAGAR:
@@ -51,14 +52,16 @@ export function ChipEstado({
   if (!href) {
     return (
       <Badge variant="outline" className={clases}>
-        {ETIQUETAS_ESTADO[estado]}
+        <TextoDeChip>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
       </Badge>
     )
   }
 
   return (
     <Badge asChild variant="outline" className={cn(clases, 'transition-opacity hover:opacity-80')}>
-      <Link href={href}>{ETIQUETAS_ESTADO[estado]}</Link>
+      <Link href={href}>
+        <TextoDeChip>{ETIQUETAS_ESTADO[estado]}</TextoDeChip>
+      </Link>
     </Badge>
   )
 }

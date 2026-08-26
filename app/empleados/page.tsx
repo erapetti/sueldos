@@ -9,6 +9,7 @@ import { Eye, Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
+import { TextoDeChip } from '@/components/dominio/TextoDeChip'
 import { exigirUsuario } from '@/lib/auth/guards'
 import { listarEmpleadosVisibles } from '@/lib/consultas/empleados'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
@@ -73,12 +74,14 @@ export default async function PantallaEmpleados() {
                 <div className="flex flex-wrap items-center gap-2">
                   <ChipEstado estado={empleado.estado} empleadoId={empleado.id} />
                   {compartidoConmigo ? (
-                    <Badge variant="secondary">Compartido conmigo</Badge>
+                    <Badge variant="secondary">
+                      <TextoDeChip>Compartido conmigo</TextoDeChip>
+                    </Badge>
                   ) : null}
                   {soloLectura ? (
                     <Badge variant="outline" className="gap-1">
                       <Eye className="size-3" aria-hidden />
-                      Solo lectura
+                      <TextoDeChip>Solo lectura</TextoDeChip>
                     </Badge>
                   ) : null}
                 </div>
