@@ -40,6 +40,18 @@ export function itemsDeMenu(empleadoId: string): ItemMenu[] {
  */
 export const SECCIONES_DE_DATOS = ['datos', 'salario', 'regimen', 'compartido'] as const
 
+/**
+ * Todas las secciones que viven en la ficha: las de la tarjeta de Datos más las tres del
+ * menú que no tienen ruta propia. La ficha no tiene `else`, así que un `?seccion=` que no
+ * esté acá dibujaría el encabezado con el cuerpo vacío; con la lista, da 404.
+ */
+export const SECCIONES_DE_FICHA = [
+  ...SECCIONES_DE_DATOS,
+  'cuenta',
+  'licencia',
+  'movimientos',
+] as const
+
 export function EncabezadoEmpleada({
   empleadoId,
   alias,

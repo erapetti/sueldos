@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer, esDueno } from '@/lib/auth/guards'
 import { datosDeFicha, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { descripcionSeguroSalud } from '@/constants/segurosSalud'
+import { SECCIONES_DE_FICHA } from '@/components/dominio/EncabezadoEmpleada'
 import { FichaEmpleado } from './FichaEmpleado'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,17 @@ export default async function PaginaFicha({
   const acceso = await accesoAEmpleado(id, usuario)
   if (!acceso || !puedeVer(acceso.nivel)) notFound()
 
+  // Una sección que no existe es un 404 y no una ficha vacía. Va después del permiso para no
+  // cambiar en nada a quién se le muestra qué, y antes de la consulta para no ir a la base al
+  // pedo. `includes` sobre el `as const` pide el ensanchado: `seccion` es un `string` cualquiera.
+  if (!(SECCIONES_DE_FICHA as readonly string[]).includes(seccion)) notFound()
+
+  // «Compartido con» es del dueño y de nadie más: el submenú ni siquiera dibuja el botón. Para
+  // el que entra por la URL vale lo mismo que una sección inexistente, así que 404 y no una
+  // ficha con el cuerpo vacío.
+  const duenoDelEmpleado = esDueno(acceso.nivel)
+  if (seccion === 'compartido' && !duenoDelEmpleado) notFound()
+
   const datos = await datosDeFicha(id)
   const totales = totalPorPeriodo(datos.liquidaciones)
 
@@ -37,7 +49,7 @@ export default async function PaginaFicha({
       seccionInicial={seccion}
       // §8.7 — el administrador ve la ficha de un empleado ajeno en modo lectura.
       soloLectura={!puedeEditar(acceso.nivel)}
-      esDueno={esDueno(acceso.nivel)}
+      esDueno={duenoDelEmpleado}
       comoAdministrador={acceso.nivel === 'ADMIN'}
       duenoNombre={datos.empleado.dueno.nombre ?? datos.empleado.dueno.email}
       empleado={{
