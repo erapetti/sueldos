@@ -165,7 +165,6 @@ export default async function PaginaLiquidacion({
         },
       }}
       avisos={resultado.avisos}
-      aportaBps={acceso.empleado.aportaBps}
       liquidaciones={liquidacionesDeLaEmpleada}
       totalesPorPeriodo={totalesPorPeriodo}
       puedeRetroceder={puedeRetroceder}

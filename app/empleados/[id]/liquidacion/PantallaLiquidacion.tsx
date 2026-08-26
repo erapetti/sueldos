@@ -85,7 +85,6 @@ export function PantallaLiquidacion(props: {
   /** §7.6.1 — el cierre de la complementaria se calcula libro por libro. */
   porLibro: Record<Libro, { recalculado: string; yaLiquidado: string; aPagar: string }>
   avisos: string[]
-  aportaBps: boolean
   liquidaciones: FilaLiquidacion[]
   /** §7.6 — solo se puede ir atrás si hay algo antes que mirar. */
   puedeRetroceder: boolean
