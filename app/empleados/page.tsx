@@ -5,8 +5,9 @@
  * No se muestra el salario: está en la ficha del empleado.
  */
 import Link from 'next/link'
-import { Eye, Plus, Share2, Users } from 'lucide-react'
+import { Eye, Share2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BotonAgregar } from '@/components/dominio/BotonAgregar'
 import { Badge } from '@/components/ui/badge'
 import { ChipEstado } from '@/components/dominio/ChipEstado'
 import { TextoDeChip } from '@/components/dominio/TextoDeChip'
@@ -24,12 +25,7 @@ export default async function PantallaEmpleados() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <EncabezadoPagina className="mb-0 flex-1" rotulo="Espacio de trabajo" titulo="Mi Personal" />
-        <Button asChild>
-          <Link href="/empleados/nuevo">
-            <Plus className="size-4" aria-hidden />
-            Nueva empleada
-          </Link>
-        </Button>
+        <BotonAgregar href="/empleados/nuevo">Nueva empleada</BotonAgregar>
       </div>
 
       {empleados.length === 0 ? (

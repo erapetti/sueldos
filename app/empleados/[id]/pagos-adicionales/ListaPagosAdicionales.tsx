@@ -8,9 +8,8 @@
  * se avisa acá mismo, que es antes de entrar a tocarlo (§6.11).
  */
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { BotonAgregar } from '@/components/dominio/BotonAgregar'
 import { DialogoPagoAdicional } from '@/components/dominio/DialogoPagoAdicional'
 import {
   MarcoDeMovimientos,
@@ -70,10 +69,7 @@ export function ListaPagosAdicionales({
         titulo="Pagos adicionales"
         accion={
           empleada.soloLectura ? null : (
-            <Button onClick={() => setAlta(true)}>
-              <Plus className="size-4" aria-hidden />
-              Nuevo pago adicional
-            </Button>
+            <BotonAgregar onClick={() => setAlta(true)}>Nuevo pago adicional</BotonAgregar>
           )
         }
         columnas={columnas}

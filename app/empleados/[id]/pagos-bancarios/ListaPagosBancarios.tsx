@@ -9,9 +9,8 @@
  * sale (§4.9): una liquidación con las dos tablas se paga con dos transferencias.
  */
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { BotonAgregar } from '@/components/dominio/BotonAgregar'
 import { DialogoPagoBancario } from '@/components/dominio/DialogoPagoBancario'
 import {
   MarcoDeMovimientos,
@@ -78,10 +77,7 @@ export function ListaPagosBancarios({
         titulo="Pagos bancarios"
         accion={
           empleada.soloLectura ? null : (
-            <Button onClick={() => setAlta(true)}>
-              <Plus className="size-4" aria-hidden />
-              Nuevo pago bancario
-            </Button>
+            <BotonAgregar onClick={() => setAlta(true)}>Nuevo pago bancario</BotonAgregar>
           )
         }
         columnas={columnas}

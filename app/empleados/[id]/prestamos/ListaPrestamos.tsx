@@ -7,9 +7,8 @@
  * donde volver a mirar lo que registró.
  */
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { BotonAgregar } from '@/components/dominio/BotonAgregar'
 import { DialogoPrestamo } from '@/components/dominio/DialogoPrestamo'
 import {
   MarcoDeMovimientos,
@@ -63,10 +62,7 @@ export function ListaPrestamos({
         titulo="Préstamos"
         accion={
           empleada.soloLectura ? null : (
-            <Button onClick={() => setAlta(true)}>
-              <Plus className="size-4" aria-hidden />
-              Nuevo préstamo
-            </Button>
+            <BotonAgregar onClick={() => setAlta(true)}>Nuevo préstamo</BotonAgregar>
           )
         }
         columnas={columnas}
