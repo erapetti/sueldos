@@ -237,6 +237,18 @@ mismo: la tabla `FORMAL` de la liquidación cierra en el libro `FORMAL`.
 descuentos, sus boletos, sus préstamos— al formal. Las horas extras sin BPS y los boletos que
 generan, al informal. Una empleada con `aporta_bps = false` solo se relaciona con el informal.
 
+**Las faltas no llevan marca de libro, y no la necesitan.** La falta descuenta del salario, así
+que va al mismo libro que el salario, y eso se deduce de `aporta_bps`. No hay dos regímenes por
+empleada —una aporta o no aporta— así que no hay caso de falta «del otro libro». Lo mismo vale
+para el salario base, los boletos y los pagos adicionales: todos siguen a `tablaBase`.
+
+La **única excepción** es la cuota del plan de pagos, que sí guarda su libro, porque el préstamo
+puede ser anterior a un cambio de aporte. Ojo con eso: `aporta_bps` es un campo suelto de
+`empleados`, no una serie con vigencia como el salario o el régimen (§5.2), así que cambiarlo y
+recalcular un período viejo mueve **todas** sus líneas al otro libro. Es coherente con que no
+haya dos regímenes a la vez, pero conviene saberlo antes de tocar el campo de una empleada con
+historia.
+
 **Dos asientos por liquidación**, uno por libro, cada uno por el devengado bruto de ese libro:
 lo que paga más las cuotas que descuenta. El libro cuyo devengado da cero no emite asiento, que
 es el caso de la complementaria parcial y el de la empleada que solo toca un libro. Anular hace
