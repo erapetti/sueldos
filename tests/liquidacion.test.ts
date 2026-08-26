@@ -40,7 +40,12 @@ describe('1. liquidación simple sin novedades', () => {
     expect(r.valorHoraCalculado.toString()).toBe(VHC.toString())
     expect(r.factorProrrateo.toString()).toBe('1')
     expect(r.materiaGravada.toFixed(2)).toBe('65000.00')
-    expect(r.boletos).toEqual({ diasATrabajar: 22, diasExtraConBoleto: 0, boletos: 44 })
+    expect(r.boletos).toEqual({
+      diasATrabajar: 22,
+      diasExtraConBps: 0,
+      diasExtraSinBps: 0,
+      boletos: 44,
+    })
     // 65.000 + 44 boletos × $50 = 67.200
     expect(r.totalRecalculado.toFixed(2)).toBe('67200.00')
     expect(r.totalAPagar.toFixed(2)).toBe('67200.00')
@@ -53,7 +58,7 @@ describe('1. liquidación simple sin novedades', () => {
     expect(lineasCon(r.lineas, CODIGOS.DESCUENTO_BPS)).toBe(0)
   })
 
-  it('el orden de las líneas es el de los 11 pasos del §6.2', () => {
+  it('el orden de las líneas es el de los pasos del §6.2, tabla por tabla', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
         conceptosBps: [conceptoBps('Montepío', 15)],
@@ -64,24 +69,45 @@ describe('1. liquidación simple sin novedades', () => {
       }),
     )
 
-    expect(r.lineas.map((l) => l.codigo)).toEqual([
-      CODIGOS.SALARIO_BASE,
-      CODIGOS.FALTAS,
-      CODIGOS.HORAS_EXTRAS_CON_BPS,
-      CODIGOS.MATERIA_GRAVADA,
-      CODIGOS.DESCUENTO_BPS,
-      CODIGOS.SUBTOTAL,
-      CODIGOS.PAGO_ADICIONAL,
-      CODIGOS.CUOTA_PLAN,
-      CODIGOS.BOLETOS,
-      CODIGOS.HORAS_EXTRAS_SIN_BPS,
-      CODIGOS.TOTAL,
+    // La tabla formal primero, la informal después, y cada una cierra en su total a pagar.
+    expect(r.lineas.map((l) => [l.tabla, l.codigo])).toEqual([
+      ['FORMAL', CODIGOS.SALARIO_BASE],
+      ['FORMAL', CODIGOS.FALTAS],
+      ['FORMAL', CODIGOS.HORAS_EXTRAS_CON_BPS],
+      ['FORMAL', CODIGOS.MATERIA_GRAVADA],
+      ['FORMAL', CODIGOS.DESCUENTO_BPS],
+      ['FORMAL', CODIGOS.SUBTOTAL],
+      ['FORMAL', CODIGOS.CUOTA_PLAN],
+      ['FORMAL', CODIGOS.BOLETOS],
+      ['FORMAL', CODIGOS.PAGO_ADICIONAL],
+      ['FORMAL', CODIGOS.TOTAL],
+      ['INFORMAL', CODIGOS.HORAS_EXTRAS_SIN_BPS],
+      ['INFORMAL', CODIGOS.TOTAL],
     ])
-    // Los pasos 6 y 11 se muestran destacados.
+    // El orden es correlativo entre las dos tablas: es el que se persiste (§4.14).
+    expect(r.lineas.map((l) => l.orden)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    // El subtotal y los dos totales se muestran destacados.
     expect(r.lineas.filter((l) => l.destacada).map((l) => l.codigo)).toEqual([
       CODIGOS.SUBTOTAL,
       CODIGOS.TOTAL,
+      CODIGOS.TOTAL,
     ])
+  })
+
+  it('los dos totales suman el total recalculado', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        horasExtras: [horaExtra('2026-04-09', 1, true, 0), horaExtra('2026-04-10', 2, false, 0)],
+      }),
+    )
+
+    expect(r.totalFormal.plus(r.totalInformal).toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
+    // Cada total coincide con la línea TOTAL de su tabla.
+    for (const tabla of ['FORMAL', 'INFORMAL'] as const) {
+      const total = r.lineas.find((l) => l.tabla === tabla && l.codigo === CODIGOS.TOTAL)!
+      const esperado = tabla === 'FORMAL' ? r.totalFormal : r.totalInformal
+      expect(total.importe.toFixed(2)).toBe(esperado.toFixed(2))
+    }
   })
 })
 
@@ -189,7 +215,12 @@ describe('5. horas extras en un día no laborable del régimen', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({ horasExtras: [horaExtra('2026-04-11', 4, true, 100)] }),
     )
-    expect(r.boletos).toEqual({ diasATrabajar: 22, diasExtraConBoleto: 1, boletos: 46 })
+    expect(r.boletos).toEqual({
+      diasATrabajar: 22,
+      diasExtraConBps: 1,
+      diasExtraSinBps: 0,
+      boletos: 46,
+    })
   })
 
   it('no dependen de con_bps y no duplican un día ya contado', () => {
@@ -202,7 +233,9 @@ describe('5. horas extras en un día no laborable del régimen', () => {
         ],
       }),
     )
-    expect(r.boletos!.diasExtraConBoleto).toBe(1)
+    // El sábado tiene horas de los dos tipos: cuenta una sola vez, y como día con BPS.
+    expect(r.boletos!.diasExtraConBps).toBe(1)
+    expect(r.boletos!.diasExtraSinBps).toBe(0)
   })
 
   it('no genera boletos adicionales si el empleado no cobra boletos', () => {
@@ -336,6 +369,89 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
       '1000.00',
     )
     expect(r.totalDescuentosBps.toFixed(2)).toBe('0.00')
+  })
+
+  it('no tiene tabla formal: todas las líneas y el total son informales (§6.2)', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        empleado: { ...entradaBase().empleado, aportaBps: false },
+        // Un sábado, para que además haya boletos por horas extras.
+        horasExtras: [horaExtra('2026-04-08', 2, true, 0), horaExtra('2026-04-11', 4, false, 100)],
+        cuotasPlan: [cuotaPlan('2026-04-01', D(500))],
+        pagosAdicionales: [{ fecha: f('2026-04-15'), monto: D(1000), concepto: 'Premio' }],
+      }),
+    )
+
+    expect(r.lineas.every((l) => l.tabla === 'INFORMAL')).toBe(true)
+    expect(r.totalFormal.toFixed(2)).toBe('0.00')
+    expect(r.totalInformal.toFixed(2)).toBe(r.totalRecalculado.toFixed(2))
+    expect(lineasCon(r.lineas, CODIGOS.TOTAL)).toBe(1)
+  })
+
+  it('los boletos del mes son una sola línea, con los días del régimen y los extra', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        empleado: { ...entradaBase().empleado, aportaBps: false },
+        horasExtras: [horaExtra('2026-04-11', 4, false, 100)],
+      }),
+    )
+
+    const boletos = r.lineas.filter((l) => l.codigo === CODIGOS.BOLETOS)
+    expect(boletos).toHaveLength(1)
+    expect(boletos[0].descripcion).toBe('Boletos (22 días + 1 por horas extras, ida y vuelta)')
+    expect(boletos[0].cantidad!.toString()).toBe('46')
+  })
+})
+
+describe('§6.2 — el reparto de los boletos entre las dos tablas', () => {
+  // Sábado 11/4/2026 y domingo 12/4/2026: el régimen base no tiene horas ninguno de los dos.
+  it('el día con horas extras con BPS va a la formal y el día sin BPS a la informal', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        horasExtras: [horaExtra('2026-04-11', 4, true, 100), horaExtra('2026-04-12', 4, false, 100)],
+      }),
+    )
+
+    const boletos = r.lineas.filter((l) => l.codigo === CODIGOS.BOLETOS)
+    expect(boletos.map((l) => [l.tabla, l.descripcion])).toEqual([
+      ['FORMAL', 'Boletos (22 días + 1 por horas extras, ida y vuelta)'],
+      ['INFORMAL', 'Boletos (1 día por horas extras, ida y vuelta)'],
+    ])
+    // Los 48 boletos del mes se reparten sin perderse ni duplicarse.
+    expect(boletos.reduce((acc, l) => acc + Number(l.cantidad), 0)).toBe(r.boletos!.boletos)
+  })
+
+  it('el día con horas de los dos tipos genera un solo boleto, en la formal', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        horasExtras: [horaExtra('2026-04-11', 2, true, 100), horaExtra('2026-04-11', 2, false, 100)],
+      }),
+    )
+
+    const boletos = r.lineas.filter((l) => l.codigo === CODIGOS.BOLETOS)
+    expect(boletos).toHaveLength(1)
+    expect(boletos[0].tabla).toBe('FORMAL')
+    expect(boletos[0].cantidad!.toString()).toBe('46')
+  })
+
+  it('sin días extra sin BPS la tabla informal solo lleva las horas extras', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({ horasExtras: [horaExtra('2026-04-08', 2, false, 0)] }),
+    )
+
+    const informales = r.lineas.filter((l) => l.tabla === 'INFORMAL')
+    expect(informales.map((l) => l.codigo)).toEqual([
+      CODIGOS.HORAS_EXTRAS_SIN_BPS,
+      CODIGOS.TOTAL,
+    ])
+  })
+
+  it('un mes sin horas extras sin BPS no tiene tabla informal', () => {
+    const r = calcularLiquidacionMensual(entradaBase())
+
+    expect(r.lineas.every((l) => l.tabla === 'FORMAL')).toBe(true)
+    expect(r.totalInformal.toFixed(2)).toBe('0.00')
+    expect(lineasCon(r.lineas, CODIGOS.TOTAL)).toBe(1)
   })
 })
 
@@ -928,7 +1044,7 @@ describe('§6.5 y §6.6 — feriados no laborables', () => {
     )
     // El día no se cuenta como día a trabajar —es feriado— pero sí como día con boleto.
     expect(r.boletos!.diasATrabajar).toBe(sinFeriado.boletos!.diasATrabajar - 1)
-    expect(r.boletos!.diasExtraConBoleto).toBe(1)
+    expect(r.boletos!.diasExtraConBps).toBe(1)
     expect(r.boletos!.boletos).toBe(sinFeriado.boletos!.boletos)
   })
 
@@ -1013,11 +1129,16 @@ describe('§6.5 y §6.6 — feriados no laborables', () => {
 
   it('el boleto no depende del recargo ni del BPS: alcanza con haber ido', () => {
     const sinFeriado = calcularLiquidacionMensual(entradaBase())
-    for (const extra of [enElFeriado(4, false, 100), enElFeriado(0, true, 0)]) {
+    // El `con_bps` no decide **si** hay boleto, solo en qué tabla cae.
+    for (const [extra, conBps, sinBps] of [
+      [enElFeriado(4, false, 100), 0, 1],
+      [enElFeriado(0, true, 0), 1, 0],
+    ] as const) {
       const r = calcularLiquidacionMensual(
         entradaBase({ feriados: feriado, horasExtras: [extra] }),
       )
-      expect(r.boletos!.diasExtraConBoleto).toBe(1)
+      expect(r.boletos!.diasExtraConBps).toBe(conBps)
+      expect(r.boletos!.diasExtraSinBps).toBe(sinBps)
       expect(r.boletos!.boletos).toBe(sinFeriado.boletos!.boletos)
     }
   })

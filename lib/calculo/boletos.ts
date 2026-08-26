@@ -89,9 +89,13 @@ export function calcularBoletos(entrada: EntradaBoletos): DetalleBoletos {
   // trabajar, y cuyo día no era de trabajo: o el régimen le da 0 horas, o es feriado no
   // laborable. El criterio es «fue a trabajar, viajó», así que no mira ni `con_bps` ni el
   // recargo; alcanza con que haya un registro de horas extras, aunque sea de cero horas.
+  //
+  // El `con_bps` sí decide **en qué tabla** de la liquidación cae el boleto del día (§6.5.1),
+  // así que se guarda por fecha: `true` si alguna de las horas extras de ese día lleva BPS.
+  // Un día con horas de los dos tipos cuenta como día con BPS, porque ya quedó documentado.
   const desdeMes = primerDiaDelMes(periodo).getTime()
   const hastaMes = ultimoDiaDelMes(periodo).getTime()
-  const diasExtra = new Set<string>()
+  const diasExtra = new Map<string, boolean>()
 
   for (const he of horasExtras) {
     const t = he.fecha.getTime()
@@ -101,15 +105,16 @@ export function calcularBoletos(entrada: EntradaBoletos): DetalleBoletos {
       horasDelDia(regimen, he.fecha).lessThanOrEqualTo(0) || feriadosNoLaborables.has(clave)
     if (!noEraDiaDeTrabajo) continue
     if (contados.has(clave)) continue
-    diasExtra.add(clave)
+    diasExtra.set(clave, (diasExtra.get(clave) ?? false) || he.conBps)
   }
 
-  const diasExtraConBoleto = diasExtra.size
+  const diasExtraConBps = [...diasExtra.values()].filter(Boolean).length
 
   return {
     diasATrabajar,
-    diasExtraConBoleto,
+    diasExtraConBps,
+    diasExtraSinBps: diasExtra.size - diasExtraConBps,
     // Cada día suma 2 boletos: ida y vuelta.
-    boletos: (diasATrabajar + diasExtraConBoleto) * 2,
+    boletos: (diasATrabajar + diasExtra.size) * 2,
   }
 }

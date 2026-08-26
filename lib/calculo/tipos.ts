@@ -108,8 +108,18 @@ export type EntradaLiquidacion = {
 /** Signo de una línea: suma, resta, o subtotal/informativa. */
 export type SignoLinea = 1 | -1 | 0
 
+/**
+ * §6.2 — en qué tabla de la liquidación va la línea.
+ *
+ * `FORMAL` es lo que pasa por el BPS y cierra en su propio total a pagar; `INFORMAL` es lo
+ * que se paga sin aportes —las horas extras sin BPS y los boletos que generan— y cierra en
+ * otro. Una empleada con `aportaBps = false` no tiene tabla formal: todo lo suyo es informal.
+ */
+export type TablaLiquidacion = 'FORMAL' | 'INFORMAL'
+
 export type LineaLiquidacion = {
   orden: number
+  tabla: TablaLiquidacion
   codigo: string
   descripcion: string
   cantidad: Decimal | null
@@ -123,7 +133,10 @@ export type LineaLiquidacion = {
 
 export type DetalleBoletos = {
   diasATrabajar: number
-  diasExtraConBoleto: number
+  /** §6.5 — días fuera del régimen con alguna hora extra con BPS: su boleto va a la formal. */
+  diasExtraConBps: number
+  /** §6.5 — días fuera del régimen sin ninguna hora extra con BPS: su boleto va a la informal. */
+  diasExtraSinBps: number
   boletos: number
 }
 
@@ -138,7 +151,11 @@ export type ResultadoLiquidacion = {
   totalDescuentosBps: Decimal
   subtotal: Decimal
   boletos: DetalleBoletos | null
-  /** Total del período según el cálculo completo (§4.14). */
+  /** §6.2 — total a pagar de la tabla formal. Cero si la empleada no aporta BPS. */
+  totalFormal: Decimal
+  /** §6.2 — total a pagar de la tabla informal. Cero si no hay ninguna línea informal. */
+  totalInformal: Decimal
+  /** Total del período según el cálculo completo (§4.14): `totalFormal + totalInformal`. */
   totalRecalculado: Decimal
   totalYaLiquidado: Decimal
   /** totalRecalculado − totalYaLiquidado. Puede ser negativo en una complementaria. */

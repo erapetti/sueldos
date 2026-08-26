@@ -64,6 +64,12 @@ enum EstadoLiquidacion {
   ANULADA
 }
 
+/// §6.2 — en qué tabla de la liquidación va la línea: la que pasa por el BPS o la que no.
+enum TablaLiquidacion {
+  FORMAL
+  INFORMAL
+}
+
 enum TipoLicenciaMovimiento {
   GENERACION_ANUAL
   GOCE
@@ -454,6 +460,11 @@ model Liquidacion {
   /// totalRecalculado − totalYaLiquidado. Puede ser negativo en una complementaria.
   totalAPagar      Decimal @map("total_a_pagar") @db.Decimal(14, 2)
 
+  /// §6.2 — total a pagar de la tabla formal. Cero si la empleada no aporta BPS.
+  totalFormal   Decimal @map("total_formal") @db.Decimal(14, 2)
+  /// §6.2 — total a pagar de la tabla informal. Cero si no hubo ninguna línea informal.
+  totalInformal Decimal @map("total_informal") @db.Decimal(14, 2)
+
   /// Entradas y resultados completos del cálculo (§4.14).
   snapshot Json
 
@@ -487,6 +498,7 @@ model LiquidacionLinea {
   id             String  @id @default(uuid(7)) @db.Char(36)
   liquidacionId  String  @map("liquidacion_id") @db.Char(36)
   orden          Int
+  tabla          TablaLiquidacion
   codigo         String  @db.VarChar(40)
   descripcion    String  @db.VarChar(255)
   cantidad       Decimal? @db.Decimal(12, 4)

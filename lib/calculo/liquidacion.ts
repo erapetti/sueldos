@@ -12,7 +12,7 @@
  * `redondearPesos` en lib/format/money.
  */
 import Decimal from 'decimal.js'
-import { redondearPesos } from '@/lib/format/money'
+import { formatearDias, redondearPesos } from '@/lib/format/money'
 import {
   aISO,
   diasCorridos,
@@ -32,6 +32,7 @@ import {
   type LineaLiquidacion,
   type ResultadoLiquidacion,
   type SalarioVigente,
+  type TablaLiquidacion,
 } from './tipos'
 
 /**
@@ -139,8 +140,19 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   const { empleado, periodo } = entrada
   const avisos: string[] = []
-  const lineas: LineaLiquidacion[] = []
-  let orden = 0
+
+  /**
+   * §6.2 — las líneas se juntan en una sola lista y sin `orden`; al final se separan por
+   * tabla —la formal primero, la informal después— y ahí se numeran. Así cada tabla se lee
+   * en su propio orden sin tener que llevar un contador global mientras se calcula.
+   */
+  const lineas: Omit<LineaLiquidacion, 'orden'>[] = []
+
+  /**
+   * La tabla de todo lo que no es específicamente informal. Con `aportaBps = false` no hay
+   * tabla formal: el salario, sus descuentos, sus cuotas y sus boletos son todos informales.
+   */
+  const tablaBase: TablaLiquidacion = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
 
   const vhc = valorHoraCalculado(salario)
 
@@ -155,7 +167,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   }
 
   lineas.push({
-    orden: (orden += 1),
+    tabla: tablaBase,
     codigo: CODIGOS.SALARIO_BASE,
     descripcion: prorrateo.factor.equals(1)
       ? 'Salario base'
@@ -173,7 +185,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   if (horasFalta.greaterThan(0)) {
     lineas.push({
-      orden: (orden += 1),
+      tabla: tablaBase,
       codigo: CODIGOS.FALTAS,
       descripcion: 'Faltas',
       cantidad: horasFalta,
@@ -233,7 +245,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     const importe = redondearPesos(horas.times(unitario))
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
-      orden: (orden += 1),
+      tabla: tablaBase,
       codigo: CODIGOS.HORAS_EXTRAS_CON_BPS,
       descripcion: `Horas extras con BPS (recargo ${grupo.recargoPct} %)`,
       cantidad: horas,
@@ -248,7 +260,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     const importe = redondearPesos(horasEnFeriados.times(vhc))
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
-      orden: (orden += 1),
+      tabla: tablaBase,
       codigo: CODIGOS.HORAS_EN_FERIADOS,
       descripcion: 'Horas en feriados no laborables',
       cantidad: horasEnFeriados,
@@ -265,7 +277,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // el paso 4 pasa directamente al paso 6.
   if (empleado.aportaBps) {
     lineas.push({
-      orden: (orden += 1),
+      tabla: tablaBase,
       codigo: CODIGOS.MATERIA_GRAVADA,
       descripcion: 'Materia gravada',
       cantidad: null,
@@ -283,7 +295,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
       const importe = redondearPesos(materiaGravada.times(concepto.porcentaje).dividedBy(100))
       totalDescuentosBps = totalDescuentosBps.plus(importe)
       lineas.push({
-        orden: (orden += 1),
+        tabla: tablaBase,
         codigo: CODIGOS.DESCUENTO_BPS,
         descripcion: concepto.seguroSalud
           ? `${concepto.concepto} (seguro ${concepto.seguroSalud})`
@@ -303,7 +315,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 6: subtotal = 4 − 5 ─────────────────────────────────────────────────────────
   const subtotal = materiaGravada.minus(totalDescuentosBps)
   lineas.push({
-    orden: (orden += 1),
+    tabla: tablaBase,
     codigo: CODIGOS.SUBTOTAL,
     descripcion: 'Subtotal',
     cantidad: null,
@@ -313,29 +325,14 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     destacada: true,
   })
 
-  // ── Paso 7: pagos adicionales, sin descuentos de ningún tipo (§4.7) ──────────────────
-  let totalPagosAdicionales = new Decimal(0)
-  for (const pago of entrada.pagosAdicionales) {
-    const importe = redondearPesos(pago.monto)
-    totalPagosAdicionales = totalPagosAdicionales.plus(importe)
-    lineas.push({
-      orden: (orden += 1),
-      codigo: CODIGOS.PAGO_ADICIONAL,
-      descripcion: pago.concepto ? `Pago adicional: ${pago.concepto}` : 'Pago adicional',
-      cantidad: null,
-      valorUnitario: null,
-      importe,
-      signo: 1,
-    })
-  }
-
-  // ── Paso 8: cuotas del plan de pagos del mes (§4.8) ──────────────────────────────────
-  let totalCuotas = new Decimal(0)
+  // ── Paso 7: cuotas del plan de pagos del mes (§4.8) ──────────────────────────────────
+  //
+  // Van en la misma tabla que el salario. Cuando exista el libro informal (§4.9) la cuota va
+  // a descontar en la tabla del libro donde quedó el préstamo, que no siempre es el que le
+  // toca hoy a la empleada: puede haber pedido el préstamo antes de empezar a aportar.
   for (const cuota of entrada.cuotasPlan) {
-    const importe = redondearPesos(cuota.monto)
-    totalCuotas = totalCuotas.plus(importe)
     lineas.push({
-      orden: (orden += 1),
+      tabla: tablaBase,
       codigo: CODIGOS.CUOTA_PLAN,
       /*
         «Cuota 2 de 5 del préstamo de 25/08». Decía «Cuota del plan de pagos» y con dos
@@ -347,14 +344,20 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
       )}`,
       cantidad: null,
       valorUnitario: null,
-      importe,
+      importe: redondearPesos(cuota.monto),
       signo: -1,
     })
   }
 
-  // ── Paso 9: boletos (§6.4, §6.5) ─────────────────────────────────────────────────────
+  // ── Paso 8: boletos (§6.4, §6.5) ─────────────────────────────────────────────────────
+  //
+  // El boleto no lleva BPS, pero viaja con el pago del trabajo que lo generó: los días del
+  // régimen y los días que la empleada fue a hacer horas extras **con** BPS van en la tabla
+  // formal, y los días cuyas horas extras son todas sin BPS, en la informal. Con
+  // `aportaBps = false` no hay tabla formal y los boletos del mes son una sola línea.
+  //
+  // Cada línea se emite solo si tiene días: un renglón de «0 días» por $0 no dice nada.
   let detalleBoletos = null
-  let importeBoletos = new Decimal(0)
 
   if (empleado.cobraBoletos) {
     detalleBoletos = calcularBoletos({
@@ -368,61 +371,122 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     })
 
     const valorBoleto = entrada.valorBoleto!
-    importeBoletos = redondearPesos(new Decimal(detalleBoletos.boletos).times(valorBoleto))
+    const { diasATrabajar, diasExtraConBps, diasExtraSinBps } = detalleBoletos
 
-    const detalleDias =
-      detalleBoletos.diasExtraConBoleto > 0
-        ? `${detalleBoletos.diasATrabajar} días + ${detalleBoletos.diasExtraConBoleto} por horas extras`
-        : `${detalleBoletos.diasATrabajar} días`
+    /** Un día de trabajo son dos boletos: ida y vuelta. */
+    const lineaBoletos = (tabla: TablaLiquidacion, dias: number, diasExtra: number) => {
+      const boletos = (dias + diasExtra) * 2
+      if (boletos === 0) return
 
-    lineas.push({
-      orden: (orden += 1),
-      codigo: CODIGOS.BOLETOS,
-      descripcion: `Boletos (${detalleDias}, ida y vuelta)`,
-      cantidad: new Decimal(detalleBoletos.boletos),
-      valorUnitario: valorBoleto,
-      importe: importeBoletos,
-      signo: 1,
-    })
+      const detalleDias =
+        dias > 0 && diasExtra > 0
+          ? `${formatearDias(dias)} + ${diasExtra} por horas extras`
+          : diasExtra > 0
+            ? `${formatearDias(diasExtra)} por horas extras`
+            : formatearDias(dias)
+
+      lineas.push({
+        tabla,
+        codigo: CODIGOS.BOLETOS,
+        descripcion: `Boletos (${detalleDias}, ida y vuelta)`,
+        cantidad: new Decimal(boletos),
+        valorUnitario: valorBoleto,
+        importe: redondearPesos(new Decimal(boletos).times(valorBoleto)),
+        signo: 1,
+      })
+    }
+
+    if (empleado.aportaBps) {
+      lineaBoletos('FORMAL', diasATrabajar, diasExtraConBps)
+    } else {
+      lineaBoletos(tablaBase, diasATrabajar, diasExtraConBps + diasExtraSinBps)
+    }
   }
 
-  // ── Paso 10: horas extras sin BPS, al valor hora "en negro" (§6.6) ───────────────────
+  // ── Paso 9: horas extras sin BPS, al valor hora "en negro" (§6.6) ────────────────────
   const extrasSinBps = agruparPorRecargo(entrada.horasExtras.filter((h) => !h.conBps))
-  let totalExtrasSinBps = new Decimal(0)
 
   for (const grupo of extrasSinBps) {
     const vhn = entrada.valorHoraNegro!
     const unitario = vhn.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
-    const importe = redondearPesos(grupo.horas.times(unitario))
-    totalExtrasSinBps = totalExtrasSinBps.plus(importe)
     lineas.push({
-      orden: (orden += 1),
+      tabla: 'INFORMAL',
       codigo: CODIGOS.HORAS_EXTRAS_SIN_BPS,
       descripcion: `Horas extras sin BPS (recargo ${grupo.recargoPct} %)`,
       cantidad: grupo.horas,
       valorUnitario: unitario,
-      importe,
+      importe: redondearPesos(grupo.horas.times(unitario)),
       signo: 1,
     })
   }
 
-  // ── Paso 11: total a pagar ───────────────────────────────────────────────────────────
-  const totalRecalculado = subtotal
-    .plus(totalPagosAdicionales)
-    .minus(totalCuotas)
-    .plus(importeBoletos)
-    .plus(totalExtrasSinBps)
+  // ── Paso 9 bis: los boletos de esas horas extras, atrás de ellas ─────────────────────
+  //
+  // Se emite después del paso 9 y no junto con los otros boletos, para que la tabla informal
+  // se lea en orden: primero las horas que se fueron a hacer, después el viaje que costaron.
+  if (detalleBoletos && empleado.aportaBps) {
+    const boletos = detalleBoletos.diasExtraSinBps * 2
+    if (boletos > 0) {
+      const valorBoleto = entrada.valorBoleto!
+      lineas.push({
+        tabla: 'INFORMAL',
+        codigo: CODIGOS.BOLETOS,
+        descripcion: `Boletos (${formatearDias(detalleBoletos.diasExtraSinBps)} por horas extras, ida y vuelta)`,
+        cantidad: new Decimal(boletos),
+        valorUnitario: valorBoleto,
+        importe: redondearPesos(new Decimal(boletos).times(valorBoleto)),
+        signo: 1,
+      })
+    }
+  }
 
-  lineas.push({
-    orden: (orden += 1),
-    codigo: CODIGOS.TOTAL,
-    descripcion: 'Total a pagar',
-    cantidad: null,
-    valorUnitario: null,
-    importe: totalRecalculado,
-    signo: 0,
-    destacada: true,
-  })
+  // ── Paso 10: pagos adicionales, sin descuentos de ningún tipo (§4.7) ─────────────────
+  //
+  // Al final de su tabla, por decisión del usuario: es lo último que se agrega al pago.
+  for (const pago of entrada.pagosAdicionales) {
+    lineas.push({
+      tabla: tablaBase,
+      codigo: CODIGOS.PAGO_ADICIONAL,
+      descripcion: pago.concepto ? `Pago adicional: ${pago.concepto}` : 'Pago adicional',
+      cantidad: null,
+      valorUnitario: null,
+      importe: redondearPesos(pago.monto),
+      signo: 1,
+    })
+  }
+
+  // ── Paso 11: un total a pagar por tabla ──────────────────────────────────────────────
+  //
+  // Cada total es la suma **con signo** de las líneas de su tabla. Las de signo 0 —materia
+  // gravada y subtotal— no suman: son informativas, y su importe ya está en las líneas que
+  // las componen.
+  const sumarTabla = (tabla: TablaLiquidacion) =>
+    lineas
+      .filter((l) => l.tabla === tabla)
+      .reduce((acc, l) => acc.plus(l.importe.times(l.signo)), new Decimal(0))
+
+  const totalFormal = sumarTabla('FORMAL')
+  const totalInformal = sumarTabla('INFORMAL')
+  const hayInformal = lineas.some((l) => l.tabla === 'INFORMAL')
+
+  const totalAPagarDe = (tabla: TablaLiquidacion, importe: Decimal) =>
+    lineas.push({
+      tabla,
+      codigo: CODIGOS.TOTAL,
+      descripcion: 'Total a pagar',
+      cantidad: null,
+      valorUnitario: null,
+      importe,
+      signo: 0,
+      destacada: true,
+    })
+
+  // La formal existe siempre que la empleada aporte: como mínimo tiene el salario base. La
+  // informal solo si algo cayó en ella; un mes sin horas extras sin BPS no la muestra.
+  if (empleado.aportaBps) totalAPagarDe('FORMAL', totalFormal)
+  if (hayInformal) totalAPagarDe('INFORMAL', totalInformal)
+
+  const totalRecalculado = totalFormal.plus(totalInformal)
 
   // §6.9 / §13.1 — la liquidación del mes de egreso está incompleta hasta que se especifique
   // el cálculo del despido y de la licencia no gozada.
@@ -436,9 +500,18 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   const totalAPagar = totalRecalculado.minus(entrada.totalYaLiquidado)
 
+  /**
+   * El `orden` se asigna acá: numera la tabla formal y sigue con la informal. Es el orden de
+   * presentación y el que se persiste, así que las líneas se releen siempre igual (§4.14).
+   */
+  const ordenadas: LineaLiquidacion[] = [
+    ...lineas.filter((l) => l.tabla === 'FORMAL'),
+    ...lineas.filter((l) => l.tabla === 'INFORMAL'),
+  ].map((linea, i) => ({ ...linea, orden: i + 1 }))
+
   return {
     periodo,
-    lineas,
+    lineas: ordenadas,
     valorHoraCalculado: vhc,
     factorProrrateo: prorrateo.factor,
     diasConVinculo: prorrateo.diasConVinculo,
@@ -447,6 +520,8 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     totalDescuentosBps,
     subtotal,
     boletos: detalleBoletos,
+    totalFormal,
+    totalInformal,
     totalRecalculado,
     totalYaLiquidado: entrada.totalYaLiquidado,
     totalAPagar,

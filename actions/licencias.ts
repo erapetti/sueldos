@@ -139,6 +139,7 @@ export async function registrarLicencia(entrada: unknown) {
 
     const auditoriaCols = { creadoPor: usuario.id, modificadoPor: usuario.id }
     const secuencia = previas + 1
+    const tabla = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
 
     const resultado = await prisma.$transaction(async (tx) => {
       const licencia = await tx.licencia.create({
@@ -175,6 +176,13 @@ export async function registrarLicencia(entrada: unknown) {
           totalRecalculado: aColumnaImporte(salarioVacacional),
           totalYaLiquidado: '0.00',
           totalAPagar: aColumnaImporte(salarioVacacional),
+          /*
+            §6.2 — el salario vacacional no se parte en dos: es una sola partida, y cae entera
+            en la tabla que le corresponde a la empleada. La formal si aporta BPS; la informal
+            si no, porque entonces todo lo suyo es informal.
+          */
+          totalFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
+          totalInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
           ukVigente: 1,
           confirmadaEn: new Date(),
           confirmadaPor: usuario.id,
@@ -197,6 +205,7 @@ export async function registrarLicencia(entrada: unknown) {
             create: [
               {
                 orden: 1,
+                tabla,
                 codigo: CODIGOS.SALARIO_VACACIONAL,
                 descripcion: `Salario vacacional (${formatearDiasHabiles(desglose.diasHabiles)})`,
                 cantidad: desglose.diasHabiles.toString(),
@@ -206,6 +215,7 @@ export async function registrarLicencia(entrada: unknown) {
               },
               {
                 orden: 2,
+                tabla,
                 codigo: CODIGOS.TOTAL,
                 descripcion: 'Total a pagar',
                 cantidad: null,

@@ -183,6 +183,58 @@ régimen». Tomado al pie de la letra eso valdría para todo —el tope de horas
 Si alguna vez se quiere la lectura amplia, hay que pasarle los feriados a `horasDelDia` y
 revisar sus tres usos.
 
+### 1.7.1 La liquidación se presenta en dos tablas
+
+Pedido del usuario, y el §6.2 quedó reescrito con esto: la liquidación se lee en dos tablas
+—**formal** e **informal**—, cada una con su propio total a pagar, más un total general cuando
+existen las dos. Los importes y el total del mes no cambian: es el mismo cálculo repartido.
+
+**Cómo está implementado.** Cada `LineaLiquidacion` tiene `tabla: 'FORMAL' | 'INFORMAL'`, y la
+columna `tabla` de `liquidacion_lineas` la persiste. El motor junta las líneas en una sola lista
+sin `orden`, y al final las separa por tabla —formal primero— y las numera. Por eso el `orden`
+es correlativo entre las dos tablas y no arranca de nuevo en la segunda: es el que se guarda y
+el que ordena la relectura de una liquidación confirmada (§4.14).
+
+Los totales son la **suma con signo de las líneas de cada tabla**; las de signo 0 —materia
+gravada y subtotal— no suman. `totalRecalculado` pasó a ser `totalFormal + totalInformal`, que
+da exactamente lo mismo que la fórmula anterior.
+
+**La tabla base.** Todo lo que no es específicamente informal —salario, faltas, horas extras con
+BPS, descuentos, subtotal, cuotas, pagos adicionales— va a `tablaBase`, que es la formal si el
+empleado aporta y la informal si no. Con `aporta_bps = false` no hay tabla formal: la pantalla
+muestra una sola tabla y no rotula ninguna, porque el título sobraría.
+
+**Los boletos se parten en dos líneas** (§6.5.1): los días del régimen y los días con alguna
+hora extra con BPS van a la formal; el resto, a la informal. `calcularBoletos` devuelve
+`diasExtraConBps` y `diasExtraSinBps` en vez del viejo `diasExtraConBoleto`. Un día con horas de
+los dos tipos cuenta una vez y como día con BPS.
+
+Dos consecuencias menores, las dos deliberadas:
+
+- Una línea de boletos **sin días no se emite**. Antes, un mes sin días trabajados —período
+  anterior al ingreso— mostraba «Boletos (0 días) $0»; ahora no aparece.
+- Los **pagos adicionales** bajaron del paso 7 al final de su tabla, después de los boletos, por
+  pedido del usuario. No cambia ningún total.
+
+**Los boletos informales van después de las horas extras sin BPS**, no junto con los otros
+boletos: la tabla informal se lee «las horas que fue a hacer, y el viaje que costaron».
+
+**El salario vacacional** (§7.11) no se parte: cae entero en la tabla que le corresponde al
+empleado, la formal si aporta y la informal si no.
+
+**Lo que todavía no está: los dos libros.** La contabilidad sigue con un solo asiento
+`LIQUIDACION` por el devengado bruto y un solo `total_a_pagar` (§4.9). El plan acordado con el
+usuario es una segunda etapa: una columna `libro: FORMAL | INFORMAL` en `cuenta_corriente`, dos
+asientos por liquidación, cada `PAGO` con su libro, y el estado «pagada» por libro. Cuando eso
+exista hay dos cosas que cambian acá:
+
+- la **cuota** del plan de pagos va a descontar en la tabla del libro donde quedó el préstamo,
+  no en la del aporte actual del empleado. Hoy es lo mismo salvo que el empleado haya cambiado
+  de régimen de aporte con cuotas pendientes. El libro sale de `plan_pagos.prestamo_id`, que ya
+  apunta al movimiento del préstamo: no hace falta guardarlo aparte;
+- la **complementaria** va a poder ser parcial: si un libro está pagado y el otro no, la
+  diferencia se calcula por libro y el libro que no cambió no emite asiento.
+
 ### 1.8 «Con aviso» también puede no descontar
 
 El §4.6.1 hace editable el campo `descuenta` **solo** con `ENFERMEDAD` y lista `CON_AVISO`,

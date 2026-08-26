@@ -33,6 +33,7 @@ import { NavegadorDePeriodo } from './NavegadorDePeriodo'
 
 export type LineaVista = {
   orden: number
+  tabla: 'FORMAL' | 'INFORMAL'
   codigo: string
   descripcion: string
   cantidad: string | null
@@ -104,6 +105,34 @@ export function PantallaLiquidacion(props: {
   const enModoLectura = ultima !== null
   const lineasAMostrar =
     enModoLectura && props.lineasPersistidas ? props.lineasPersistidas : props.lineas
+
+  /**
+   * §6.2 — la liquidación se lee en dos tablas: la formal, que pasa por el BPS, y la informal,
+   * con lo que se paga sin aportes. Cada una cierra en su propio total a pagar.
+   *
+   * Las dos salen de las mismas líneas, así que basta con agruparlas: la formal no existe si
+   * la empleada no aporta BPS, y la informal solo si algo cayó en ella. Cuando queda una sola
+   * tabla no se rotula: el título sobraría.
+   */
+  const tablas = (
+    [
+      { tabla: 'FORMAL', titulo: 'Conceptos con BPS' },
+      { tabla: 'INFORMAL', titulo: 'Conceptos sin BPS' },
+    ] as const
+  )
+    .map((t) => ({ ...t, lineas: lineasAMostrar.filter((l) => l.tabla === t.tabla) }))
+    .filter((t) => t.lineas.length > 0)
+
+  const dosTablas = tablas.length > 1
+
+  /**
+   * El total del período: la suma de los dos totales a pagar. Sale de las líneas y no de
+   * `totalRecalculado` para que en modo lectura sea exactamente lo que muestran las tablas.
+   */
+  const totalGeneral = tablas.reduce(
+    (acc, t) => acc + Number(t.lineas.find((l) => l.codigo === 'TOTAL')?.importe ?? 0),
+    0,
+  )
 
   /**
    * §7.6 — aviso de que los parámetros actuales darían un resultado distinto. Se compara el
@@ -237,56 +266,79 @@ export function PantallaLiquidacion(props: {
             </dl>
           </div>
 
-          <table
-            className={cn(
-              'w-full text-sm',
-              '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
-            )}
-          >
-            <caption className="sr-only">Desglose de la liquidación</caption>
-            <thead className="sr-only">
-              <tr>
-                <th scope="col">Concepto</th>
-                <th scope="col">Cantidad</th>
-                <th scope="col">Valor unitario</th>
-                <th scope="col">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineasAMostrar.map((linea) => {
-                const negativa = linea.signo === -1
-                return (
-                  <tr
-                    key={`${linea.orden}-${linea.codigo}`}
-                    className={cn(
-                      'border-b last:border-0',
-                      linea.destacada && 'bg-muted/60 font-semibold',
-                      linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
-                    )}
-                  >
-                    <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
-                    <td className="px-2 py-3 text-right tabular text-muted-foreground">
-                      {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
-                    </td>
-                    <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
-                      {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
-                    </td>
-                    <td
+          {tablas.map((t) => (
+            <table
+              key={t.tabla}
+              className={cn(
+                'w-full border-b text-sm last:border-0',
+                '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
+              )}
+            >
+              {/*
+                El título de la tabla es su `caption`: con las dos tablas se muestra, y con una
+                sola queda solo para el lector de pantalla, como estaba antes.
+              */}
+              <caption
+                className={cn(
+                  dosTablas
+                    ? 'px-[22px] pt-4 text-left text-sm font-semibold text-muted-foreground'
+                    : 'sr-only',
+                )}
+              >
+                {dosTablas ? t.titulo : 'Desglose de la liquidación'}
+              </caption>
+              <thead className="sr-only">
+                <tr>
+                  <th scope="col">Concepto</th>
+                  <th scope="col">Cantidad</th>
+                  <th scope="col">Valor unitario</th>
+                  <th scope="col">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {t.lineas.map((linea) => {
+                  const negativa = linea.signo === -1
+                  return (
+                    <tr
+                      key={`${linea.orden}-${linea.codigo}`}
                       className={cn(
-                        'py-3 pr-[22px] pl-2 text-right tabular',
-                        // §8.5 — los importes negativos van en rojo y con signo menos.
-                        negativa && 'text-destructive',
+                        'border-b last:border-0',
+                        linea.destacada && 'bg-muted/60 font-semibold',
+                        linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
                       )}
                     >
-                      {negativa
-                        ? `−${formatearImporteEntero(linea.importe)}`
-                        : formatearImporteEntero(linea.importe)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
+                      <td className="px-2 py-3 text-right tabular text-muted-foreground">
+                        {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
+                      </td>
+                      <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
+                        {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
+                      </td>
+                      <td
+                        className={cn(
+                          'py-3 pr-[22px] pl-2 text-right tabular',
+                          // §8.5 — los importes negativos van en rojo y con signo menos.
+                          negativa && 'text-destructive',
+                        )}
+                      >
+                        {negativa
+                          ? `−${formatearImporteEntero(linea.importe)}`
+                          : formatearImporteEntero(linea.importe)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          ))}
+
+          {/* Con las dos tablas, lo que se paga en total no está en ninguna de las dos. */}
+          {dosTablas ? (
+            <div className="flex justify-between gap-4 border-t-2 px-[22px] py-3 font-semibold">
+              <span>Total general</span>
+              <span className="tabular">{formatearImporteEntero(totalGeneral)}</span>
+            </div>
+          ) : null}
         </div>
 
         {/* §7.6.1 — bloque de cierre de la complementaria */}

@@ -30,12 +30,15 @@ function armarSnapshot(resultado: ResultadoLiquidacion, entrada: unknown) {
       totalDescuentosBps: resultado.totalDescuentosBps.toFixed(2),
       subtotal: resultado.subtotal.toFixed(2),
       boletos: resultado.boletos,
+      totalFormal: resultado.totalFormal.toFixed(2),
+      totalInformal: resultado.totalInformal.toFixed(2),
       totalRecalculado: resultado.totalRecalculado.toFixed(2),
       totalYaLiquidado: resultado.totalYaLiquidado.toFixed(2),
       totalAPagar: resultado.totalAPagar.toFixed(2),
       avisos: resultado.avisos,
       lineas: resultado.lineas.map((l) => ({
         orden: l.orden,
+        tabla: l.tabla,
         codigo: l.codigo,
         descripcion: l.descripcion,
         cantidad: l.cantidad?.toString() ?? null,
@@ -108,6 +111,8 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
           totalRecalculado: aColumnaImporte(resultado.totalRecalculado),
           totalYaLiquidado: aColumnaImporte(resultado.totalYaLiquidado),
           totalAPagar: aColumnaImporte(resultado.totalAPagar),
+          totalFormal: aColumnaImporte(resultado.totalFormal),
+          totalInformal: aColumnaImporte(resultado.totalInformal),
           snapshot: armarSnapshot(resultado, contexto.entrada),
           ukVigente: 1,
           confirmadaEn: new Date(),
@@ -117,6 +122,7 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
           lineas: {
             create: resultado.lineas.map((l) => ({
               orden: l.orden,
+              tabla: l.tabla,
               codigo: l.codigo,
               descripcion: l.descripcion,
               cantidad: l.cantidad ? l.cantidad.toDecimalPlaces(4).toString() : null,

@@ -492,6 +492,8 @@ aunque cambien los parámetros.
 | `total_recalculado` | `DECIMAL(14,2)` | Total del período según el cálculo completo de §6.2 |
 | `total_ya_liquidado` | `DECIMAL(14,2)` | Suma de `total_a_pagar` de las liquidaciones vigentes anteriores del mismo `(empleado, periodo, tipo)`. Es 0 en la secuencia 1 |
 | `total_a_pagar` | `DECIMAL(14,2)` | `total_recalculado − total_ya_liquidado`. **Puede ser negativo** en una complementaria |
+| `total_formal` | `DECIMAL(14,2)` | Total a pagar de la tabla formal (§6.2). 0 si el empleado no aporta BPS |
+| `total_informal` | `DECIMAL(14,2)` | Total a pagar de la tabla informal (§6.2). 0 si no hubo ninguna línea informal |
 | `snapshot` | `JSONB` | Entradas y resultados completos del cálculo |
 | `confirmada_en/por` | | |
 
@@ -500,8 +502,10 @@ aunque cambien los parámetros.
 Una liquidación se considera **pagada** si existe al menos un movimiento de cuenta corriente de
 tipo `PAGO` con `liquidacion_id` apuntando a ella (§7.5).
 
-`liquidacion_lineas`: `orden`, `codigo`, `descripcion`, `cantidad`, `valor_unitario`,
-`importe`, `signo`. Es lo que se renderiza en la pantalla de cálculo.
+`liquidacion_lineas`: `orden`, `tabla`, `codigo`, `descripcion`, `cantidad`, `valor_unitario`,
+`importe`, `signo`. Es lo que se renderiza en la pantalla de cálculo. `tabla` es
+`ENUM('FORMAL','INFORMAL')` (§6.2) y el `orden` es correlativo entre las dos: numera primero la
+tabla formal y sigue con la informal.
 
 ### 4.15 Licencia
 
@@ -667,6 +671,12 @@ Para un empleado E y un período P (mes/año):
 
 ### 6.2 Orden de cálculo
 
+La liquidación se presenta en **dos tablas**. La **formal** lleva todo lo que pasa por el BPS;
+la **informal** —"en negro"—, lo que se paga sin aportes. Cada una cierra en su propio **total
+a pagar**, y cuando existen las dos se muestra además un **total general**.
+
+**Tabla formal.** Solo existe si el empleado tiene `aporta_bps = true`.
+
 ```
  1.  SALARIO BASE                       = salario mensual vigente × factor_prorrateo (§6.10)
  2.  − FALTAS                           = valor_hora_calculado × Σ horas_falta_del_mes
@@ -676,20 +686,32 @@ Para un empleado E y un período P (mes/año):
  4.  = MATERIA GRAVADA                  = 1 − 2 + 3
  5.  − DESCUENTOS BPS                   = MATERIA GRAVADA × Σ porcentajes aplicables
                                           (una línea por concepto)
-                                          0 si el empleado tiene aporta_bps = false
      ────────────────────────────────────────────────────────────────
  6.  = SUBTOTAL                         = 4 − 5
- 7.  + PAGOS ADICIONALES                = Σ montos del mes (sin descuentos de ningún tipo)
- 8.  − PLAN DE PAGOS                    = Σ cuotas PENDIENTES del mes
- 9.  + BOLETOS                          = (días_a_trabajar + días_extra_con_boleto)
-                                          × 2 × valor_boleto
-10.  + HORAS EXTRAS SIN BPS             = Σ ( horas × valor_hora_negro × (1 + recargo/100) )
+ 7.  − PLAN DE PAGOS                    = Σ cuotas PENDIENTES del mes
+ 8.  + BOLETOS                          = boletos formales del mes × valor_boleto (§6.5.1)
+ 9.  + PAGOS ADICIONALES                = Σ montos del mes (sin descuentos de ningún tipo)
      ════════════════════════════════════════════════════════════════
-11.  = TOTAL A PAGAR
+10.  = TOTAL A PAGAR de la tabla formal
 ```
 
-El orden es también el orden de presentación en pantalla y en la impresión. Los pasos 6 y 11
-se muestran destacados.
+**Tabla informal.** Solo se muestra si alguna línea cayó en ella.
+
+```
+ 1.  HORAS EXTRAS SIN BPS               = Σ ( horas × valor_hora_negro × (1 + recargo/100) )
+ 2.  + BOLETOS                          = boletos informales del mes × valor_boleto (§6.5.1)
+     ════════════════════════════════════════════════════════════════
+ 3.  = TOTAL A PAGAR de la tabla informal
+```
+
+**`aporta_bps = false`** → no hay tabla formal: todo lo del empleado es informal, y la única
+tabla lleva, en este orden, salario base, faltas, horas extras con BPS —que conservan su valor
+hora calculado (§6.6)—, subtotal, plan de pagos, boletos (todos, en una sola línea), horas
+extras sin BPS y pagos adicionales, y cierra en un único total a pagar. No hay total general:
+hay un solo total.
+
+El orden es también el orden de presentación en pantalla y en la impresión. El subtotal y los
+totales a pagar se muestran destacados.
 
 ### 6.3 Descuentos BPS
 
@@ -747,6 +769,21 @@ con 0 horas, y no pagan boleto.
 Aplica **si el empleado tiene `cobra_boletos = true`**; no depende de `con_bps` ni de ningún
 atributo del registro de horas extras. Cada uno de esos días suma 2 boletos, igual que un día
 normal.
+
+### 6.5.1 Boletos — en qué tabla va cada día
+
+El boleto no lleva BPS, pero viaja con el pago del trabajo que lo generó (§6.2):
+
+```
+boletos_formales   = ( días_a_trabajar
+                     + días_extra_con_boleto con alguna hora extra con_bps = true ) × 2
+boletos_informales = todos los demás días con boleto × 2
+```
+
+- Un día con horas extras de los dos tipos cuenta **una sola vez y como día con BPS**: ya quedó
+  documentado.
+- Con `aporta_bps = false` no hay tabla formal y los boletos del mes son **una sola línea**.
+- Cada línea de boletos se emite solo si tiene días: un renglón de «0 días» por $0 no se muestra.
 
 ### 6.6 Horas extras — resumen
 

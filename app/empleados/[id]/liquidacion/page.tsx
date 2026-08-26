@@ -110,6 +110,7 @@ export default async function PaginaLiquidacion({
 
   const lineas: LineaVista[] = resultado.lineas.map((l) => ({
     orden: l.orden,
+    tabla: l.tabla,
     codigo: l.codigo,
     descripcion: l.descripcion,
     cantidad: l.cantidad ? l.cantidad.toString() : null,
@@ -163,6 +164,7 @@ export default async function PaginaLiquidacion({
         ultimaConfirmada
           ? ultimaConfirmada.lineas.map((l) => ({
               orden: l.orden,
+              tabla: l.tabla,
               codigo: l.codigo,
               descripcion: l.descripcion,
               cantidad: l.cantidad ? l.cantidad.toString() : null,
