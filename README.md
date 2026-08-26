@@ -418,6 +418,9 @@ siguen funcionando: `@prisma/config` solo usa la función `deepmerge`, que v8 ma
 **Sacar el override cuando Prisma actualice la dependencia de fábrica**, verificando con
 `npm ls deepmerge-ts` que ya resuelva a 8 sin ayuda.
 
+El procedimiento para subir versiones, con sus trampas, está en
+[NPM_UPDATE.md](NPM_UPDATE.md).
+
 ## Redondeo: pesos enteros
 
 **Divergencia deliberada del SPECS.** El §4.3 dice que el valor hora se usa con precisión
