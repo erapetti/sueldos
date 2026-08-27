@@ -3,6 +3,10 @@
 /**
  * §4.2.2 — formulario de alta.
  *
+ * El switch de BPS y el seguro de salud no son campos de `empleados`: son el primer registro
+ * de la serie del aporte (§4.4.1), con vigencia el 1° del mes de la fecha de ingreso, igual
+ * que el salario y el régimen. En el alta no se usa el `<SelectorVigencia>`.
+ *
  * El campo del valor hora "en negro" se pre-carga con el valor hora calculado a partir del
  * salario y las horas semanales ingresados, y se recalcula en vivo mientras esos campos
  * cambian, hasta que el usuario lo edite manualmente.
@@ -202,7 +206,12 @@ export function FormularioAlta() {
           />
         </div>
         <div className="flex items-center justify-between rounded-md border p-3">
-          <Label htmlFor="aporta-bps">Aporta BPS</Label>
+          <div>
+            <Label htmlFor="aporta-bps">Aporta BPS</Label>
+            <p className="text-sm text-muted-foreground">
+              Después se cambia con vigencia desde un mes, en «Datos › Salario».
+            </p>
+          </div>
           <Switch
             id="aporta-bps"
             checked={datos.aportaBps}

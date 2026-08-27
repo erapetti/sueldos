@@ -39,6 +39,15 @@ type ValorHoraNegro = {
   origen: string
 }
 
+type AporteBps = {
+  id: string
+  fechaVigencia: string
+  fechaVigenciaISO: string
+  aportaBps: boolean
+  seguroSalud: string | null
+  seguroSaludDescripcion: string | null
+}
+
 type Regimen = {
   id: string
   fechaVigencia: string
@@ -64,17 +73,15 @@ export type FichaProps = {
     fechaIngreso: string
     fechaEgreso: string | null
     cobraBoletos: boolean
-    aportaBps: boolean
     celular: string | null
     direccion: string | null
     cedula: string | null
-    seguroSalud: string | null
-    seguroSaludDescripcion: string | null
     activo: boolean
     visible: boolean
   }
   salarios: Salario[]
   valoresHoraNegro: ValorHoraNegro[]
+  aportesBps: AporteBps[]
   regimenes: Regimen[]
   /** §4.9 — un listado por libro, con su propio saldo. Solo los que tienen movimientos. */
   librosDeCuenta: {
@@ -172,6 +179,32 @@ export function FichaEmpleado(props: FichaProps) {
       etiqueta: 'Origen',
       className: 'text-sm text-muted-foreground',
       celda: (v) => (v.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'),
+    },
+  ]
+
+  const columnasDeAporteBps: Columna<AporteBps>[] = [
+    { clave: 'vigencia', etiqueta: 'Vigente desde', className: 'tabular', celda: (a) => a.fechaVigencia },
+    {
+      clave: 'aporta',
+      etiqueta: 'Aporta BPS',
+      celda: (a) => (
+        <Badge variant={a.aportaBps ? 'secondary' : 'outline'}>{a.aportaBps ? 'Sí' : 'No'}</Badge>
+      ),
+    },
+    {
+      clave: 'seguro',
+      etiqueta: 'Seguro de salud',
+      // Sin aporte el seguro no tiene efecto, y el registro lo guarda en null: no hay nada
+      // que mostrar más que el guion.
+      celda: (a) =>
+        a.seguroSalud ? (
+          <span title={a.seguroSaludDescripcion ?? undefined}>
+            {a.seguroSalud}
+            {a.seguroSaludDescripcion ? ` — ${a.seguroSaludDescripcion}` : ''}
+          </span>
+        ) : (
+          '—'
+        ),
     },
   ]
 
@@ -308,6 +341,28 @@ export function FichaEmpleado(props: FichaProps) {
             {!props.soloLectura ? (
               <FormularioSeries
                 tipo="VALOR_HORA_NEGRO"
+                empleadoId={props.empleadoId}
+                onGuardado={() => router.refresh()}
+              />
+            ) : null}
+          </section>
+
+          {/*
+            §4.4.1 — el aporte a BPS también es una serie: cambiarlo rige desde un mes y no
+            hacia atrás, así que recalcular un período viejo sigue dando lo que dio.
+          */}
+          <section className="space-y-3">
+            <h2 className="text-[20px]">Aporte a BPS</h2>
+            <p className="text-sm text-muted-foreground">
+              Decide si la liquidación lleva descuentos de BPS y en qué libro de la cuenta
+              corriente cae (§4.9). El seguro de salud viaja en el mismo registro: solo tiene
+              efecto si se aporta.
+            </p>
+            <Tabla columnas={columnasDeAporteBps} filas={props.aportesBps} />
+
+            {!props.soloLectura ? (
+              <FormularioSeries
+                tipo="APORTE_BPS"
                 empleadoId={props.empleadoId}
                 onGuardado={() => router.refresh()}
               />

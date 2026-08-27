@@ -97,6 +97,18 @@ function verificarDatos(entrada: EntradaLiquidacion): void {
       destino: 'regimen',
     })
   }
+  /*
+    §4.4.1 — el aporte a BPS es una serie, así que puede faltar, y faltar no es «no aporta»:
+    tomarlo como `false` liquidaría sin aportes a alguien que sí los tiene, y le mandaría
+    todas las líneas al libro informal.
+  */
+  if (!entrada.aporteBps) {
+    faltantes.push({
+      codigo: 'APORTE_BPS',
+      mensaje: `No hay aporte a BPS vigente para ${formatearPeriodo(entrada.periodo)}`,
+      destino: 'salario',
+    })
+  }
   const hayExtrasSinBps = entrada.horasExtras.some((h) => !h.conBps)
   if (hayExtrasSinBps && !entrada.valorHoraNegro) {
     faltantes.push({
@@ -137,6 +149,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // verificarDatos ya garantizó que estos no son null.
   const salario = entrada.salario!
   const regimen = entrada.regimen!
+  const aportaBps = entrada.aporteBps!.aportaBps
 
   const { empleado, periodo } = entrada
   const avisos: string[] = []
@@ -149,10 +162,10 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   const lineas: Omit<LineaLiquidacion, 'orden'>[] = []
 
   /**
-   * La tabla de todo lo que no es específicamente informal. Con `aportaBps = false` no hay
+   * La tabla de todo lo que no es específicamente informal. Sin aporte a BPS no hay
    * tabla formal: el salario, sus descuentos, sus cuotas y sus boletos son todos informales.
    */
-  const tablaBase: Libro = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
+  const tablaBase: Libro = aportaBps ? 'FORMAL' : 'INFORMAL'
 
   const vhc = valorHoraCalculado(salario)
 
@@ -273,9 +286,9 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 4: materia gravada = 1 − 2 + 3 ──────────────────────────────────────────────
   const materiaGravada = salarioBase.minus(importeFaltas).plus(totalExtrasConBps)
 
-  // §6.3 — con `aportaBps = false` no se renderiza ni la materia gravada ni los descuentos:
+  // §6.3 — sin aporte a BPS no se renderiza ni la materia gravada ni los descuentos:
   // el paso 4 pasa directamente al paso 6.
-  if (empleado.aportaBps) {
+  if (aportaBps) {
     lineas.push({
       tabla: tablaBase,
       codigo: CODIGOS.MATERIA_GRAVADA,
@@ -290,7 +303,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // ── Paso 5: descuentos de BPS, una línea por concepto (§6.3) ─────────────────────────
   let totalDescuentosBps = new Decimal(0)
 
-  if (empleado.aportaBps) {
+  if (aportaBps) {
     for (const concepto of entrada.conceptosBps) {
       const importe = redondearPesos(materiaGravada.times(concepto.porcentaje).dividedBy(100))
       totalDescuentosBps = totalDescuentosBps.plus(importe)
@@ -356,8 +369,8 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   //
   // El boleto no lleva BPS, pero viaja con el pago del trabajo que lo generó: los días del
   // régimen y los días que la empleada fue a hacer horas extras **con** BPS van en la tabla
-  // formal, y los días cuyas horas extras son todas sin BPS, en la informal. Con
-  // `aportaBps = false` no hay tabla formal y los boletos del mes son una sola línea.
+  // formal, y los días cuyas horas extras son todas sin BPS, en la informal. Sin aporte a
+  // BPS no hay tabla formal y los boletos del mes son una sola línea.
   //
   // Cada línea se emite solo si tiene días: un renglón de «0 días» por $0 no dice nada.
   let detalleBoletos = null
@@ -399,7 +412,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
       })
     }
 
-    if (empleado.aportaBps) {
+    if (aportaBps) {
       lineaBoletos('FORMAL', diasATrabajar, diasExtraConBps)
     } else {
       lineaBoletos(tablaBase, diasATrabajar, diasExtraConBps + diasExtraSinBps)
@@ -427,7 +440,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   //
   // Se emite después del paso 9 y no junto con los otros boletos, para que la tabla informal
   // se lea en orden: primero las horas que se fueron a hacer, después el viaje que costaron.
-  if (detalleBoletos && empleado.aportaBps) {
+  if (detalleBoletos && aportaBps) {
     const boletos = detalleBoletos.diasExtraSinBps * 2
     if (boletos > 0) {
       const valorBoleto = entrada.valorBoleto!

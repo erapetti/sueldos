@@ -53,6 +53,7 @@ export async function armarContextoLiquidacion(
     empleado,
     salario,
     regimen,
+    aporteBps,
     valorHoraNegro,
     valorBoleto,
     filasBps,
@@ -70,6 +71,11 @@ export async function armarContextoLiquidacion(
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.empleadoRegimen.findFirst({
+      where: { empleadoId, ...vigenteAlPeriodo },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    // §4.4.1 — el aporte a BPS es una serie más: se resuelve al período, no se lee de hoy.
+    prisma.empleadoAporteBps.findFirst({
       where: { empleadoId, ...vigenteAlPeriodo },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -160,17 +166,19 @@ export async function armarContextoLiquidacion(
       fechaIngreso: empleado.fechaIngreso,
       fechaEgreso: empleado.fechaEgreso,
       cobraBoletos: empleado.cobraBoletos,
-      aportaBps: empleado.aportaBps,
-      seguroSalud: empleado.seguroSalud,
     },
+    aporteBps: aporteBps
+      ? { aportaBps: aporteBps.aportaBps, seguroSalud: aporteBps.seguroSalud }
+      : null,
     salario: salario
       ? { salario: aDecimal(salario.salario), horasSemanales: aDecimal(salario.horasSemanales) }
       : null,
     regimen: regimen ? aRegimenHoras(regimen) : null,
     valorHoraNegro: valorHoraNegro ? aDecimal(valorHoraNegro.valor) : null,
     valorBoleto: valorBoleto ? aDecimal(valorBoleto.monto) : null,
-    // §6.3 — con aportaBps = false no se resuelve ningún concepto y el seguro se ignora.
-    conceptosBps: empleado.aportaBps
+    // §6.3 — sin aporte a BPS no se resuelve ningún concepto y el seguro se ignora. Sin
+    // registro vigente tampoco se resuelve nada: el motor falla antes, por §6.8.
+    conceptosBps: aporteBps?.aportaBps
       ? resolverConceptosBps(
           filasBps.map((f) => ({
             concepto: f.concepto,
@@ -179,7 +187,7 @@ export async function armarContextoLiquidacion(
             fechaVigencia: f.fechaVigencia,
           })),
           desde,
-          empleado.seguroSalud,
+          aporteBps.seguroSalud,
         )
       : [],
     faltas: faltas.map((f) => ({

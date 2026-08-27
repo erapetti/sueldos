@@ -35,7 +35,7 @@ function limpiar(valor: string | undefined | null): string | null {
 
 /**
  * §4.2.2 — el alta es un único formulario que crea, en una transacción, el empleado y el
- * primer registro de cada una de las tres series, todos con vigencia el 1° del mes de
+ * primer registro de cada una de las cuatro series, todos con vigencia el 1° del mes de
  * `fechaIngreso`.
  */
 export async function crearEmpleado(entrada: unknown) {
@@ -77,10 +77,23 @@ export async function crearEmpleado(entrada: unknown) {
           cuenta: limpiar(datos.cuenta),
           fechaIngreso,
           cobraBoletos: datos.cobraBoletos,
-          aportaBps: datos.aportaBps,
           celular: limpiar(datos.celular),
           direccion: limpiar(datos.direccion),
           cedula: limpiar(datos.cedula),
+          ...auditoria,
+        },
+      })
+
+      /*
+        §4.4.1 — el primer registro de la serie del aporte. Es el que garantiza que **todo**
+        mes del vínculo tenga aporte resuelto: sin él, la primera liquidación fallaría por
+        §6.8. Por eso va en el alta y no se puede cargar después.
+      */
+      await tx.empleadoAporteBps.create({
+        data: {
+          empleadoId: creado.id,
+          fechaVigencia: vigencia,
+          aportaBps: datos.aportaBps,
           // §4.2 — el seguro de salud solo tiene efecto si aporta BPS.
           seguroSalud: datos.aportaBps ? (datos.seguroSalud ?? null) : null,
           ...auditoria,
@@ -159,11 +172,9 @@ export async function actualizarEmpleado(empleadoId: string, entrada: unknown) {
         cuenta: limpiar(datos.cuenta),
         fechaIngreso: parseFechaISO(datos.fechaIngreso),
         cobraBoletos: datos.cobraBoletos,
-        aportaBps: datos.aportaBps,
         celular: limpiar(datos.celular),
         direccion: limpiar(datos.direccion),
         cedula: limpiar(datos.cedula),
-        seguroSalud: datos.aportaBps ? (datos.seguroSalud ?? null) : null,
         modificadoPor: usuario.id,
       },
     })

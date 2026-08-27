@@ -4,7 +4,7 @@
  */
 
 export type DatoFaltante = {
-  codigo: 'SALARIO' | 'REGIMEN' | 'VALOR_HORA_NEGRO' | 'VALOR_BOLETO'
+  codigo: 'SALARIO' | 'REGIMEN' | 'APORTE_BPS' | 'VALOR_HORA_NEGRO' | 'VALOR_BOLETO'
   mensaje: string
   /** Ruta relativa a la ficha del empleado donde se carga el dato. */
   destino: string

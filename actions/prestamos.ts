@@ -15,7 +15,8 @@ import {
   prestamo as esquemaPrestamo,
 } from '@/lib/validacion/esquemas'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
-import { parseFechaISO } from '@/lib/format/dates'
+import { aporteBpsALaFecha, libroALaFecha } from '@/lib/consultas/aporteBps'
+import { hoy, parseFechaISO } from '@/lib/format/dates'
 
 /**
  * Cómo queda el concepto de un asiento al que se lo dejaron vacío. Es obligatorio en la base
@@ -50,20 +51,31 @@ export async function registrarPrestamo(entrada: unknown) {
     log({ usuarioId: usuario.id, entidad: 'cuenta_corriente', entidadId: empleado.id })
 
     const auditoria = { creadoPor: usuario.id, modificadoPor: usuario.id }
+    const fecha = parseFechaISO(datos.fecha)
+
+    /*
+      §4.9 — el préstamo va al libro que le corresponde a la empleada **a la fecha del
+      préstamo**: el formal si aporta BPS, el informal si no. El aporte es una serie (§4.4.1),
+      así que se resuelve a esa fecha y no a la de hoy; uno cargado retroactivo tiene que caer
+      en el libro que regía entonces.
+
+      Queda grabado ahí y **no se recalcula**: sus cuotas van a descontar en ese libro aunque
+      después cambie el aporte, que es lo que hace que el préstamo amortice donde nació.
+    */
+    const libro = await libroALaFecha(empleado.id, fecha)
+    if (!libro) {
+      throw new ErrorNegocio(
+        'La empleada no tiene ningún aporte a BPS registrado: no se puede determinar el libro del préstamo.',
+      )
+    }
 
     const movimiento = await prisma.$transaction(async (tx) => {
       const creado = await tx.cuentaCorriente.create({
         data: {
           empleadoId: empleado.id,
-          fecha: parseFechaISO(datos.fecha),
+          fecha,
           tipo: 'PRESTAMO',
-          /*
-            §4.9 — el préstamo va al libro que le corresponde a la empleada hoy: el formal si
-            aporta BPS, el informal si no. Queda grabado ahí y **no se recalcula**: sus cuotas
-            van a descontar en ese libro aunque después cambie el aporte, que es lo que hace
-            que el préstamo amortice donde nació.
-          */
-          libro: empleado.aportaBps ? 'FORMAL' : 'INFORMAL',
+          libro,
           // §4.9 — el préstamo va al debe: el empleado pasa a adeudar.
           debe: datos.monto,
           haber: '0',
@@ -341,8 +353,12 @@ export async function liquidacionesParaPago(empleadoId: string) {
       take: 24,
     })
 
+    // El libro que el diálogo propone por defecto es el que le toca **hoy**: es una sugerencia
+    // para una transferencia que se está haciendo ahora, no el libro de un asiento pasado.
+    const aporte = await aporteBpsALaFecha(empleado.id, hoy())
+
     return exito({
-      aportaBps: empleado.aportaBps,
+      aportaBps: aporte?.aportaBps ?? true,
       liquidaciones: liquidaciones.map((l) => {
         const pago = pagoDeLiquidacion(l)
         return {

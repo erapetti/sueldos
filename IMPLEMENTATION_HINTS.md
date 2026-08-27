@@ -48,6 +48,9 @@ Las migraciones son cuatro y hay una escrita a mano:
   extras relajado a `>= 0` (§1.6)
 - `20260826000000_liquidacion_en_dos_tablas` y `20260826000100_dos_libros` — los totales por
   tabla y el libro de cada asiento (§1.7.1 y §1.7.2)
+- `20260827000000_aporte_bps_serie` — **a mano**: la tabla `empleado_aporte_bps` con su CHECK,
+  la fila por empleada que rellena la serie y el borrado de las dos columnas de `empleados`
+  (§1.7.3)
 
 `prisma migrate dev` no conoce los `CHECK` y los reporta como drift. Para cambiar el modelo:
 `prisma migrate dev --create-only` y volver a agregarlos si la migración generada recrea
@@ -252,11 +255,9 @@ empleada —una aporta o no aporta— así que no hay caso de falta «del otro l
 para el salario base, los boletos y los pagos adicionales: todos siguen a `tablaBase`.
 
 La **única excepción** es la cuota del plan de pagos, que sí guarda su libro, porque el préstamo
-puede ser anterior a un cambio de aporte. Ojo con eso: `aporta_bps` es un campo suelto de
-`empleados`, no una serie con vigencia como el salario o el régimen (§5.2), así que cambiarlo y
-recalcular un período viejo mueve **todas** sus líneas al otro libro. Es coherente con que no
-haya dos regímenes a la vez, pero conviene saberlo antes de tocar el campo de una empleada con
-historia.
+puede ser anterior a un cambio de aporte. Eso ya no es una trampa: el aporte pasó a ser una serie
+con vigencia (§1.7.3), así que cada período se liquida con el que regía ese mes y recalcular uno
+viejo no le mueve las líneas.
 
 **Dos asientos por liquidación**, uno por libro, cada uno por el devengado bruto de ese libro:
 lo que paga más las cuotas que descuenta. El libro cuyo devengado da cero no emite asiento, que
@@ -300,6 +301,52 @@ El ajuste manual también pide libro.
 **La cuenta corriente de la ficha se muestra en dos listados**, cada uno con su saldo acumulado,
 y arriba el saldo total. Un saldo corrido que mezclara los dos libros no diría cuánto falta de
 ninguno. La empleada que solo tocó un libro ve un solo listado sin rótulo, como antes.
+
+### 1.7.3 El aporte a BPS es una serie, y el SPECS todavía lo pone en `empleados`
+
+**Divergencia con el SPECS.** El §4.2 lista `aporta_bps` y `seguro_salud` como columnas de
+`empleados`, y el §5 enumera las series una por una sin incluirla. Las dos cosas quedaron
+desactualizadas: el aporte es la tabla `empleado_aporte_bps`, con `fecha_vigencia`, y las dos
+columnas de `empleados` **ya no existen**. El SPECS no se edita sin permiso del dueño (§2.7): la
+actualización quedó anotada como pendiente aparte.
+
+**Por qué.** Con el aporte suelto en `empleados`, cambiárselo a una empleada con historia y
+recalcular un período viejo le movía **todas** las líneas al otro libro, porque el motor leía el
+valor de hoy y no el que regía ese mes. Las liquidaciones confirmadas nunca corrieron peligro
+—tienen su snapshot (§4.14)—, pero el recálculo daba un resultado que nunca fue cierto.
+
+**El seguro de salud viaja en el mismo registro.** Solo tiene efecto si se aporta (§4.2) y es lo
+que resuelve qué conceptos aplican (§4.11), así que separarlos permitiría estados imposibles: un
+seguro vigente sin aporte, o un aporte sin el seguro que le corresponde. La serie no tiene
+`origen`: el aumento masivo (§7.8) no la toca.
+
+**El motor sigue recibiendo un booleano ya resuelto.** Lo que cambió es de dónde sale: era
+`entrada.empleado.aportaBps` y ahora es `entrada.aporteBps`, que —como el salario y el régimen—
+puede venir en `null`. Ese `null` es el cuarto caso del §6.8, `APORTE_BPS`, y **no** es «no
+aporta»: tomarlo como `false` liquidaría sin aportes a alguien que sí los tiene.
+
+**Cada lectura tiene su fecha, y ninguna es «hoy» por descuido.** Es lo más fácil de equivocar:
+
+| Dónde | Con qué fecha |
+|---|---|
+| `lib/liquidacion/datos.ts` | La del período liquidado, junto con las otras series |
+| `actions/licencias.ts` (salario vacacional) | La del mes de `fecha_desde`, la misma con la que resuelve el salario |
+| `actions/prestamos.ts` (libro del préstamo) | La del préstamo. El libro queda grabado en el movimiento (§4.9) |
+| `liquidacionesParaPago` → `DialogoPagoBancario` | Hoy: es solo el libro que el diálogo propone |
+
+Las tres últimas pasan por `lib/consultas/aporteBps.ts`, que es el único lugar que resuelve la
+serie fuera de la liquidación. `lib/auth/guards.ts` **dejó de traer** el aporte: servía a tres
+llamadores con tres fechas distintas, y una sola de ellas era «hoy».
+
+**Siempre hay un registro desde el mes de ingreso.** Lo crea el alta en su transacción (§4.2.2)
+y la migración lo hizo para las que ya existían. De eso depende que todo mes con vínculo
+resuelva, así que el helper solo devuelve `null` cuando la empleada no tiene **ningún** registro,
+y ahí el préstamo y la licencia se rechazan en vez de adivinar el libro. Para una fecha anterior
+a toda la serie devuelve el registro más antiguo, que es con el que la empleada empezó.
+
+**En la ficha es el tercer bloque de «Datos › Salario»**, con su tabla de vigencias y el
+`FormularioSeries`. De «Generales» se fueron el switch y el selector de seguro: no son campos de
+`empleados`.
 
 ### 1.8 «Con aviso» también puede no descontar
 

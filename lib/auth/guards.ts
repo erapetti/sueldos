@@ -70,8 +70,6 @@ export type EmpleadoConAcceso = {
     fechaIngreso: Date
     fechaEgreso: Date | null
     cobraBoletos: boolean
-    aportaBps: boolean
-    seguroSalud: string | null
   }
   nivel: NivelAcceso
 }
@@ -112,8 +110,6 @@ export async function accesoAEmpleado(
       fechaIngreso: true,
       fechaEgreso: true,
       cobraBoletos: true,
-      aportaBps: true,
-      seguroSalud: true,
       permisos: { where: { usuarioId: usuario.id }, select: { permiso: true } },
     },
   })

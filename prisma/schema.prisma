@@ -118,12 +118,9 @@ model Empleado {
   cuenta         String?   @db.VarChar(32)
   fechaIngreso   DateTime  @map("fecha_ingreso") @db.Date
   cobraBoletos   Boolean   @map("cobra_boletos")
-  aportaBps      Boolean   @default(true) @map("aporta_bps")
   celular        String?   @db.VarChar(60)
   direccion      String?   @db.VarChar(255)
   cedula         String?   @db.VarChar(20)
-  /// Código del Anexo A. Solo tiene efecto si aportaBps = true.
-  seguroSalud    String?   @map("seguro_salud") @db.VarChar(4)
   activo         Boolean   @default(true)
   fechaEgreso    DateTime? @map("fecha_egreso") @db.Date
   /// false = no aparece en /empleados, sí en /empleados/todos (§8.3, §8.7)
@@ -138,6 +135,7 @@ model Empleado {
   salarios           EmpleadoSalario[]
   valoresHoraNegro   EmpleadoValorHoraNegro[]
   regimenes          EmpleadoRegimen[]
+  aportesBps         EmpleadoAporteBps[]
   horasExtras        HoraExtra[]
   faltas             Falta[]
   pagosAdicionales   PagoAdicional[]
@@ -224,6 +222,37 @@ model EmpleadoRegimen {
 
   @@unique([empleadoId, fechaVigencia])
   @@map("empleado_regimenes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §4.4.1 empleado_aporte_bps (serie)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// El aporte a BPS es una serie y no un campo de `empleados`: cambiarlo tiene que valer
+/// desde un mes y no hacia atrás, o recalcular un período viejo movería todas sus líneas
+/// al otro libro (§4.9).
+///
+/// El seguro de salud viaja en el mismo registro porque solo tiene efecto si se aporta
+/// (§4.2) y es lo que resuelve qué conceptos aplican (§4.11): separarlos permitiría un
+/// seguro vigente sin aporte.
+model EmpleadoAporteBps {
+  id            String   @id @default(uuid(7)) @db.Char(36)
+  empleadoId    String   @map("empleado_id") @db.Char(36)
+  /// Siempre el día 1 de un mes (§5.1). CHECK en la migración.
+  fechaVigencia DateTime @map("fecha_vigencia") @db.Date
+  aportaBps     Boolean  @map("aporta_bps")
+  /// Código del Anexo A. Solo tiene efecto si aportaBps = true.
+  seguroSalud   String?  @map("seguro_salud") @db.VarChar(4)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
+  creadoPor     String?  @map("creado_por") @db.Char(36)
+  modificadoEn  DateTime @updatedAt @map("modificado_en") @db.DateTime(3)
+  modificadoPor String?  @map("modificado_por") @db.Char(36)
+
+  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, fechaVigencia])
+  @@map("empleado_aporte_bps")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

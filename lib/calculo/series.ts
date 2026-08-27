@@ -2,7 +2,7 @@
  * §5 — resolución de series con fecha de vigencia.
  *
  * Aplica igual a empleado_salarios, empleado_valor_hora_negro, empleado_regimenes,
- * bps_conceptos y valor_boleto.
+ * empleado_aporte_bps, bps_conceptos y valor_boleto.
  */
 import { dia, primerDiaDelMes } from '@/lib/format/dates'
 

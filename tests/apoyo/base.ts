@@ -64,6 +64,7 @@ export async function limpiarBase() {
     'empleado_permisos',
     'empleado_regimenes',
     'empleado_valor_hora_negro',
+    'empleado_aporte_bps',
     'empleado_salarios',
     'empleados',
     'usuarios',
@@ -119,6 +120,15 @@ export async function crearEmpleadoDePrueba(opciones: OpcionesEmpleado) {
       cuenta: 'ABC123',
       fechaIngreso,
       cobraBoletos: opciones.cobraBoletos ?? true,
+    },
+  })
+
+  // §4.4.1 — el aporte es una serie: el primer registro rige desde el mes de ingreso, como
+  // lo crea el alta real (§4.2.2).
+  await prisma.empleadoAporteBps.create({
+    data: {
+      empleadoId: empleado.id,
+      fechaVigencia: vigencia,
       aportaBps: opciones.aportaBps ?? true,
       seguroSalud: opciones.seguroSalud ?? null,
     },

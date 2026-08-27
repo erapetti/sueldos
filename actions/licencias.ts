@@ -23,6 +23,7 @@ import {
   seSuperponen,
 } from '@/lib/calculo/licencias'
 import { aColumnaCantidad, aColumnaImporte, aDecimal } from '@/lib/db/mapeo'
+import { aporteBpsALaFecha } from '@/lib/consultas/aporteBps'
 import { CODIGOS } from '@/lib/calculo/tipos'
 import { formatearDiasHabiles } from '@/lib/format/money'
 import {
@@ -110,12 +111,14 @@ export async function registrarLicencia(entrada: unknown) {
 
     const periodo = primerDiaDelMes(fechaDesde)
 
-    const [feriados, salarioVigente, previas] = await Promise.all([
+    const [feriados, salarioVigente, aporteVigente, previas] = await Promise.all([
       prisma.feriado.findMany({ where: { fecha: { gte: fechaDesde, lte: fechaHasta } } }),
       prisma.empleadoSalario.findFirst({
         where: { empleadoId: empleado.id, fechaVigencia: { lte: periodo } },
         orderBy: { fechaVigencia: 'desc' },
       }),
+      // §4.4.1 — el aporte va resuelto al mismo mes que el salario: el de `fechaDesde`.
+      aporteBpsALaFecha(empleado.id, periodo),
       prisma.liquidacion.count({
         where: {
           empleadoId: empleado.id,
@@ -132,6 +135,18 @@ export async function registrarLicencia(entrada: unknown) {
       )
     }
 
+    /*
+      Sin aporte registrado no se elige la tabla. Tomarlo como «no aporta» mandaría el salario
+      vacacional entero al libro informal de alguien que sí aporta, y el asiento queda grabado:
+      es de las cosas que no se arreglan sin anular la liquidación.
+    */
+    if (!aporteVigente) {
+      throw new ErrorNegocio(
+        'La empleada no tiene ningún aporte a BPS registrado: no se puede determinar en qué tabla va el salario vacacional.',
+      )
+    }
+    const aportaBps = aporteVigente.aportaBps
+
     const desglose = calcularDiasHabiles(fechaDesde, fechaHasta, feriados)
     const salarioMensual = aDecimal(salarioVigente.salario)
     // §13.2 sigue pendiente: hoy el salario vacacional se liquida bruto, sin descuentos.
@@ -139,7 +154,7 @@ export async function registrarLicencia(entrada: unknown) {
 
     const auditoriaCols = { creadoPor: usuario.id, modificadoPor: usuario.id }
     const secuencia = previas + 1
-    const tabla = empleado.aportaBps ? 'FORMAL' : 'INFORMAL'
+    const tabla = aportaBps ? 'FORMAL' : 'INFORMAL'
 
     const resultado = await prisma.$transaction(async (tx) => {
       const licencia = await tx.licencia.create({
@@ -181,10 +196,10 @@ export async function registrarLicencia(entrada: unknown) {
             en la tabla que le corresponde a la empleada. La formal si aporta BPS; la informal
             si no, porque entonces todo lo suyo es informal.
           */
-          totalRecalculadoFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
-          totalRecalculadoInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
-          totalAPagarFormal: empleado.aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
-          totalAPagarInformal: empleado.aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
+          totalRecalculadoFormal: aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
+          totalRecalculadoInformal: aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
+          totalAPagarFormal: aportaBps ? aColumnaImporte(salarioVacacional) : '0.00',
+          totalAPagarInformal: aportaBps ? '0.00' : aColumnaImporte(salarioVacacional),
           ukVigente: 1,
           confirmadaEn: new Date(),
           confirmadaPor: usuario.id,
@@ -199,7 +214,7 @@ export async function registrarLicencia(entrada: unknown) {
             diasHabiles: desglose.diasHabiles.toString(),
             salarioMensual: salarioMensual.toFixed(2),
             salarioVacacional: salarioVacacional.toFixed(2),
-            aportaBps: empleado.aportaBps,
+            aportaBps,
             nota: 'Liquidado bruto, sin descuentos de BPS (SPECS §13.2 pendiente).',
           },
           ...auditoriaCols,

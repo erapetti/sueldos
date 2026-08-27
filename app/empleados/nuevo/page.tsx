@@ -13,7 +13,7 @@ export default async function PaginaNuevoEmpleado() {
         className="mb-0"
         rotulo="Alta"
         titulo="Nueva empleada"
-        bajada="Se crean el empleado, el salario, el régimen horario y el valor hora sin aportes, los cuatro con vigencia desde el 1° del mes de ingreso."
+        bajada="Se crean el empleado, el salario, el régimen horario, el valor hora sin aportes y el aporte a BPS, los cuatro últimos con vigencia desde el 1° del mes de ingreso."
       />
       <FormularioAlta />
     </div>

@@ -80,6 +80,15 @@ export type EmpleadoCalculo = {
   fechaIngreso: Date
   fechaEgreso: Date | null
   cobraBoletos: boolean
+}
+
+/**
+ * §4.4.1 — el aporte a BPS vigente para el período, ya resuelto de la serie (§5.2).
+ *
+ * Es una serie y no un campo del empleado, así que puede faltar: el motor lo trata como al
+ * salario o al régimen y falla con un error explícito (§6.8) en vez de asumir que no aporta.
+ */
+export type AporteBpsVigente = {
   aportaBps: boolean
   seguroSalud: string | null
 }
@@ -93,6 +102,7 @@ export type EntradaLiquidacion = {
   /** Primer día del mes liquidado. */
   periodo: Date
   empleado: EmpleadoCalculo
+  aporteBps: AporteBpsVigente | null
   salario: SalarioVigente | null
   regimen: RegimenHoras | null
   valorHoraNegro: Decimal | null
@@ -126,7 +136,7 @@ export type SignoLinea = 1 | -1 | 0
  *
  * `FORMAL` es lo que lleva aportes y cierra en su propio total a pagar; `INFORMAL` es lo que
  * se paga sin ellos —las horas extras sin BPS y los boletos que generan— y cierra en otro.
- * Una empleada con `aportaBps = false` solo se relaciona con el informal.
+ * Una empleada que no aporta al BPS solo se relaciona con el informal.
  *
  * El mismo corte nombra la tabla de la liquidación y el libro de la cuenta corriente, porque
  * son la misma cosa: cada tabla cierra en su libro.

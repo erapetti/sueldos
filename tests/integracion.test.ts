@@ -20,9 +20,11 @@ import { prisma } from '@/lib/db/prisma'
 import { fecha } from '@/lib/format/dates'
 import { confirmarLiquidacionMensual, anularLiquidacionConfirmada } from '@/actions/liquidaciones'
 import { registrarPagoBancario, registrarPrestamo } from '@/actions/prestamos'
+import { registrarAporteBps } from '@/actions/series'
+import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { guardarHorasExtras, guardarFaltas, guardarPagoAdicional } from '@/actions/novedades'
 import { registrarLicencia } from '@/actions/licencias'
-import { cambiarVisibilidad } from '@/actions/empleados'
+import { cambiarVisibilidad, crearEmpleado } from '@/actions/empleados'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 
 let dueno: UsuarioDePrueba
@@ -238,6 +240,94 @@ describe('§4.9 — los dos libros de la cuenta corriente', () => {
       where: { liquidacion: { empleadoId: empleado.id }, codigo: 'CUOTA_PLAN' },
     })
     expect(lineas.map((l) => l.tabla)).toEqual(['INFORMAL'])
+  })
+})
+
+describe('§4.4.1 — el aporte a BPS es una serie con vigencia', () => {
+  /**
+   * El caso que motivó la serie: antes, cambiarle el aporte a una empleada con historia y
+   * recalcular un período viejo le movía **todas** las líneas al otro libro, porque el motor
+   * leía el valor de hoy y no el que regía ese mes.
+   */
+  it('cada período se liquida con el aporte que regía ese mes, y recalcular uno viejo no lo mueve', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: true })
+
+    // Deja de aportar desde junio. Mayo ya está cerrado por la vigencia, no por la fecha.
+    const cambio = await registrarAporteBps({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      aportaBps: false,
+    })
+    expect(cambio.ok).toBe(true)
+
+    expect((await liquidar(empleado.id, '2026-05')).ok).toBe(true)
+    expect((await liquidar(empleado.id, '2026-06')).ok).toBe(true)
+
+    /** Las tablas en las que la liquidación del período dejó su línea de salario. */
+    const tablaDelSalario = async (periodo: Date) => {
+      const lineas = await prisma.liquidacionLinea.findMany({
+        where: {
+          liquidacion: { empleadoId: empleado.id, periodo },
+          codigo: 'SALARIO_BASE',
+        },
+      })
+      return lineas.map((l) => l.tabla)
+    }
+
+    expect(await tablaDelSalario(fecha(2026, 5, 1))).toEqual(['FORMAL'])
+    expect(await tablaDelSalario(fecha(2026, 6, 1))).toEqual(['INFORMAL'])
+
+    // Y cada asiento cayó en el libro de su tabla.
+    const asientos = await prisma.cuentaCorriente.findMany({
+      where: { empleadoId: empleado.id, tipo: 'LIQUIDACION' },
+      orderBy: { fecha: 'asc' },
+    })
+    expect(asientos.map((a) => a.libro)).toEqual(['FORMAL', 'INFORMAL'])
+
+    // Recalcular mayo con el cambio ya registrado sigue dando la tabla formal: es lo que
+    // antes no pasaba.
+    const recalculo = await calcularPeriodo(empleado.id, fecha(2026, 5, 1))
+    expect(recalculo.resultado.lineas.every((l) => l.tabla === 'FORMAL')).toBe(true)
+    expect(recalculo.resultado.totalRecalculadoInformal.toFixed(2)).toBe('0.00')
+  })
+
+  /*
+    §4.2.2 — el alta crea el primer registro junto con el empleado, en la misma transacción.
+    Es el invariante en el que se apoya todo lo demás: si faltara, la primera liquidación de
+    la empleada fallaría por §6.8 y no habría cómo cargarlo retroactivo sin pisar la vigencia.
+  */
+  it('el alta crea el primer registro de la serie con vigencia el 1° del mes de ingreso', async () => {
+    const alta = await crearEmpleado({
+      alias: 'Nueva',
+      nombreCompleto: 'Nueva Empleada',
+      fechaIngreso: '2026-03-15',
+      cobraBoletos: true,
+      aportaBps: true,
+      seguroSalud: '15',
+      salario: '65000',
+      horasSemanales: 30,
+      valorHoraNegro: '300',
+      regimen: { lunes: 6, martes: 6, miercoles: 6, jueves: 6, viernes: 6, sabado: 0, domingo: 0 },
+    })
+    expect(alta.ok).toBe(true)
+    if (!alta.ok) return
+
+    const aportes = await prisma.empleadoAporteBps.findMany({
+      where: { empleadoId: alta.datos.id },
+    })
+    expect(aportes).toHaveLength(1)
+    expect(aportes[0].fechaVigencia).toEqual(fecha(2026, 3, 1))
+    expect(aportes[0].aportaBps).toBe(true)
+    expect(aportes[0].seguroSalud).toBe('15')
+  })
+
+  it('sin ningún registro de aporte la liquidación falla en vez de asumir que no aporta (§6.8)', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+    await prisma.empleadoAporteBps.deleteMany({ where: { empleadoId: empleado.id } })
+
+    const r = await liquidar(empleado.id, '2026-05')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('aporte a BPS')
   })
 })
 

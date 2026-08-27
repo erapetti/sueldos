@@ -1,26 +1,43 @@
 'use client'
 
 /**
- * §4.3, §4.3.1, §4.4 y §5.3 — alta de un nuevo registro de serie, siempre con el
+ * §4.3, §4.3.1, §4.4, §4.4.1 y §5.3 — alta de un nuevo registro de serie, siempre con el
  * `<SelectorVigencia>`.
  */
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { SelectorVigencia, vigenciaPorDefecto } from '@/components/dominio/SelectorVigencia'
 import { CampoMonto } from '@/components/dominio/CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
-import { registrarRegimen, registrarSalario, registrarValorHoraNegro } from '@/actions/series'
+import {
+  registrarAporteBps,
+  registrarRegimen,
+  registrarSalario,
+  registrarValorHoraNegro,
+} from '@/actions/series'
+import { SEGUROS_SALUD } from '@/constants/segurosSalud'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
 
-type Tipo = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'REGIMEN'
+type Tipo = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'APORTE_BPS' | 'REGIMEN'
 
 const TITULOS: Record<Tipo, string> = {
   SALARIO: 'Nuevo salario',
   VALOR_HORA_NEGRO: 'Nuevo valor hora sin aportes',
+  APORTE_BPS: 'Nuevo aporte a BPS',
   REGIMEN: 'Nuevo régimen horario',
 }
+
+const SIN_SEGURO = 'ninguno'
 
 export function FormularioSeries({
   tipo,
@@ -40,6 +57,8 @@ export function FormularioSeries({
   const [salario, setSalario] = useState('')
   const [horasSemanales, setHorasSemanales] = useState('')
   const [valor, setValor] = useState('')
+  const [aportaBps, setAportaBps] = useState(true)
+  const [seguroSalud, setSeguroSalud] = useState(SIN_SEGURO)
   const [dias, setDias] = useState<string[]>(['', '', '', '', '', '', ''])
 
   function guardar() {
@@ -55,17 +74,24 @@ export function FormularioSeries({
             })
         : tipo === 'VALOR_HORA_NEGRO'
           ? () => registrarValorHoraNegro({ ...comun, valor })
-          : () =>
-              registrarRegimen({
-                ...comun,
-                lunes: Number(dias[0] || 0),
-                martes: Number(dias[1] || 0),
-                miercoles: Number(dias[2] || 0),
-                jueves: Number(dias[3] || 0),
-                viernes: Number(dias[4] || 0),
-                sabado: Number(dias[5] || 0),
-                domingo: Number(dias[6] || 0),
-              })
+          : tipo === 'APORTE_BPS'
+            ? () =>
+                registrarAporteBps({
+                  ...comun,
+                  aportaBps,
+                  seguroSalud: seguroSalud === SIN_SEGURO ? null : seguroSalud,
+                })
+            : () =>
+                registrarRegimen({
+                  ...comun,
+                  lunes: Number(dias[0] || 0),
+                  martes: Number(dias[1] || 0),
+                  miercoles: Number(dias[2] || 0),
+                  jueves: Number(dias[3] || 0),
+                  viernes: Number(dias[4] || 0),
+                  sabado: Number(dias[5] || 0),
+                  domingo: Number(dias[6] || 0),
+                })
 
     ejecutar(accion, {
       exito: 'Registro guardado.',
@@ -128,6 +154,55 @@ export function FormularioSeries({
           error={campos.valor}
           disabled={enviando}
         />
+      ) : null}
+
+      {/*
+        §4.4.1 — el aporte y el seguro se cargan juntos porque son un solo registro: el seguro
+        solo tiene efecto si se aporta (§4.2), así que con el switch apagado se deshabilita.
+      */}
+      {tipo === 'APORTE_BPS' ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div>
+              <Label htmlFor="serie-aporta-bps">Aporta BPS</Label>
+              <p className="text-sm text-muted-foreground">
+                Si se apaga, no se le aplica ningún descuento de BPS desde ese mes.
+              </p>
+            </div>
+            <Switch
+              id="serie-aporta-bps"
+              checked={aportaBps}
+              onCheckedChange={setAportaBps}
+              disabled={enviando}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="serie-seguro-salud">Seguro de salud</Label>
+            <Select
+              value={seguroSalud}
+              onValueChange={setSeguroSalud}
+              disabled={enviando || !aportaBps}
+            >
+              <SelectTrigger id="serie-seguro-salud">
+                <SelectValue placeholder="Sin seguro" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_SEGURO}>Sin seguro</SelectItem>
+                {SEGUROS_SALUD.map((s) => (
+                  <SelectItem key={s.codigo} value={s.codigo}>
+                    {s.codigo} — {s.descripcion}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!aportaBps ? (
+              <p className="text-sm text-muted-foreground">
+                Sin aporte al BPS el seguro de salud no tiene efecto.
+              </p>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       {tipo === 'REGIMEN' ? (

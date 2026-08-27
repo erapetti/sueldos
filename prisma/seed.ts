@@ -196,9 +196,6 @@ async function datosDemo() {
         cuenta: demo.cuenta,
         fechaIngreso: vigencia,
         cobraBoletos: demo.cobraBoletos,
-        aportaBps: demo.aportaBps,
-        // §4.2 — el seguro de salud solo tiene efecto si aporta BPS.
-        seguroSalud: demo.aportaBps ? demo.seguroSalud : null,
         activo: demo.activo ?? true,
         visible: demo.visible ?? true,
         celular: '099 123 456',
@@ -207,7 +204,17 @@ async function datosDemo() {
       },
     })
 
-    // §4.2.2 — los tres registros de serie, con vigencia el 1° del mes de ingreso.
+    // §4.2.2 — los cuatro registros de serie, con vigencia el 1° del mes de ingreso.
+    await prisma.empleadoAporteBps.create({
+      data: {
+        empleadoId: empleado.id,
+        fechaVigencia: vigencia,
+        aportaBps: demo.aportaBps,
+        // §4.2 — el seguro de salud solo tiene efecto si aporta BPS.
+        seguroSalud: demo.aportaBps ? demo.seguroSalud : null,
+        ...aud,
+      },
+    })
     await prisma.empleadoSalario.create({
       data: {
         empleadoId: empleado.id,

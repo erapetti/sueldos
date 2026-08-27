@@ -2,19 +2,15 @@
 
 /**
  * §8.4 punto 1 — todos los campos de §4.2, editables si el usuario tiene permiso.
+ *
+ * El aporte a BPS y el seguro de salud **no** están acá: son una serie con fecha de vigencia
+ * (§4.4.1) y se cargan en «Datos › Salario», con el `<SelectorVigencia>` como el resto.
  */
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,10 +29,7 @@ import {
   darDeBajaEmpleado,
   reactivarEmpleado,
 } from '@/actions/empleados'
-import { SEGUROS_SALUD } from '@/constants/segurosSalud'
 import { aISO, hoy } from '@/lib/format/dates'
-
-const SIN_SEGURO = 'ninguno'
 
 export function FormularioDatos({
   empleadoId,
@@ -53,12 +46,9 @@ export function FormularioDatos({
     fechaIngreso: string
     fechaEgreso: string | null
     cobraBoletos: boolean
-    aportaBps: boolean
     celular: string | null
     direccion: string | null
     cedula: string | null
-    seguroSalud: string | null
-    seguroSaludDescripcion: string | null
     activo: boolean
   }
   soloLectura: boolean
@@ -75,11 +65,9 @@ export function FormularioDatos({
     cuenta: valores.cuenta ?? '',
     fechaIngreso: valores.fechaIngreso as string | null,
     cobraBoletos: valores.cobraBoletos,
-    aportaBps: valores.aportaBps,
     celular: valores.celular ?? '',
     direccion: valores.direccion ?? '',
     cedula: valores.cedula ?? '',
-    seguroSalud: valores.seguroSalud ?? SIN_SEGURO,
   })
 
   const [dialogoBaja, setDialogoBaja] = useState(false)
@@ -90,14 +78,10 @@ export function FormularioDatos({
   }
 
   function guardar() {
-    guardado.ejecutar(
-      () =>
-        actualizarEmpleado(empleadoId, {
-          ...datos,
-          seguroSalud: datos.seguroSalud === SIN_SEGURO ? null : datos.seguroSalud,
-        }),
-      { exito: 'Datos guardados.', onExito: () => router.refresh() },
-    )
+    guardado.ejecutar(() => actualizarEmpleado(empleadoId, datos), {
+      exito: 'Datos guardados.',
+      onExito: () => router.refresh(),
+    })
   }
 
   const campos = guardado.campos
@@ -197,48 +181,6 @@ export function FormularioDatos({
             disabled={deshabilitado}
           />
         </div>
-
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <div>
-            <Label htmlFor="aporta-bps">Aporta BPS</Label>
-            <p className="text-sm text-muted-foreground">
-              Si se apaga, no se le aplica ningún descuento de BPS.
-            </p>
-          </div>
-          <Switch
-            id="aporta-bps"
-            checked={datos.aportaBps}
-            onCheckedChange={(v) => cambiar('aportaBps', v)}
-            disabled={deshabilitado}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="seguro-salud">Seguro de salud</Label>
-        <Select
-          value={datos.seguroSalud}
-          onValueChange={(v) => cambiar('seguroSalud', v)}
-          // §4.2 — el campo se deshabilita cuando el switch de BPS está apagado.
-          disabled={deshabilitado || !datos.aportaBps}
-        >
-          <SelectTrigger id="seguro-salud">
-            <SelectValue placeholder="Sin seguro" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={SIN_SEGURO}>Sin seguro</SelectItem>
-            {SEGUROS_SALUD.map((s) => (
-              <SelectItem key={s.codigo} value={s.codigo}>
-                {s.codigo} — {s.descripcion}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {!datos.aportaBps ? (
-          <p className="text-sm text-muted-foreground">
-            La empleada no aporta al BPS: el seguro de salud no tiene efecto.
-          </p>
-        ) : null}
       </div>
 
       {!soloLectura ? (

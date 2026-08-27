@@ -12,6 +12,7 @@ import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { horasSemanalesDelRegimen } from '@/lib/calculo/boletos'
 import { conSaldoAcumulado, LIBROS } from '@/lib/calculo/cuentaCorriente'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
+import { descripcionSeguroSalud } from '@/constants/segurosSalud'
 import { aISO, formatearFecha, formatearPeriodo, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
 
 export async function datosDeFicha(empleadoId: string) {
@@ -20,6 +21,7 @@ export async function datosDeFicha(empleadoId: string) {
     salarios,
     valoresHoraNegro,
     regimenes,
+    aportesBps,
     movimientos,
     cuotas,
     liquidaciones,
@@ -38,6 +40,10 @@ export async function datosDeFicha(empleadoId: string) {
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.empleadoRegimen.findMany({
+      where: { empleadoId },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    prisma.empleadoAporteBps.findMany({
       where: { empleadoId },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -156,6 +162,14 @@ export async function datosDeFicha(empleadoId: string) {
         total: horasSemanalesDelRegimen(horas).toString(),
       }
     }),
+    aportesBps: aportesBps.map((a) => ({
+      id: a.id,
+      fechaVigencia: formatearFecha(a.fechaVigencia),
+      fechaVigenciaISO: aISO(a.fechaVigencia),
+      aportaBps: a.aportaBps,
+      seguroSalud: a.seguroSalud,
+      seguroSaludDescripcion: descripcionSeguroSalud(a.seguroSalud),
+    })),
     librosDeCuenta: librosDeCuenta.map((l) => ({ ...l, saldo: l.saldo.toFixed(2) })),
     // El saldo de la empleada es la suma de los dos libros: lo que se le debe en total.
     saldo: librosDeCuenta.reduce((acc, l) => acc.plus(l.saldo), new Decimal(0)).toFixed(2),

@@ -11,7 +11,6 @@ import {
   esDueno,
 } from '@/lib/auth/guards'
 import { datosDeFicha, totalPorPeriodo } from '@/lib/consultas/ficha'
-import { descripcionSeguroSalud } from '@/constants/segurosSalud'
 import { SECCIONES_DE_FICHA } from '@/components/dominio/EncabezadoEmpleada'
 import { FichaEmpleado } from './FichaEmpleado'
 
@@ -70,17 +69,15 @@ export default async function PaginaFicha({
           ? datos.empleado.fechaEgreso.toISOString().slice(0, 10)
           : null,
         cobraBoletos: datos.empleado.cobraBoletos,
-        aportaBps: datos.empleado.aportaBps,
         celular: datos.empleado.celular,
         direccion: datos.empleado.direccion,
         cedula: datos.empleado.cedula,
-        seguroSalud: datos.empleado.seguroSalud,
-        seguroSaludDescripcion: descripcionSeguroSalud(datos.empleado.seguroSalud),
         activo: datos.empleado.activo,
         visible: datos.empleado.visible,
       }}
       salarios={datos.salarios}
       valoresHoraNegro={datos.valoresHoraNegro}
+      aportesBps={datos.aportesBps}
       regimenes={datos.regimenes}
       librosDeCuenta={datos.librosDeCuenta}
       saldo={datos.saldo}

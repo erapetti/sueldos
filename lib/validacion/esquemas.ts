@@ -100,7 +100,6 @@ export const datosEmpleado = z.object({
     .optional(),
   fechaIngreso: fechaNoFutura,
   cobraBoletos: z.boolean(),
-  aportaBps: z.boolean(),
   celular: z.string().trim().max(60).optional().or(z.literal('')),
   direccion: z.string().trim().max(255).optional().or(z.literal('')),
   cedula: z
@@ -109,17 +108,21 @@ export const datosEmpleado = z.object({
     .optional()
     .or(z.literal(''))
     .refine((v) => !v || cedulaValida(v), 'El dígito verificador de la cédula no cierra'),
+})
+
+/**
+ * §4.2.2 — el alta crea el empleado y los cuatro primeros registros de serie en una
+ * transacción, todos con vigencia el 1° del mes de `fechaIngreso`.
+ *
+ * El aporte a BPS y el seguro de salud entran acá y no en `datosEmpleado` porque no son
+ * columnas de `empleados`: son el primer registro de su serie (§4.4.1).
+ */
+export const altaEmpleado = datosEmpleado.extend({
+  aportaBps: z.boolean(),
   seguroSalud: z
     .enum(CODIGOS_SEGURO_SALUD as [string, ...string[]])
     .nullable()
     .optional(),
-})
-
-/**
- * §4.2.2 — el alta crea el empleado y los tres primeros registros de serie en una
- * transacción, todos con vigencia el 1° del mes de `fechaIngreso`.
- */
-export const altaEmpleado = datosEmpleado.extend({
   salario: importePositivo,
   horasSemanales: z
     .number()
@@ -142,7 +145,7 @@ export const bajaEmpleado = z.object({
   fechaEgreso: fechaISO,
 })
 
-// ── §4.3 / §4.3.1 / §4.4 series del empleado ─────────────────────────────────
+// ── §4.3 / §4.3.1 / §4.4 / §4.4.1 series del empleado ────────────────────────
 
 export const nuevoSalario = z.object({
   empleadoId: idUuid,
@@ -156,6 +159,18 @@ export const nuevoValorHoraNegro = z.object({
   empleadoId: idUuid,
   valor: importePositivo,
   fechaVigencia: fechaVigenciaISO,
+  reemplazar: z.boolean().default(false),
+})
+
+export const nuevoAporteBps = z.object({
+  empleadoId: idUuid,
+  fechaVigencia: fechaVigenciaISO,
+  aportaBps: z.boolean(),
+  /** Solo tiene efecto si se aporta (§4.2); la acción lo guarda en `null` si no. */
+  seguroSalud: z
+    .enum(CODIGOS_SEGURO_SALUD as [string, ...string[]])
+    .nullable()
+    .optional(),
   reemplazar: z.boolean().default(false),
 })
 

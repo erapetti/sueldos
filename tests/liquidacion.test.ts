@@ -263,7 +263,7 @@ describe('6 y 7. resolución de conceptos de BPS (§4.11)', () => {
 
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, seguroSalud: '15' },
+        aporteBps: { aportaBps: true, seguroSalud: '15' },
         conceptosBps: resueltos,
       }),
     )
@@ -324,14 +324,11 @@ describe('6 y 7. resolución de conceptos de BPS (§4.11)', () => {
   })
 })
 
-describe('8. empleado con aporta_bps = false (§6.3)', () => {
+describe('8. empleado sin aporte a BPS (§6.3)', () => {
   const sinBps = () =>
     entradaBase({
-      empleado: {
-        ...entradaBase().empleado,
-        aportaBps: false,
-        seguroSalud: '15', // tiene que ignorarse
-      },
+      // El seguro tiene que ignorarse: sin aporte no aplica ningún concepto.
+      aporteBps: { aportaBps: false, seguroSalud: '15' },
       conceptosBps: [conceptoBps('Montepío', 15), conceptoBps('FONASA', 3, '15')],
     })
 
@@ -360,7 +357,7 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
   it('las horas extras con con_bps = true se pagan al valor hora calculado, enteras', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, aportaBps: false },
+        aporteBps: { aportaBps: false, seguroSalud: null },
         conceptosBps: [conceptoBps('Montepío', 15)],
         horasExtras: [horaExtra('2026-04-08', 2, true, 0)],
       }),
@@ -374,7 +371,7 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
   it('no tiene tabla formal: todas las líneas y el total son informales (§6.2)', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, aportaBps: false },
+        aporteBps: { aportaBps: false, seguroSalud: null },
         // Un sábado, para que además haya boletos por horas extras.
         horasExtras: [horaExtra('2026-04-08', 2, true, 0), horaExtra('2026-04-11', 4, false, 100)],
         // El préstamo lo pidió sin aportar, así que su cuota también es informal (§4.9).
@@ -392,7 +389,7 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
   it('los boletos del mes son una sola línea, con los días del régimen y los extra', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, aportaBps: false },
+        aporteBps: { aportaBps: false, seguroSalud: null },
         horasExtras: [horaExtra('2026-04-11', 4, false, 100)],
       }),
     )
@@ -412,7 +409,7 @@ describe('8. empleado con aporta_bps = false (§6.3)', () => {
   it('la cuota de un préstamo formal le abre tabla formal aunque no aporte (§4.9)', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, aportaBps: false },
+        aporteBps: { aportaBps: false, seguroSalud: null },
         cuotasPlan: [cuotaPlan('2026-04-01', D(500), { libro: 'FORMAL' })],
       }),
     )
@@ -727,6 +724,18 @@ describe('14. datos faltantes: error explícito, no cálculo parcial (§6.8)', (
     expect(() => calcularLiquidacionMensual(entradaBase({ regimen: null }))).toThrow(
       ErrorDatosFaltantes,
     )
+  })
+
+  // §4.4.1 — faltar no es «no aporta»: tomarlo como false liquidaría sin aportes a alguien
+  // que sí los tiene y le mandaría todas las líneas al libro informal.
+  it('sin aporte a BPS vigente', () => {
+    try {
+      calcularLiquidacionMensual(entradaBase({ aporteBps: null }))
+      expect.unreachable('debía lanzar')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ErrorDatosFaltantes)
+      expect((e as ErrorDatosFaltantes).faltantes.map((x) => x.codigo)).toEqual(['APORTE_BPS'])
+    }
   })
 
   it('sin valor hora "en negro" y con horas extras sin BPS', () => {
