@@ -383,6 +383,50 @@ liquidar igual (§6.8), así que adivinar no arreglaría nada y sí impediría c
 **Las faltas quedan afuera y no les falta nada.** Una falta no lleva marca de BPS: descuenta del
 salario, así que va al libro que se deduce del aporte, y no hay dos regímenes a la vez (§1.7.2).
 
+### 1.7.5 La liquidación se lee en tarjetas, y en papel no sale nada informal
+
+Tercera etapa de lo anterior, pedida por el usuario. **Divergencia con el §6.2**, que dice que
+el orden de las líneas «es también el orden de presentación en pantalla y en la impresión»: en
+pantalla sí, en la hoja impresa no, porque la hoja no lleva la tabla informal.
+
+**En pantalla, una tarjeta por tabla.** Antes era una sola tarjeta con el bloque de datos, las
+dos tablas separadas por líneas internas y el total general como un pie. Ahora son cuatro
+bloques hermanos —datos, tabla formal, tabla informal y total general—, cada uno en su tarjeta,
+con el `space-y-5` de la pantalla entre ellos. El total general pasó de `div` a tabla de una
+fila, y **sigue apareciendo solo cuando existen las dos tablas**: con una sola, el total ya es
+su última línea.
+
+**Las tablas no llevan rótulo.** Decían «Conceptos con BPS» y «Conceptos sin BPS» en un
+`caption`; se sacó el `caption` entero, así que tampoco queda para el lector de pantalla. Cuál
+es cuál se lee en las líneas: la formal es la que tiene los descuentos de BPS.
+
+**En papel no sale nada informal**, y de esa regla sale todo lo demás:
+
+| Qué | En la hoja |
+|---|---|
+| Tabla formal | sale |
+| Tabla informal | **no sale** (`no-print`) |
+| Total general | **no sale**: incluye lo informal |
+| Cierre de la complementaria (§7.6.1) | sale, pero **solo su columna formal** |
+| Bordes redondeados | rectos: `border-radius: 0` para todo, en el bloque `@media print` |
+
+El corte es por lo que la tabla **es**, no por su posición: una empleada con `aporta_bps = false`
+tiene la informal como única tabla, así que su hoja sale con el encabezado de datos y **ninguna
+tabla**. Es a propósito, y es la consecuencia que hay que tener presente antes de «arreglarlo».
+
+**El cierre de la complementaria pidió dos cosas más**, y las dos son de fondo, no de estilo:
+
+- si el cierre no tiene columna formal, el bloque entero se queda afuera de la hoja: serían
+  tres rótulos sin ninguna cifra;
+- el rótulo —«DIFERENCIA A PAGAR» / «A DESCONTAR»— y el aviso de saldo a favor de la empresa
+  **miran la cifra del libro formal en papel** y la del período en pantalla. Los dos signos
+  pueden no coincidir: con el formal en cero y el informal en −$1.050, la hoja decía «A
+  DESCONTAR» arriba de un $0. Por eso hay dos versiones del rótulo, una `print:hidden` y otra
+  `hidden print:inline`, en vez de una sola.
+
+Lo que **no** se toca al imprimir es el encabezado de datos de la empleada: es lo único que
+identifica la hoja, porque el encabezado de la página es `no-print` (§7.6).
+
 ### 1.8 «Con aviso» también puede no descontar
 
 El §4.6.1 hace editable el campo `descuenta` **solo** con `ENFERMEDAD` y lista `CON_AVISO`,
@@ -786,6 +830,7 @@ que decide.
 | Un error de Prisma que no se corresponde con el código —`Argument 'dueno' is missing` con `duenoId` presente, o tipos `string` donde el schema dice `String?`— | El cliente generado quedó viejo respecto del schema | `lib/db/generated/` está en `.gitignore`. **En desarrollo**, después de `db:generate` hay que reiniciar el dev server: el proceso tiene el cliente anterior en memoria. **En el deploy**, ese directorio sobrevive de una vez a la siguiente y `git pull` no lo actualiza, así que `npm run build` corre `prisma generate` antes de compilar |
 | Una sombra o cualquier token de `@theme` no se aplica, sin error | En `@theme inline` la variable se definió apuntándose a sí misma | `--shadow-soft: var(--shadow-soft)` es circular y el valor queda inválido en silencio. Las variables de `:root` que alimentan el tema tienen que llamarse distinto: en `globals.css` son `--sombra-*` |
 | Un `<input type="number">` acepta valores fuera de `min`/`max` | Esos atributos solo limitan las flechas del spinner y la validación nativa, no lo que se tipea | Las planillas mensuales clampean en el `onChange`. El tope real de horas de falta contra el régimen lo valida el servidor (§4.6), que es donde tiene que estar |
+| Al verificar el CSS de impresión, las utilidades `print:*` de Tailwind parecen no existir | Un recorrido de `document.styleSheets` que solo mira las reglas de primer nivel no las encuentra: viven dentro de `@layer utilities`, y ahí el `@media print` es una regla anidada | Hay que recorrer `CSSGroupingRule.cssRules` en recursión. Las de `globals.css` sí están arriba, así que el recorrido plano encuentra `.no-print` y hace parecer que Tailwind no emitió nada |
 | Un archivo de tests rompe el build de producción | `tsconfig.json` incluía `**/*.ts`, así que `next build` typechequeaba `tests/` | Resuelto: ver abajo |
 
 ### Los tests están fuera del typecheck de producción
@@ -871,6 +916,13 @@ dependen de que `--set-xauthrequest=true` esté puesto.
 - **Agrupación de líneas.** Las horas extras se agrupan por porcentaje de recargo y emiten una
   línea por recargo; los pagos adicionales y las cuotas emiten una línea cada uno. El §6.7
   fija la línea como unidad de redondeo, así que la suma cierra igual.
+- **La columna «cantidad» de la liquidación lleva la unidad de cada línea.** No cuenta lo mismo
+  en todas: son horas, un porcentaje o una cantidad de boletos según la línea, y los números
+  pelados se leían todos como lo mismo. La decisión vive en un mapa `código → formateador` en
+  `PantallaLiquidacion`; si se agrega una línea con cantidad, se le agrega su unidad ahí. La
+  del boleto —`38 b`— es **inventada**: el §8.5 fija `$`, `h` y `%`, y de los boletos no dice
+  nada, así que vive en la pantalla y no en `lib/format/money`. Los días quedan pelados a
+  propósito: la descripción de la línea ya los dice.
 - **Estados vacíos y toasts.** Cada acción devuelve un `Resultado` (`lib/acciones/resultado.ts`)
   que el hook `useAccion` traduce a toast de éxito, aviso o error, y a errores por campo. Si
   agregás una acción, seguí ese contrato: la UI ya sabe qué hacer con él.

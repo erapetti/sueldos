@@ -10,13 +10,19 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
-import { formatearImporteEntero, formatearCantidad, formatearHoras } from '@/lib/format/money'
+import {
+  formatearImporteEntero,
+  formatearCantidad,
+  formatearHoras,
+  formatearPorcentaje,
+} from '@/lib/format/money'
 import {
   formatearFecha,
   formatearPeriodoCapitalizado,
   parseFechaISO,
   parsePeriodo,
 } from '@/lib/format/dates'
+import { CODIGOS } from '@/lib/calculo/tipos'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
@@ -33,6 +39,43 @@ export type LineaVista = {
   importe: string
   signo: number
   destacada: boolean
+}
+
+/**
+ * `38 b`. La unidad es **inventada para esta columna**: el §8.5 fija `$`, `h` y `%`, y no dice
+ * nada de los boletos. Vive acá y no en `lib/format/money` justamente por eso: no es una
+ * convención de la aplicación, es cómo se lee este renglón.
+ *
+ * Se probó con el icono `Bus` de lucide en vez de la «b» y **se descartó por decisión del
+ * usuario**: a 14px —el alto de la cifra— un icono de trazo con ventanas y ruedas se lee como
+ * una manchita, y era el único icono dentro de una columna de datos en toda la aplicación, al
+ * lado de un `4 h` y un `15 %`.
+ */
+const formatearBoletos = (valor: string) => `${formatearCantidad(valor)} b`
+
+/**
+ * §8.5 — la columna «cantidad» no cuenta lo mismo en todas las líneas, así que cada una se
+ * muestra con su unidad: **horas** en las faltas y en las tres de horas extras, el
+ * **porcentaje** del concepto en los descuentos de BPS (§6.3) y **boletos** en la de boletos.
+ * Sin la unidad, «15» se leía como quince de algo al lado de la materia gravada, y «4» de
+ * faltas como cuatro faltas en vez de cuatro horas.
+ *
+ * Los únicos que quedan pelados son los días: los de un salario prorrateado (§6.9) y los
+ * hábiles de un salario vacacional (§7.11) ya van dichos en la descripción de la línea, así
+ * que la columna los repetiría.
+ */
+const CON_SU_UNIDAD: Record<string, (valor: string) => string> = {
+  [CODIGOS.FALTAS]: formatearHoras,
+  [CODIGOS.HORAS_EXTRAS_CON_BPS]: formatearHoras,
+  [CODIGOS.HORAS_EN_FERIADOS]: formatearHoras,
+  [CODIGOS.HORAS_EXTRAS_SIN_BPS]: formatearHoras,
+  [CODIGOS.DESCUENTO_BPS]: formatearPorcentaje,
+  [CODIGOS.BOLETOS]: formatearBoletos,
+}
+
+function cantidadDeLaLinea(linea: LineaVista) {
+  if (!linea.cantidad) return ''
+  return (CON_SU_UNIDAD[linea.codigo] ?? formatearCantidad)(linea.cantidad)
 }
 
 type Libro = 'FORMAL' | 'INFORMAL'
@@ -383,7 +426,7 @@ export function PantallaLiquidacion(props: {
                     >
                       <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
                       <td className="px-2 py-3 text-right tabular text-muted-foreground">
-                        {linea.cantidad ? formatearCantidad(linea.cantidad) : ''}
+                        {cantidadDeLaLinea(linea)}
                       </td>
                       <td className="hidden px-2 py-3 text-right tabular text-muted-foreground sm:table-cell">
                         {linea.valorUnitario ? formatearImporteEntero(linea.valorUnitario) : ''}
