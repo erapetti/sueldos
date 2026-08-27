@@ -96,7 +96,10 @@ const EMPLEADOS_DEMO: EmpleadoDemo[] = [
     valorHoraNegro: '420.00',
     cobraBoletos: true,
     aportaBps: true,
-    seguroSalud: 'A1',
+    // Anexo A — «Beneficiarios con hijos sin cónyuge o concubino a cargo». Tiene que ser un
+    // código de la tabla fija: los esquemas zod son un `z.enum` sobre ella, así que un código
+    // inventado es un valor que la aplicación nunca habría dejado cargar.
+    seguroSalud: '1',
   },
   // Sin boletos: su liquidación no lleva la línea de boletos.
   {
@@ -308,26 +311,36 @@ async function datosDemo() {
     update: { monto: '55.00', modificadoPor: dueno.id },
   })
 
-  // §4.11 — conceptos generales, aplicables a todos los empleados que aporten.
-  const CONCEPTOS: [string, string][] = [
-    ['Jubilación', '15.0000'],
-    ['FONASA', '4.5000'],
-    ['FRL', '0.1000'],
+  /**
+   * §4.11 — los tres generales, que aplican a todo el que aporte, y uno atado al seguro de
+   * salud de Ana, para que la demo ejercite también ese camino.
+   *
+   * Los específicos **se suman** a los generales: la resolución agrupa por
+   * `(concepto, seguro)` y no desempata por especificidad, así que el del seguro es un
+   * adicional y no un reemplazo del FONASA general. Por eso lleva nombre propio.
+   */
+  const CONCEPTOS: { concepto: string; porcentaje: string; seguroSalud: string | null }[] = [
+    { concepto: 'Jubilación', porcentaje: '15.0000', seguroSalud: null },
+    { concepto: 'FONASA', porcentaje: '4.5000', seguroSalud: null },
+    { concepto: 'FRL', porcentaje: '0.1000', seguroSalud: null },
+    { concepto: 'FONASA adicional por hijos', porcentaje: '1.5000', seguroSalud: '1' },
   ]
-  for (const [concepto, porcentaje] of CONCEPTOS) {
+  for (const { concepto, porcentaje, seguroSalud } of CONCEPTOS) {
     await prisma.bpsConcepto.upsert({
       where: {
         concepto_seguroSaludClave_fechaVigencia: {
           concepto,
-          seguroSaludClave: '*',
+          // §4.11 — MySQL no compara NULL entre sí, así que el índice único va por la
+          // columna clave y el general se guarda como '*'.
+          seguroSaludClave: seguroSalud ?? '*',
           fechaVigencia: vigencia,
         },
       },
       create: {
         concepto,
         porcentaje,
-        seguroSalud: null,
-        seguroSaludClave: '*',
+        seguroSalud,
+        seguroSaludClave: seguroSalud ?? '*',
         fechaVigencia: vigencia,
         ...aud,
       },
