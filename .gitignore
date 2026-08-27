@@ -26,8 +26,11 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 
-# Claude
-.claude
+# Claude: el directorio queda afuera, menos los skills del proyecto.
+# Hay que ignorar el contenido y no el directorio, porque git no desciende
+# en un directorio ignorado y la excepción nunca se llegaría a evaluar.
+/.claude/*
+!/.claude/skills/
 
 # Notas de trabajo pendiente, locales
 PENDIENTES.md
