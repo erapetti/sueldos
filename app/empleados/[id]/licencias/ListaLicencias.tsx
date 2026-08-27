@@ -16,8 +16,7 @@
  * saldo, la tabla y el alta. Editar la nota y borrar una licencia quedan para más adelante.
  */
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { BotonAgregar } from '@/components/dominio/BotonAgregar'
 import { DialogoLicencia } from '@/components/dominio/DialogoLicencia'
 import {
   MarcoDeMovimientos,
@@ -89,10 +88,7 @@ export function ListaLicencias({
         titulo="Licencias"
         accion={
           empleada.soloLectura ? null : (
-            <Button onClick={() => setAlta(true)}>
-              <Plus className="size-4" aria-hidden />
-              Nueva licencia
-            </Button>
+            <BotonAgregar onClick={() => setAlta(true)}>Nueva licencia</BotonAgregar>
           )
         }
         resumen={
