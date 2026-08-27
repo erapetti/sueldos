@@ -31,3 +31,7 @@ yarn-error.log*
 
 # Notas de trabajo pendiente, locales
 PENDIENTES.md
+
+# Los reescribe `next dev` en cada directorio donde corre
+AGENTS.md
+CLAUDE.md
