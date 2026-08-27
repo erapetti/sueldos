@@ -194,15 +194,25 @@ export function FichaEmpleado(props: FichaProps) {
     {
       clave: 'seguro',
       etiqueta: 'Seguro de salud',
-      // Sin aporte el seguro no tiene efecto, y el registro lo guarda en null: no hay nada
-      // que mostrar más que el guion.
+      /*
+        El texto del Anexo A y no el código: «15» no le dice nada a nadie. El código queda en
+        el `title`, que es donde sirve —para cotejar contra una planilla del BPS— sin ocupar
+        la columna.
+
+        Los textos del Anexo A pasan los 200 caracteres, así que esta columna es la única de
+        la ficha que envuelve: con `whitespace-nowrap` la tabla se iría de ancho. El mínimo es
+        para el teléfono, donde sin él la columna se comprime a un hilo de 130 px y el texto
+        cae en veinte renglones; con el mínimo, la tabla scrollea de costado como el resto.
+      */
+      className: 'min-w-[18rem] whitespace-normal',
       celda: (a) =>
         a.seguroSalud ? (
-          <span title={a.seguroSaludDescripcion ?? undefined}>
-            {a.seguroSalud}
-            {a.seguroSaludDescripcion ? ` — ${a.seguroSaludDescripcion}` : ''}
+          <span title={`Código ${a.seguroSalud}`}>
+            {/* Un código que no está en el Anexo A no tiene texto: se muestra pelado. */}
+            {a.seguroSaludDescripcion ?? a.seguroSalud}
           </span>
         ) : (
+          // Sin aporte el seguro no tiene efecto, y el registro lo guarda en null.
           '—'
         ),
     },
