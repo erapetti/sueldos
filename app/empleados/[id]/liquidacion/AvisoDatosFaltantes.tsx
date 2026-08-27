@@ -8,17 +8,20 @@ import { Button } from '@/components/ui/button'
 import type { DatoFaltante } from '@/lib/calculo/errores'
 import { formatearPeriodoCapitalizado, parsePeriodo } from '@/lib/format/dates'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import type { ListadoDePersonal } from '@/constants/listados'
 
 export function AvisoDatosFaltantes({
   empleadoId,
   alias,
   nombreCompleto,
+  listadoDeOrigen,
   periodo,
   faltantes,
 }: {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  listadoDeOrigen: ListadoDePersonal
   periodo: string
   faltantes: DatoFaltante[]
 }) {
@@ -30,6 +33,7 @@ export function AvisoDatosFaltantes({
         alias={alias}
         nombreCompleto={nombreCompleto}
         activa="liquidaciones"
+        listadoDeOrigen={listadoDeOrigen}
       />
 
       <p className="text-sm text-muted-foreground">

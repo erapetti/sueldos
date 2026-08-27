@@ -28,6 +28,7 @@ import {
   parsePeriodo,
 } from '@/lib/format/dates'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import type { ListadoDePersonal } from '@/constants/listados'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
 import { NavegadorDePeriodo } from './NavegadorDePeriodo'
 
@@ -71,6 +72,7 @@ export function PantallaLiquidacion(props: {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  listadoDeOrigen: ListadoDePersonal
   periodo: string
   puedeEditar: boolean
   lineas: LineaVista[]
@@ -233,6 +235,7 @@ export function PantallaLiquidacion(props: {
           alias={props.alias}
           nombreCompleto={props.nombreCompleto}
           activa="liquidaciones"
+          listadoDeOrigen={props.listadoDeOrigen}
         />
 
         <NavegadorDePeriodo

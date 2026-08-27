@@ -11,6 +11,7 @@
  * `fechaIngreso` no la usa el marco: la usan los diálogos de alta de cada pantalla, para no
  * ofrecer fechas anteriores al ingreso.
  */
+import type { ListadoDePersonal } from '@/constants/listados'
 import { EncabezadoEmpleada } from './EncabezadoEmpleada'
 import { MovimientosEmpleado } from './MovimientosEmpleado'
 
@@ -20,6 +21,8 @@ export type EmpleadaDelMarco = {
   alias: string
   nombreCompleto: string
   fechaIngreso: string
+  /** De qué listado se vino, para el breadcrumb del encabezado. */
+  listadoDeOrigen: ListadoDePersonal
   soloLectura: boolean
   dadoDeBaja: boolean
   visible: boolean
@@ -42,6 +45,7 @@ export function MarcoDeMovimientos({
         alias={empleada.alias}
         nombreCompleto={empleada.nombreCompleto}
         activa="movimientos"
+        listadoDeOrigen={empleada.listadoDeOrigen}
       />
 
       {/* El submenú acompaña como en Datos: está presente en toda la rama, no solo en su índice. */}

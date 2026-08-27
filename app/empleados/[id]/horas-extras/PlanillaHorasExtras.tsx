@@ -29,6 +29,7 @@ import {
   type DiaContexto,
   type Renglon,
 } from '@/components/dominio/PlanillaMensual'
+import type { ListadoDePersonal } from '@/constants/listados'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarHorasExtras } from '@/actions/novedades'
 import { RECARGOS } from '@/constants/recargos'
@@ -45,6 +46,7 @@ export function PlanillaHorasExtras(props: {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  listadoDeOrigen: ListadoDePersonal
   periodo: string
   dias: DiaContexto[]
   guardados: Renglon[]
@@ -90,6 +92,7 @@ export function PlanillaHorasExtras(props: {
       empleadoId={props.empleadoId}
       alias={props.alias}
       nombreCompleto={props.nombreCompleto}
+      listadoDeOrigen={props.listadoDeOrigen}
       periodo={props.periodo}
       ruta={`/empleados/${props.empleadoId}/horas-extras`}
       claveMenu="horas-extras"

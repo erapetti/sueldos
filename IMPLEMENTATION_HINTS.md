@@ -773,6 +773,24 @@ dependen de que `--set-xauthrequest=true` esté puesto.
   agregás una acción, seguí ese contrato: la UI ya sabe qué hacer con él.
 - **Los avisos del §5.3 y del §6.11** viajan en el campo `aviso` del resultado, no como
   excepción. Son informativos: la operación se guardó igual.
+- **El rótulo del encabezado de la empleada es un breadcrumb al listado.** Decía «Empleada»,
+  que era repetir lo que ya dice el título (§8.4); ahora es el enlace al listado de donde se
+  vino: «Mi Personal» (§8.3) o «Todo el Personal» (§8.7). Las dos etiquetas con su ruta salen
+  de `constants/listados.ts`, que es también de donde las toma el menú (§8.1), para que el
+  breadcrumb diga exactamente lo mismo que el ítem de donde se vino.
+- **De qué listado se vino se deduce del permiso, no de la URL.** Los dos listados linkean a la
+  misma ruta (`/empleados/{id}/faltas`), así que el origen no se puede leer de la ruta, y
+  llevarlo en un `?desde=` obligaba a propagarlo por cada enlace de adentro de la empleada —el
+  menú, los dos submenús, las filas de los listados de movimientos, el navegador de período—.
+  Lo resuelve `listadoDeOrigen` (`lib/auth/guards.ts`) en un solo lugar: el único nivel de
+  acceso que dice «no es propia ni compartida conmigo» es `ADMIN`, y esa es justo la empleada
+  que solo aparece en «Todo el Personal» (§8.7). El valor viaja como prop `listadoDeOrigen`
+  hasta `EncabezadoEmpleada`; en la rama de Movimientos va adentro de `EmpleadaDelMarco`, así
+  que lo arma `empleadaDelMarco` y las nueve pantallas no lo repiten. **Dos casos quedan
+  mostrando «Mi Personal» sin estar ahí**: el administrador que entra desde «Todo el Personal»
+  a una empleada propia, y la empleada oculta, que se lista solo en «Todo el Personal». En los
+  dos el enlace lleva a un listado que existe, y si hace falta acertar siempre el camino es el
+  `?desde=`.
 
 ### La estética viene de un proyecto de Claude Design
 

@@ -11,6 +11,7 @@
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import type { ListadoDePersonal } from '@/constants/listados'
 import { MOTIVO_NO_IMPLEMENTADO } from '@/lib/calculo/aguinaldo'
 import { etiquetaPeriodo } from '@/lib/calculo/periodos'
 import { parsePeriodo } from '@/lib/format/dates'
@@ -21,6 +22,7 @@ export function PantallaAguinaldo(props: {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  listadoDeOrigen: ListadoDePersonal
   /** `AAAA-MM` de junio o de diciembre. */
   periodo: string
   puedeRetroceder: boolean
@@ -39,6 +41,7 @@ export function PantallaAguinaldo(props: {
           alias={props.alias}
           nombreCompleto={props.nombreCompleto}
           activa="liquidaciones"
+          listadoDeOrigen={props.listadoDeOrigen}
         />
 
         <NavegadorDePeriodo

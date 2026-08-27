@@ -23,6 +23,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
+import { LISTADOS_DE_PERSONAL } from '@/constants/listados'
 import { cn } from '@/lib/utils'
 
 type OpcionMenu = {
@@ -35,8 +36,8 @@ type OpcionMenu = {
 }
 
 const GENERALES: OpcionMenu[] = [
-  { etiqueta: 'Mi Personal', ruta: '/empleados', icono: Users },
-  { etiqueta: 'Todo el Personal', ruta: '/empleados/todos', icono: UsersRound },
+  { ...LISTADOS_DE_PERSONAL.MI_PERSONAL, icono: Users },
+  { ...LISTADOS_DE_PERSONAL.TODO_EL_PERSONAL, icono: UsersRound },
 ]
 
 const ADMINISTRACION: OpcionMenu[] = [

@@ -2,7 +2,14 @@
  * §8.4 — ficha del empleado. Título = alias, subtítulo = nombre completo.
  */
 import { notFound, redirect } from 'next/navigation'
-import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer, esDueno } from '@/lib/auth/guards'
+import {
+  exigirUsuario,
+  accesoAEmpleado,
+  listadoDeOrigen,
+  puedeEditar,
+  puedeVer,
+  esDueno,
+} from '@/lib/auth/guards'
 import { datosDeFicha, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { descripcionSeguroSalud } from '@/constants/segurosSalud'
 import { SECCIONES_DE_FICHA } from '@/components/dominio/EncabezadoEmpleada'
@@ -51,6 +58,7 @@ export default async function PaginaFicha({
       soloLectura={!puedeEditar(acceso.nivel)}
       esDueno={duenoDelEmpleado}
       comoAdministrador={acceso.nivel === 'ADMIN'}
+      listadoDeOrigen={listadoDeOrigen(acceso.nivel)}
       duenoNombre={datos.empleado.dueno.nombre ?? datos.empleado.dueno.email}
       empleado={{
         alias: datos.empleado.alias,

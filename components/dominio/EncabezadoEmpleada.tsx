@@ -12,6 +12,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import { LISTADOS_DE_PERSONAL, type ListadoDePersonal } from '@/constants/listados'
 import { cn } from '@/lib/utils'
 
 /** Ítem del menú. `seccion` es el valor de `?seccion=` cuando la sección vive en la ficha. */
@@ -55,6 +56,7 @@ export function EncabezadoEmpleada({
   alias,
   nombreCompleto,
   activa,
+  listadoDeOrigen,
   estados,
   aviso,
 }: {
@@ -63,12 +65,18 @@ export function EncabezadoEmpleada({
   nombreCompleto: string
   /** Clave del ítem del menú donde estás. */
   activa: string
+  /**
+   * De qué listado se vino, que es a dónde vuelve el breadcrumb. Lo deduce del permiso
+   * `listadoDeOrigen` (`lib/auth/guards.ts`) y viaja prop por prop porque no está en la URL.
+   */
+  listadoDeOrigen: ListadoDePersonal
   /** Chips de estado: dado de baja, oculto, sin aportes. */
   estados?: React.ReactNode
   /** Aviso de §8.7, cuando un administrador mira una empleada ajena. */
   aviso?: React.ReactNode
 }) {
   const items = itemsDeMenu(empleadoId)
+  const listado = LISTADOS_DE_PERSONAL[listadoDeOrigen]
   const activaNormalizada = (SECCIONES_DE_DATOS as readonly string[]).includes(activa)
     ? 'datos'
     : activa
@@ -86,7 +94,17 @@ export function EncabezadoEmpleada({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <EncabezadoPagina
           className="mb-0 flex-1"
-          rotulo="Empleada"
+          /*
+            El rótulo decía «Empleada», que era repetir lo que ya dice el título. En su lugar
+            va el breadcrumb al listado de donde se vino: el enlace no trae estilo propio y
+            hereda el del rótulo —chico, con el color de acento—, así que la única diferencia
+            visible es el subrayado al pasar por encima.
+          */
+          rotulo={
+            <Link href={listado.ruta} className="hover:underline">
+              {listado.etiqueta}
+            </Link>
+          }
           titulo={alias}
           bajada={nombreCompleto}
         />

@@ -15,6 +15,7 @@ import { PanelCompartir } from './PanelCompartir'
 import { formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
 import { ETIQUETA_LIBRO } from '@/constants/etiquetas'
+import type { ListadoDePersonal } from '@/constants/listados'
 import {
   EncabezadoEmpleada,
   EstadosEmpleada,
@@ -52,6 +53,8 @@ export type FichaProps = {
   soloLectura: boolean
   esDueno: boolean
   comoAdministrador: boolean
+  /** De qué listado se vino, para el breadcrumb del encabezado. */
+  listadoDeOrigen: ListadoDePersonal
   duenoNombre: string
   empleado: {
     alias: string
@@ -224,6 +227,7 @@ export function FichaEmpleado(props: FichaProps) {
         alias={props.empleado.alias}
         nombreCompleto={props.empleado.nombreCompleto}
         activa={seccion}
+        listadoDeOrigen={props.listadoDeOrigen}
         estados={
           <EstadosEmpleada
             empleadoId={props.empleadoId}

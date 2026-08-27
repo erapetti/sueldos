@@ -43,6 +43,7 @@ import {
 } from '@/lib/format/dates'
 import { formatearHoras } from '@/lib/format/money'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
+import type { ListadoDePersonal } from '@/constants/listados'
 
 export type Renglon = {
   /** Clave local; los ya guardados traen además `id`. */
@@ -265,6 +266,8 @@ export type PlanillaMensualProps = {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  /** De qué listado se vino, para el breadcrumb del encabezado. */
+  listadoDeOrigen: ListadoDePersonal
   periodo: string
   /** Ruta base de la planilla, para navegar entre meses. */
   ruta: string
@@ -689,6 +692,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           alias={props.alias}
           nombreCompleto={props.nombreCompleto}
           activa={props.claveMenu}
+          listadoDeOrigen={props.listadoDeOrigen}
         />
 
         <div className="flex flex-wrap items-center gap-3">

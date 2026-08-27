@@ -30,6 +30,7 @@ import {
   PlanillaMensual,
   type DiaContexto, type Renglon
 } from '@/components/dominio/PlanillaMensual'
+import type { ListadoDePersonal } from '@/constants/listados'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarFaltas } from '@/actions/novedades'
 import {
@@ -53,6 +54,7 @@ export function PlanillaFaltas(props: {
   empleadoId: string
   alias: string
   nombreCompleto: string
+  listadoDeOrigen: ListadoDePersonal
   periodo: string
   dias: DiaContexto[]
   guardados: Renglon[]
@@ -95,6 +97,7 @@ export function PlanillaFaltas(props: {
       empleadoId={props.empleadoId}
       alias={props.alias}
       nombreCompleto={props.nombreCompleto}
+      listadoDeOrigen={props.listadoDeOrigen}
       periodo={props.periodo}
       ruta={`/empleados/${props.empleadoId}/faltas`}
       claveMenu="faltas"

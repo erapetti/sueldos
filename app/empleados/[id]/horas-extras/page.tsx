@@ -1,7 +1,13 @@
 /** §7.1 — planilla mensual de horas extras, en su página propia. */
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
-import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer } from '@/lib/auth/guards'
+import {
+  exigirUsuario,
+  accesoAEmpleado,
+  listadoDeOrigen,
+  puedeEditar,
+  puedeVer,
+} from '@/lib/auth/guards'
 import { contextoDePlanilla } from '@/lib/consultas/planilla'
 import { aDecimal } from '@/lib/db/mapeo'
 import {
@@ -55,6 +61,7 @@ export default async function PaginaHorasExtras({
       empleadoId={id}
       alias={acceso.empleado.alias}
       nombreCompleto={acceso.empleado.nombreCompleto}
+      listadoDeOrigen={listadoDeOrigen(acceso.nivel)}
       periodo={aPeriodoISO(periodo)}
       dias={contexto.dias}
       guardados={guardados}

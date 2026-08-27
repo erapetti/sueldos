@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
 import { usuarioActual, type UsuarioActual } from './currentUser'
 import { aISO } from '@/lib/format/dates'
+import type { ListadoDePersonal } from '@/constants/listados'
 import type { EmpleadaDelMarco } from '@/components/dominio/MarcoDeMovimientos'
 
 /**
@@ -86,6 +87,7 @@ export function empleadaDelMarco({ empleado, nivel }: EmpleadoConAcceso): Emplea
     alias: empleado.alias,
     nombreCompleto: empleado.nombreCompleto,
     fechaIngreso: aISO(empleado.fechaIngreso),
+    listadoDeOrigen: listadoDeOrigen(nivel),
     soloLectura: !puedeEditar(nivel),
     dadoDeBaja: !empleado.activo,
     visible: empleado.visible,
@@ -127,6 +129,21 @@ export async function accesoAEmpleado(
   else if (usuario.esAdmin) nivel = 'ADMIN'
 
   return { empleado: datos, nivel }
+}
+
+/**
+ * De qué listado se vino, para el breadcrumb del encabezado de la empleada.
+ *
+ * No viaja en la URL: se **deduce del permiso**, porque los dos listados llevan a la misma
+ * ruta y propagar un `?desde=` por cada enlace de adentro de la empleada era mucho más caro.
+ * «Todo el Personal» solo lo ve un administrador (§8.7), y el único nivel que dice «no es
+ * propia ni compartida conmigo» es `ADMIN`: con cualquier otro la empleada está en «Mi
+ * Personal». El caso que queda mal es el administrador que entra desde «Todo el Personal» a
+ * una empleada propia; ahí el breadcrumb lo devuelve a «Mi Personal», donde igual la
+ * encuentra.
+ */
+export function listadoDeOrigen(nivel: NivelAcceso): ListadoDePersonal {
+  return nivel === 'ADMIN' ? 'TODO_EL_PERSONAL' : 'MI_PERSONAL'
 }
 
 export function puedeVer(nivel: NivelAcceso): boolean {

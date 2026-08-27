@@ -4,7 +4,13 @@
  */
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
-import { exigirUsuario, accesoAEmpleado, puedeEditar, puedeVer } from '@/lib/auth/guards'
+import {
+  exigirUsuario,
+  accesoAEmpleado,
+  listadoDeOrigen,
+  puedeEditar,
+  puedeVer,
+} from '@/lib/auth/guards'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
@@ -78,6 +84,7 @@ export default async function PaginaLiquidacion({
         empleadoId={id}
         alias={acceso.empleado.alias}
         nombreCompleto={acceso.empleado.nombreCompleto}
+        listadoDeOrigen={listadoDeOrigen(acceso.nivel)}
         periodo={aPeriodoISO(periodo)}
         puedeRetroceder={puedeRetroceder}
         puedeAvanzar={puedeAvanzar}
@@ -91,6 +98,7 @@ export default async function PaginaLiquidacion({
     empleadoId: id,
     alias: acceso.empleado.alias,
     nombreCompleto: acceso.empleado.nombreCompleto,
+    listadoDeOrigen: listadoDeOrigen(acceso.nivel),
     periodo: aPeriodoISO(periodo),
     puedeEditar: puedeEditar(acceso.nivel),
   }
