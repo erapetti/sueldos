@@ -16,7 +16,13 @@
  *
  * `peligrosa` mueve el acento: en una acción que saca algo de su lugar, el botón lleno es
  * **Cancelar** y el de confirmar va en rojo. En una que devuelve las cosas a donde estaban, el
- * acento se queda en la acción.
+ * acento se queda en la acción. No tiene por qué ser fijo: en la planilla depende de si la
+ * salida pierde el borrador o no.
+ *
+ * **Los botones no cierran solos.** Es a propósito, y es la diferencia con el `AlertDialog`
+ * que estos diálogos usaban antes: si la acción falla, el diálogo queda abierto con lo que el
+ * usuario había elegido, en vez de cerrarse y dejar solo un toast de error. Cerrar es tarea
+ * del `onExito` de la acción.
  */
 import { Button } from '@/components/ui/button'
 import {
@@ -35,12 +41,26 @@ export type PropsDialogoDeAccion = {
   /** Qué va a pasar al confirmar. Lo que el usuario necesita para decidir. */
   descripcion: React.ReactNode
   etiquetaConfirmar: string
+  /** Reemplaza a `etiquetaConfirmar` mientras se envía. Sin esto, la etiqueta no cambia. */
+  etiquetaEnviando?: string
   onConfirmar: () => void
   enviando?: boolean
+  /**
+   * «Cancelar» no siempre es la palabra: en la planilla es «Seguir editando» o «Descartar», y
+   * en una pantalla donde la acción **es** cancelar algo, decir «Cancelar» a las dos cosas se
+   * lee al revés.
+   */
+  etiquetaCancelar?: string
   /** Cuando falta elegir algo del cuerpo. */
   confirmarDeshabilitado?: boolean
   /** Saca algo de su lugar: el acento pasa a Cancelar y confirmar va en rojo. */
   peligrosa?: boolean
+  /**
+   * Para los formularios de alta, que no entran en el ancho de una pregunta: más ancho y con
+   * el alto acotado al viewport, así el cuerpo largo scrollea adentro del diálogo en vez de
+   * empujarlo fuera de la pantalla.
+   */
+  amplio?: boolean
   /** Lo que haya que elegir antes de confirmar. Sin esto, el diálogo es solo la pregunta. */
   children?: React.ReactNode
 }
@@ -51,15 +71,20 @@ export function DialogoDeAccion({
   titulo,
   descripcion,
   etiquetaConfirmar,
+  etiquetaEnviando,
   onConfirmar,
   enviando,
+  etiquetaCancelar = 'Cancelar',
   confirmarDeshabilitado,
   peligrosa,
+  amplio,
   children,
 }: PropsDialogoDeAccion) {
   return (
     <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className={amplio ? 'max-h-[90vh] overflow-y-auto sm:max-w-lg' : 'sm:max-w-md'}
+      >
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>{descripcion}</DialogDescription>
@@ -73,14 +98,14 @@ export function DialogoDeAccion({
             onClick={onCerrar}
             disabled={enviando}
           >
-            Cancelar
+            {etiquetaCancelar}
           </Button>
           <Button
             variant={peligrosa ? 'destructive' : 'default'}
             onClick={onConfirmar}
             disabled={enviando || confirmarDeshabilitado}
           >
-            {etiquetaConfirmar}
+            {enviando && etiquetaEnviando ? etiquetaEnviando : etiquetaConfirmar}
           </Button>
         </DialogFooter>
       </DialogContent>

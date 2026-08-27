@@ -11,15 +11,6 @@
  */
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -30,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { SelectorFecha } from './SelectorFecha'
 import { CampoMonto, CampoTexto } from './CampoMonto'
+import { DialogoDeAccion } from './DialogoDeAccion'
 import type { DialogoNovedadProps } from './DialogoPagoAdicional'
 import { useAccion } from '@/hooks/useAccion'
 import { liquidacionesParaPago, registrarPagoBancario } from '@/actions/prestamos'
@@ -75,13 +67,7 @@ function montoDelLibro(liquidacion: Liquidacion, libro: Libro): string {
  * en cada apertura, sin un efecto que lo resetee.
  */
 export function DialogoPagoBancario(props: DialogoNovedadProps) {
-  return (
-    <Dialog open={props.abierto} onOpenChange={(v) => !v && props.onCerrar()}>
-      <DialogContent className="sm:max-w-md">
-        {props.abierto ? <Cuerpo {...props} /> : null}
-      </DialogContent>
-    </Dialog>
-  )
+  return props.abierto ? <Cuerpo {...props} /> : null
 }
 
 function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
@@ -170,111 +156,106 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Registrar pago bancario</DialogTitle>
-        <DialogDescription>{alias} — transferencia al empleado.</DialogDescription>
-      </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-banc-liquidacion">Liquidación vinculada</Label>
-            <Select
-              value={liquidacionId}
-              onValueChange={elegirLiquidacion}
-              disabled={enviando}
-            >
-              <SelectTrigger id="pago-banc-liquidacion">
-                <SelectValue placeholder="Ninguna" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SIN_VINCULO}>Ninguna</SelectItem>
-                {liquidaciones.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
-                    {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
-                    {l.pago === 'PAGADA' ? ' · ya pagada' : ''}
-                    {l.pago === 'PARCIAL'
-                      ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
-                      : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Vincularla es lo que la marca como pagada.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-banc-libro">Libro</Label>
-            <Select value={libro} onValueChange={elegirLibro} disabled={enviando}>
-              <SelectTrigger id="pago-banc-libro">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LIBROS.map((l) => (
-                  <SelectItem key={l} value={l}>
-                    {ETIQUETA_LIBRO[l]}
-                    {vinculada && vinculada.libros.includes(l)
-                      ? ` — ${formatearImporte(montoDelLibro(vinculada, l))}`
-                      : ''}
-                    {vinculada && vinculada.libros.includes(l) && !vinculada.faltan.includes(l)
-                      ? ' · ya pagado'
-                      : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {vinculada && vinculada.libros.length > 1 ? (
-              <p className="text-sm text-muted-foreground">
-                Esta liquidación se paga en dos transferencias, una por libro.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-banc-fecha">Fecha</Label>
-            <SelectorFecha
-              id="pago-banc-fecha"
-              valor={fecha}
-              onChange={setFecha}
-              minimo={fechaIngreso}
-              maximo={aISO(hoy())}
-              disabled={enviando}
-              aria-label="Fecha del pago"
-            />
-            {campos.fecha ? <p className="text-sm text-destructive">{campos.fecha}</p> : null}
-          </div>
-
-          <CampoMonto
-            id="pago-banc-monto"
-            etiqueta="Monto"
-            valor={monto}
-            onChange={setMonto}
-            error={campos.monto}
+    <DialogoDeAccion
+      abierto
+      onCerrar={onCerrar}
+      titulo="Registrar pago bancario"
+      descripcion={`${alias} — transferencia al empleado.`}
+      etiquetaConfirmar="Registrar pago"
+      etiquetaEnviando="Guardando…"
+      onConfirmar={guardar}
+      enviando={enviando}
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-banc-liquidacion">Liquidación vinculada</Label>
+          <Select
+            value={liquidacionId}
+            onValueChange={elegirLiquidacion}
             disabled={enviando}
-          />
-
-          <CampoTexto
-            id="pago-banc-concepto"
-            etiqueta="Concepto"
-            valor={concepto}
-            onChange={setConcepto}
-            error={campos.concepto}
-            disabled={enviando}
-            maxLength={255}
-          />
+          >
+            <SelectTrigger id="pago-banc-liquidacion">
+              <SelectValue placeholder="Ninguna" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SIN_VINCULO}>Ninguna</SelectItem>
+              {liquidaciones.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
+                  {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
+                  {l.pago === 'PAGADA' ? ' · ya pagada' : ''}
+                  {l.pago === 'PARCIAL'
+                    ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
+                    : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            Vincularla es lo que la marca como pagada.
+          </p>
         </div>
 
-      <DialogFooter>
-        <Button variant="outline" onClick={onCerrar} disabled={enviando}>
-          Cancelar
-        </Button>
-        <Button onClick={guardar} disabled={enviando}>
-          {enviando ? 'Guardando…' : 'Registrar pago'}
-        </Button>
-      </DialogFooter>
-    </>
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-banc-libro">Libro</Label>
+          <Select value={libro} onValueChange={elegirLibro} disabled={enviando}>
+            <SelectTrigger id="pago-banc-libro">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LIBROS.map((l) => (
+                <SelectItem key={l} value={l}>
+                  {ETIQUETA_LIBRO[l]}
+                  {vinculada && vinculada.libros.includes(l)
+                    ? ` — ${formatearImporte(montoDelLibro(vinculada, l))}`
+                    : ''}
+                  {vinculada && vinculada.libros.includes(l) && !vinculada.faltan.includes(l)
+                    ? ' · ya pagado'
+                    : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {vinculada && vinculada.libros.length > 1 ? (
+            <p className="text-sm text-muted-foreground">
+              Esta liquidación se paga en dos transferencias, una por libro.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-banc-fecha">Fecha</Label>
+          <SelectorFecha
+            id="pago-banc-fecha"
+            valor={fecha}
+            onChange={setFecha}
+            minimo={fechaIngreso}
+            maximo={aISO(hoy())}
+            disabled={enviando}
+            aria-label="Fecha del pago"
+          />
+          {campos.fecha ? <p className="text-sm text-destructive">{campos.fecha}</p> : null}
+        </div>
+
+        <CampoMonto
+          id="pago-banc-monto"
+          etiqueta="Monto"
+          valor={monto}
+          onChange={setMonto}
+          error={campos.monto}
+          disabled={enviando}
+        />
+
+        <CampoTexto
+          id="pago-banc-concepto"
+          etiqueta="Concepto"
+          valor={concepto}
+          onChange={setConcepto}
+          error={campos.concepto}
+          disabled={enviando}
+          maxLength={255}
+        />
+      </div>
+    </DialogoDeAccion>
   )
 }

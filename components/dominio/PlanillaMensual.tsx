@@ -14,16 +14,6 @@ import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import {
   aISO,
@@ -42,6 +32,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { formatearHoras } from '@/lib/format/money'
+import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
 
@@ -949,66 +940,53 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
         </div>
       )}
 
-      {/* §7.1 — confirmación única para todas las salidas con borrador. */}
-      <AlertDialog open={salida !== null} onOpenChange={(v) => !v && setSalida(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {salida?.motivo === 'vista'
-                ? '¿Cambiar de vista con renglones sin guardar?'
-                : 'Tenés renglones sin guardar'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {salida?.motivo === 'vista'
-                ? 'Los renglones en borrador no se pierden: son los mismos en las dos vistas y en el calendario se ven en amarillo. Pero siguen sin guardarse.'
-                : 'Si salís de la planilla se pierden los renglones en borrador. Guardalos o descartalos para conservarlos.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {/*
-            El énfasis va siempre en la opción que no pierde nada. Cambiar de vista no pierde
-            el borrador, así que ahí el acento se queda en la acción; salir sí lo pierde, y
-            entonces el acento pasa a «Seguir editando» y la salida queda en rojo.
-            El foco inicial lo pone Radix en el botón de cancelar en los dos casos.
-          */}
-          <AlertDialogFooter>
-            <AlertDialogCancel variant={salida?.motivo === 'salir' ? 'default' : 'outline'}>
-              Seguir editando
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant={salida?.motivo === 'salir' ? 'destructive' : 'default'}
-              onClick={() => {
-                const accion = salida?.accion
-                setSalida(null)
-                accion?.()
-              }}
-            >
-              {salida?.motivo === 'vista' ? 'Cambiar de vista' : 'Salir sin guardar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/*
+        §7.1 — confirmación única para todas las salidas con borrador.
 
-      {/* Confirmación de lo que el lote tiene de inhabitual, antes de guardarlo. */}
-      <AlertDialog open={confirmacion !== null} onOpenChange={(v) => !v && setConfirmacion(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Antes de guardar</AlertDialogTitle>
-            <AlertDialogDescription>{confirmacion}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Descartar</AlertDialogCancel>
-            {/* Guardar no destruye nada, así que el acento se queda en la acción. */}
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmacion(null)
-                props.onGuardar(renglones, borrar)
-              }}
-            >
-              Continuar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        El énfasis va siempre en la opción que no pierde nada. Cambiar de vista no pierde el
+        borrador, así que ahí el acento se queda en la acción; salir sí lo pierde, y entonces
+        el acento pasa a «Seguir editando» y la salida queda en rojo. Eso es exactamente lo
+        que hace `peligrosa`, que por eso no es fija sino el motivo de la salida.
+      */}
+      <DialogoDeAccion
+        abierto={salida !== null}
+        onCerrar={() => setSalida(null)}
+        titulo={
+          salida?.motivo === 'vista'
+            ? '¿Cambiar de vista con renglones sin guardar?'
+            : 'Tenés renglones sin guardar'
+        }
+        descripcion={
+          salida?.motivo === 'vista'
+            ? 'Los renglones en borrador no se pierden: son los mismos en las dos vistas y en el calendario se ven en amarillo. Pero siguen sin guardarse.'
+            : 'Si salís de la planilla se pierden los renglones en borrador. Guardalos o descartalos para conservarlos.'
+        }
+        etiquetaCancelar="Seguir editando"
+        etiquetaConfirmar={salida?.motivo === 'vista' ? 'Cambiar de vista' : 'Salir sin guardar'}
+        onConfirmar={() => {
+          const accion = salida?.accion
+          setSalida(null)
+          accion?.()
+        }}
+        peligrosa={salida?.motivo === 'salir'}
+      />
+
+      {/*
+        Confirmación de lo que el lote tiene de inhabitual, antes de guardarlo. Guardar no
+        destruye nada, así que el acento se queda en la acción.
+      */}
+      <DialogoDeAccion
+        abierto={confirmacion !== null}
+        onCerrar={() => setConfirmacion(null)}
+        titulo="Antes de guardar"
+        descripcion={confirmacion}
+        etiquetaCancelar="Descartar"
+        etiquetaConfirmar="Continuar"
+        onConfirmar={() => {
+          setConfirmacion(null)
+          props.onGuardar(renglones, borrar)
+        }}
+      />
 
       {/* Pie fijo (§7.1) */}
       {!props.soloLectura ? (

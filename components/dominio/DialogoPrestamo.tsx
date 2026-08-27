@@ -9,20 +9,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Decimal from 'decimal.js'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { SelectorFecha } from './SelectorFecha'
 import { CampoMonto, CampoTexto } from './CampoMonto'
+import { DialogoDeAccion } from './DialogoDeAccion'
 import type { DialogoNovedadProps } from './DialogoPagoAdicional'
 import { useAccion } from '@/hooks/useAccion'
 import { registrarPrestamo } from '@/actions/prestamos'
@@ -65,13 +57,7 @@ function desdePeriodoTexto(texto: string): string | null {
  * en cada apertura, sin un efecto que lo resetee.
  */
 export function DialogoPrestamo(props: DialogoNovedadProps) {
-  return (
-    <Dialog open={props.abierto} onOpenChange={(v) => !v && props.onCerrar()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        {props.abierto ? <Cuerpo {...props} /> : null}
-      </DialogContent>
-    </Dialog>
-  )
+  return props.abierto ? <Cuerpo {...props} /> : null
 }
 
 function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
@@ -157,160 +143,156 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Registrar préstamo</DialogTitle>
-        <DialogDescription>{alias} — pago en mano, con su plan de devolución.</DialogDescription>
-      </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="prestamo-fecha">Fecha</Label>
-            <SelectorFecha
-              id="prestamo-fecha"
-              valor={fecha}
-              onChange={setFecha}
-              minimo={fechaIngreso}
-              maximo={aISO(hoy())}
-              disabled={enviando}
-              aria-label="Fecha del préstamo"
-            />
-            {campos.fecha ? <p className="text-sm text-destructive">{campos.fecha}</p> : null}
-          </div>
-
-          <CampoMonto
-            id="prestamo-monto"
-            etiqueta="Monto"
-            valor={monto}
-            onChange={(v) => {
-              setMonto(v)
-              setCuotasManuales(null)
-            }}
-            error={campos.monto}
+    <DialogoDeAccion
+      abierto
+      onCerrar={onCerrar}
+      titulo="Registrar préstamo"
+      descripcion={`${alias} — pago en mano, con su plan de devolución.`}
+      etiquetaConfirmar="Registrar préstamo"
+      etiquetaEnviando="Guardando…"
+      onConfirmar={guardar}
+      enviando={enviando}
+      amplio
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="prestamo-fecha">Fecha</Label>
+          <SelectorFecha
+            id="prestamo-fecha"
+            valor={fecha}
+            onChange={setFecha}
+            minimo={fechaIngreso}
+            maximo={aISO(hoy())}
             disabled={enviando}
+            aria-label="Fecha del préstamo"
           />
-
-          <CampoTexto
-            id="prestamo-concepto"
-            etiqueta="Concepto"
-            valor={concepto}
-            onChange={setConcepto}
-            error={campos.concepto}
-            disabled={enviando}
-            placeholder="Adelanto, préstamo…"
-            maxLength={255}
-          />
-
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div>
-              <Label htmlFor="prestamo-con-plan">Plan de devolución</Label>
-              <p className="text-sm text-muted-foreground">
-                Desactivalo para registrar el préstamo sin cuotas previstas.
-              </p>
-            </div>
-            <Switch
-              id="prestamo-con-plan"
-              checked={conPlan}
-              onCheckedChange={(v) => {
-                setConPlan(v)
-                setCuotasManuales(null)
-              }}
-              disabled={enviando}
-            />
-          </div>
-
-          {conPlan ? (
-            <div className="space-y-3 rounded-md border p-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="prestamo-cuotas">Cantidad de cuotas</Label>
-                  <Input
-                    id="prestamo-cuotas"
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={cantidadCuotas}
-                    onChange={(e) => {
-                      setCantidadCuotas(e.target.value)
-                      setCuotasManuales(null)
-                    }}
-                    disabled={enviando}
-                    className="tabular"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="prestamo-primer-mes">Mes de la primera cuota</Label>
-                  {/*
-                    Campo de texto y no `type="month"`: Firefox no lo soporta y lo degrada a un
-                    input común, con lo cual el mismo formulario se veía distinto según el
-                    navegador. Acá siempre es `aaaa-mm`, en todos lados.
-                  */}
-                  <Input
-                    id="prestamo-primer-mes"
-                    value={textoPrimerMes}
-                    onChange={(e) => {
-                      setTextoPrimerMes(e.target.value)
-                      const iso = desdePeriodoTexto(e.target.value)
-                      if (iso) {
-                        setPrimerMes(iso)
-                        setCuotasManuales(null)
-                      }
-                    }}
-                    onBlur={() => setTextoPrimerMes(aPeriodoISO(parseFechaISO(primerMes)))}
-                    disabled={enviando}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="aaaa-mm"
-                    maxLength={7}
-                    className="tabular"
-                  />
-                </div>
-              </div>
-
-              {cuotas.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Cuotas generadas</p>
-                  <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                    {cuotas.map((cuota, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="w-40 text-sm text-muted-foreground">
-                          {formatearPeriodoCapitalizado(parseFechaISO(cuota.fecha))}
-                        </span>
-                        <Input
-                          value={cuota.monto}
-                          onChange={(e) => cambiarCuota(i, 'monto', e.target.value)}
-                          disabled={enviando}
-                          inputMode="decimal"
-                          aria-label={`Monto de la cuota ${i + 1}`}
-                          className="tabular"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {descuadre ? (
-                    <p className="text-sm text-warn-ink">
-                      Las cuotas suman {importeDelAviso(sumaCuotas)} y el préstamo es de{' '}
-                      {importeDelAviso(totalPrestamo)}.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {campos.cuotas ? <p className="text-sm text-destructive">{campos.cuotas}</p> : null}
-            </div>
-          ) : null}
+          {campos.fecha ? <p className="text-sm text-destructive">{campos.fecha}</p> : null}
         </div>
 
-      <DialogFooter>
-        <Button variant="outline" onClick={onCerrar} disabled={enviando}>
-          Cancelar
-        </Button>
-        <Button onClick={guardar} disabled={enviando}>
-          {enviando ? 'Guardando…' : 'Registrar préstamo'}
-        </Button>
-      </DialogFooter>
-    </>
+        <CampoMonto
+          id="prestamo-monto"
+          etiqueta="Monto"
+          valor={monto}
+          onChange={(v) => {
+            setMonto(v)
+            setCuotasManuales(null)
+          }}
+          error={campos.monto}
+          disabled={enviando}
+        />
+
+        <CampoTexto
+          id="prestamo-concepto"
+          etiqueta="Concepto"
+          valor={concepto}
+          onChange={setConcepto}
+          error={campos.concepto}
+          disabled={enviando}
+          placeholder="Adelanto, préstamo…"
+          maxLength={255}
+        />
+
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label htmlFor="prestamo-con-plan">Plan de devolución</Label>
+            <p className="text-sm text-muted-foreground">
+              Desactivalo para registrar el préstamo sin cuotas previstas.
+            </p>
+          </div>
+          <Switch
+            id="prestamo-con-plan"
+            checked={conPlan}
+            onCheckedChange={(v) => {
+              setConPlan(v)
+              setCuotasManuales(null)
+            }}
+            disabled={enviando}
+          />
+        </div>
+
+        {conPlan ? (
+          <div className="space-y-3 rounded-md border p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="prestamo-cuotas">Cantidad de cuotas</Label>
+                <Input
+                  id="prestamo-cuotas"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={cantidadCuotas}
+                  onChange={(e) => {
+                    setCantidadCuotas(e.target.value)
+                    setCuotasManuales(null)
+                  }}
+                  disabled={enviando}
+                  className="tabular"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="prestamo-primer-mes">Mes de la primera cuota</Label>
+                {/*
+                  Campo de texto y no `type="month"`: Firefox no lo soporta y lo degrada a un
+                  input común, con lo cual el mismo formulario se veía distinto según el
+                  navegador. Acá siempre es `aaaa-mm`, en todos lados.
+                */}
+                <Input
+                  id="prestamo-primer-mes"
+                  value={textoPrimerMes}
+                  onChange={(e) => {
+                    setTextoPrimerMes(e.target.value)
+                    const iso = desdePeriodoTexto(e.target.value)
+                    if (iso) {
+                      setPrimerMes(iso)
+                      setCuotasManuales(null)
+                    }
+                  }}
+                  onBlur={() => setTextoPrimerMes(aPeriodoISO(parseFechaISO(primerMes)))}
+                  disabled={enviando}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="aaaa-mm"
+                  maxLength={7}
+                  className="tabular"
+                />
+              </div>
+            </div>
+
+            {cuotas.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Cuotas generadas</p>
+                <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                  {cuotas.map((cuota, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-40 text-sm text-muted-foreground">
+                        {formatearPeriodoCapitalizado(parseFechaISO(cuota.fecha))}
+                      </span>
+                      <Input
+                        value={cuota.monto}
+                        onChange={(e) => cambiarCuota(i, 'monto', e.target.value)}
+                        disabled={enviando}
+                        inputMode="decimal"
+                        aria-label={`Monto de la cuota ${i + 1}`}
+                        className="tabular"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {descuadre ? (
+                  <p className="text-sm text-warn-ink">
+                    Las cuotas suman {importeDelAviso(sumaCuotas)} y el préstamo es de{' '}
+                    {importeDelAviso(totalPrestamo)}.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {campos.cuotas ? <p className="text-sm text-destructive">{campos.cuotas}</p> : null}
+          </div>
+        ) : null}
+      </div>
+    </DialogoDeAccion>
   )
 }

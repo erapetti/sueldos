@@ -555,6 +555,31 @@ Se probó distinguir las confirmaciones con `AlertDialog` —que atrapa el foco 
 y no ofrece la X— y **se descartó por decisión del usuario**: se ven igual, y trabar la salida
 de una pregunta que ya es reversible molesta más de lo que protege.
 
+**Ya no queda ninguno armado a mano.** Los usan los tres del menú de «Todo el Personal» y el de
+visibilidad, los cuatro diálogos de alta —préstamo, pago adicional, licencia, pago bancario— y
+las siete confirmaciones de `FormularioDatos`, `DetallePrestamo`, `PantallaUsuarios`,
+`PantallaLiquidacion` y `PlanillaMensual`. `components/ui/alert-dialog.tsx` quedó sin ningún
+uso.
+
+Migrarlas pidió cuatro cosas de la plantilla, y las cuatro salieron de un diálogo concreto que
+no encajaba: `etiquetaCancelar` —«Volver» donde la acción **es** cancelar algo, «Descartar» y
+«Seguir editando» en la planilla—, `etiquetaEnviando` para el «Guardando…» de los formularios
+de alta, `amplio` para los dos que no entran en el ancho de una pregunta, y que `peligrosa`
+pueda ser una expresión: en la salida de la planilla el acento depende de si se pierde el
+borrador.
+
+Dos consecuencias de la migración que conviene tener presentes:
+
+- **Los botones ya no cierran solos.** `AlertDialogAction` y `AlertDialogCancel` cerraban el
+  diálogo por su cuenta; los de `DialogoDeAccion` son botones comunes. Cerrar pasó a ser tarea
+  del `onExito` de la acción —que es lo que ya hacían todos—, y el efecto secundario es bueno:
+  si la acción falla, el diálogo queda abierto con lo elegido en vez de cerrarse y dejar solo
+  un toast de error.
+- **Los cuatro de alta se montan solo mientras están abiertos**, ahora desde afuera:
+  `props.abierto ? <Cuerpo /> : null`. Es lo que hace que el formulario arranque limpio en cada
+  apertura sin un efecto que lo resetee, y tiene que quedar afuera porque el pie —qué se envía,
+  si falta completar algo— depende del estado del cuerpo.
+
 **Una fila con detalle ignora los clics que nacen en un portal.** El diálogo y el menú de la
 fila cuelgan de `<body>` en el DOM, pero React los hace burbujear **por el árbol de
 componentes**: como `DialogoCambiarDueno` se renderiza adentro de una celda, cerrar su diálogo
@@ -563,11 +588,7 @@ navegaba de arriba—. `FilaConDetalle` lo corta con `e.currentTarget.contains(e
 es sobre el DOM y por eso separa las dos cosas. Cualquier fila que sume un control con portal
 —un `Select`, un `Popover`— queda cubierta por la misma guarda.
 
-Los usan los tres del menú de «Todo el Personal» y el de visibilidad. **Los cuatro diálogos de
-alta** —préstamo, pago adicional, licencia, pago bancario— y las siete confirmaciones sueltas
-que quedan —en `FormularioDatos`, `DetallePrestamo`, `PantallaUsuarios`, `PantallaLiquidacion`
-y `PlanillaMensual`— todavía arman el suyo; encajan en `DialogoDeAccion` y conviene migrarlas
-cuando se las toque. Si una tabla necesita algo que la plantilla no da, **agregalo a la plantilla**:
+Si una tabla necesita algo que la plantilla no da, **agregalo a la plantilla**:
 las columnas ya soportan alineación a la derecha, tipografía tabular, esconderse por
 breakpoint y clases propias, y la primera columna tiene `alLado` y `debajo` para lo que no
 debe quedar adentro del enlace —si el chip de estado y el nombre completo cayeran dentro del
