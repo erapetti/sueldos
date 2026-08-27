@@ -3,7 +3,11 @@
  *
  * En los listados el chip compite por el espacio con el alias y el nombre, y «Falta
  * liquidación» era el elemento más ancho de la fila. Antes se probó partirlo en dos renglones
- * y quedaba feo; el icono dice lo mismo en 12px.
+ * y quedaba feo; el icono dice lo mismo y ocupa una fracción.
+ *
+ * El icono **no lleva clase de tamaño**: queda en el suyo, que es el que se lee bien tanto en
+ * el chip de solo icono como al lado del texto. Con `size-3` —12px, que es lo que le pone el
+ * `Badge` a un `<svg>` que sea hijo directo— quedaba demasiado chico para reconocerlo.
  *
  * **El texto está siempre en el DOM**, nunca se quita: abajo de `lg` va con `sr-only`, que lo
  * saca de la pantalla pero lo deja para el lector de pantalla. Un chip que abajo de `lg` fuera
@@ -20,7 +24,7 @@ export function TextoDeChip({ icono: Icono, children }: { icono: LucideIcon; chi
   return (
     <>
       <span title={children} className="inline-flex shrink-0">
-        <Icono className="size-3" aria-hidden />
+        <Icono aria-hidden />
       </span>
       {/* Las clases van literales: Tailwind lee el código como texto y no resuelve variables. */}
       <span className="sr-only lg:not-sr-only">{children}</span>
