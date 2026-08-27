@@ -123,16 +123,12 @@ export function PantallaLiquidacion(props: {
    * con lo que se paga sin aportes. Cada una cierra en su propio total a pagar.
    *
    * Las dos salen de las mismas líneas, así que basta con agruparlas: la formal no existe si
-   * la empleada no aporta BPS, y la informal solo si algo cayó en ella. Cuando queda una sola
-   * tabla no se rotula: el título sobraría.
+   * la empleada no aporta BPS, y la informal solo si algo cayó en ella. Ninguna se rotula: sus
+   * propias líneas dicen cuál es cuál —la formal tiene los descuentos de BPS— y el rótulo era
+   * un renglón más arriba de cada tarjeta.
    */
-  const tablas = (
-    [
-      { tabla: 'FORMAL', titulo: 'Conceptos con BPS' },
-      { tabla: 'INFORMAL', titulo: 'Conceptos sin BPS' },
-    ] as const
-  )
-    .map((t) => ({ ...t, lineas: lineasAMostrar.filter((l) => l.tabla === t.tabla) }))
+  const tablas = (['FORMAL', 'INFORMAL'] as const)
+    .map((tabla) => ({ tabla, lineas: lineasAMostrar.filter((l) => l.tabla === tabla) }))
     .filter((t) => t.lineas.length > 0)
 
   const dosTablas = tablas.length > 1
@@ -280,67 +276,56 @@ export function PantallaLiquidacion(props: {
           </p>
         ) : null}
 
-        {/* Encabezado de la liquidación */}
-        <div className="overflow-hidden rounded-card border bg-card shadow-soft">
-          {/*
-            Identifica al empleado y a la liquidación en la hoja impresa. El encabezado de la
-            página es `no-print`, así que esta tarjeta es lo único que sale impreso: si el mes
-            no está acá, la hoja no dice de qué liquidación se trata. Por eso «Fecha» va en el
-            bloque, y en negrita.
+        {/*
+          Encabezado de la liquidación. Identifica al empleado y a la liquidación en la hoja
+          impresa. El encabezado de la página es `no-print`, así que esta tarjeta es lo único
+          que sale impreso: si el mes no está acá, la hoja no dice de qué liquidación se trata.
+          Por eso «Fecha» va en el bloque, y en negrita.
 
-            La cédula es opcional (§4.2): sin ella el renglón no se muestra, en vez de dejar un
-            hueco o un «sin cédula».
-          */}
-          <div className="border-b px-[22px] pt-4 pb-3">
-            <h2 className="text-[32px] leading-tight">{props.nombreCompleto}</h2>
+          La cédula es opcional (§4.2): sin ella el renglón no se muestra, en vez de dejar un
+          hueco o un «sin cédula».
+        */}
+        <div className="rounded-card border bg-card shadow-soft px-[22px] py-4">
+          <h2 className="text-[32px] leading-tight">{props.nombreCompleto}</h2>
 
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-              {props.cedula ? (
-                <>
-                  <dt className="text-muted-foreground">CI</dt>
-                  <dd className="tabular">{props.cedula}</dd>
-                </>
-              ) : null}
+          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+            {props.cedula ? (
+              <>
+                <dt className="text-muted-foreground">CI</dt>
+                <dd className="tabular">{props.cedula}</dd>
+              </>
+            ) : null}
 
-              <dt className="text-muted-foreground">Ingreso</dt>
-              <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
+            <dt className="text-muted-foreground">Ingreso</dt>
+            <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
 
-              {props.horasSemanales !== null ? (
-                <>
-                  <dt className="text-muted-foreground">Horas semanales</dt>
-                  <dd className="tabular">{formatearHoras(props.horasSemanales)}</dd>
-                </>
-              ) : null}
+            {props.horasSemanales !== null ? (
+              <>
+                <dt className="text-muted-foreground">Horas semanales</dt>
+                <dd className="tabular">{formatearHoras(props.horasSemanales)}</dd>
+              </>
+            ) : null}
 
-              <dt className="text-muted-foreground">Valor hora calculado</dt>
-              <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
+            <dt className="text-muted-foreground">Valor hora calculado</dt>
+            <dd className="tabular">{formatearImporteEntero(props.valorHoraCalculado)}</dd>
 
-              <dt className="text-muted-foreground">Fecha</dt>
-              <dd className="font-semibold">{formatearPeriodoCapitalizado(periodo)}</dd>
-            </dl>
-          </div>
+            <dt className="text-muted-foreground">Fecha</dt>
+            <dd className="font-semibold">{formatearPeriodoCapitalizado(periodo)}</dd>
+          </dl>
+        </div>
 
-          {tablas.map((t) => (
+        {/*
+          §6.2 — una tarjeta por tabla: la formal, la informal y, cuando existen las dos, la
+          del total general. Cada una es una tabla independiente y no lleva rótulo.
+        */}
+        {tablas.map((t) => (
+          <div key={t.tabla} className="overflow-hidden rounded-card border bg-card shadow-soft">
             <table
-              key={t.tabla}
               className={cn(
-                'w-full border-b text-sm last:border-0',
+                'w-full text-sm',
                 '[&>tbody>tr:first-child>td]:pt-4 [&>tbody>tr:last-child>td]:pb-4',
               )}
             >
-              {/*
-                El título de la tabla es su `caption`: con las dos tablas se muestra, y con una
-                sola queda solo para el lector de pantalla, como estaba antes.
-              */}
-              <caption
-                className={cn(
-                  dosTablas
-                    ? 'px-[22px] pt-4 text-left text-sm font-semibold text-muted-foreground'
-                    : 'sr-only',
-                )}
-              >
-                {dosTablas ? t.titulo : 'Desglose de la liquidación'}
-              </caption>
               <thead className="sr-only">
                 <tr>
                   <th scope="col">Concepto</th>
@@ -384,16 +369,26 @@ export function PantallaLiquidacion(props: {
                 })}
               </tbody>
             </table>
-          ))}
+          </div>
+        ))}
 
-          {/* Con las dos tablas, lo que se paga en total no está en ninguna de las dos. */}
-          {dosTablas ? (
-            <div className="flex justify-between gap-4 border-t-2 px-[22px] py-3 font-semibold">
-              <span>Total general</span>
-              <span className="tabular">{formatearImporteEntero(totalGeneral)}</span>
-            </div>
-          ) : null}
-        </div>
+        {/* Con las dos tablas, lo que se paga en total no está en ninguna de las dos. */}
+        {dosTablas ? (
+          <div className="overflow-hidden rounded-card border bg-card shadow-soft">
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="font-semibold">
+                  <th scope="row" className="py-4 pr-2 pl-[22px] text-left">
+                    Total general
+                  </th>
+                  <td className="py-4 pr-[22px] pl-2 text-right tabular">
+                    {formatearImporteEntero(totalGeneral)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) : null}
 
         {/*
           §7.6.1 — bloque de cierre de la complementaria. La diferencia se calcula **por
