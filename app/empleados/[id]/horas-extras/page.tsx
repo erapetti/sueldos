@@ -68,6 +68,7 @@ export default async function PaginaHorasExtras({
       estadoLiquidacion={contexto.estadoLiquidacion}
       valorHoraCalculado={contexto.valorHoraCalculado}
       valorHoraNegro={contexto.valorHoraNegro}
+      aportaBps={contexto.aportaBps}
       soloLectura={!puedeEditar(acceso.nivel)}
     />
   )

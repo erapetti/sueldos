@@ -16,6 +16,14 @@ export type ContextoPlanilla = {
   /** §7.1 — valores hora vigentes en ese mes, para el encabezado. */
   valorHoraCalculado: string | null
   valorHoraNegro: string | null
+  /**
+   * §4.4.1 — si la empleada aporta al BPS **en ese mes**. Es una serie como las otras, así
+   * que se resuelve al período y no a hoy: la planilla de un mes anterior a un cambio de
+   * aporte se sigue cargando con el aporte que regía entonces.
+   *
+   * `null` es «no hay registro»: no es lo mismo que «no aporta», y el que consume decide.
+   */
+  aportaBps: boolean | null
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
   hayRegimen: boolean
 }
@@ -27,7 +35,7 @@ export async function contextoDePlanilla(
   const desde = primerDiaDelMes(periodo)
   const hasta = ultimoDiaDelMes(periodo)
 
-  const [regimenFila, salario, valorHoraNegro, feriados, liquidacion, extras, faltas] =
+  const [regimenFila, salario, valorHoraNegro, aporteBps, feriados, liquidacion, extras, faltas] =
     await Promise.all([
     prisma.empleadoRegimen.findFirst({
       where: { empleadoId, fechaVigencia: { lte: desde } },
@@ -38,6 +46,10 @@ export async function contextoDePlanilla(
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.empleadoValorHoraNegro.findFirst({
+      where: { empleadoId, fechaVigencia: { lte: desde } },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    prisma.empleadoAporteBps.findFirst({
       where: { empleadoId, fechaVigencia: { lte: desde } },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -109,6 +121,7 @@ export async function contextoDePlanilla(
         }).toFixed(2)
       : null,
     valorHoraNegro: valorHoraNegro ? aDecimal(valorHoraNegro.valor).toFixed(2) : null,
+    aportaBps: aporteBps ? aporteBps.aportaBps : null,
     estadoLiquidacion: !liquidacion
       ? 'SIN_LIQUIDAR'
       // §4.14 — «pagada» es que no falte ningún libro: con el formal transferido y las horas

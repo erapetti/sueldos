@@ -348,6 +348,41 @@ a toda la serie devuelve el registro más antiguo, que es con el que la empleada
 `FormularioSeries`. De «Generales» se fueron el switch y el selector de seguro: no son campos de
 `empleados`.
 
+### 1.7.4 La marca «con BPS» no se puede cargar en un mes sin aportes
+
+**Divergencia con el §6.6**, que sigue describiendo el caso: dice que `con_bps` conserva su
+significado propio —decide el valor hora y en qué paso del cálculo entra— también para una
+empleada que no aporta. El motor lo respeta: paga esas horas al valor hora **calculado** y las
+deja en la tabla que le toca, que para ella es la informal. Lo que cambió es que **la UI ya no
+permite crear el dato**, así que el caso no aparece más por carga nueva.
+
+**Por qué.** La liquidación quedaba mostrando dos líneas de horas extras con valores unitarios
+distintos, y una de ellas rotulada «con BPS» para alguien sin aportes. Decisión del dueño del
+proyecto: no arreglarlo en la presentación sino **en el ingreso**, que el dato inconsistente no
+se pueda cargar.
+
+**Cómo.** Misma mecánica que el interruptor de faltas (`descuentaEsEditable`): se muestra igual
+pero apagado y deshabilitado, para que se vea el efecto que tiene.
+
+- `PlanillaHorasExtras.tsx` — `bpsEditable` sale del aporte del mes. Apaga los dos
+  interruptores —el de la lista y el del popover—, el `extraNuevoRenglon` y el `esPlena` de las
+  marcas del calendario.
+- `guardarHorasExtras` en `actions/novedades.ts` — fuerza `con_bps = false` igual, sin confiar
+  en lo que llegue del cliente. Un renglón viejo que quedó con la marca puesta se normaliza en
+  el primer guardado de esa planilla.
+- El **resumen** deja de partirse en «Con BPS» / «Sin BPS» cuando solo puede haber uno de los
+  dos: muestra un importe solo, al valor hora sin aportes.
+
+**El aporte se resuelve al mes de la planilla, no a hoy** (§1.7.3): cargar un mes anterior a un
+cambio de aporte se rige por el que valía entonces. Sale de `contextoDePlanilla` para la pantalla
+y de `aporteBpsALaFecha` para la acción.
+
+**Sin registro de aporte no se bloquea nada.** `null` no es «no aporta»: ese mes no se puede
+liquidar igual (§6.8), así que adivinar no arreglaría nada y sí impediría cargar.
+
+**Las faltas quedan afuera y no les falta nada.** Una falta no lleva marca de BPS: descuenta del
+salario, así que va al libro que se deduce del aporte, y no hay dos regímenes a la vez (§1.7.2).
+
 ### 1.8 «Con aviso» también puede no descontar
 
 El §4.6.1 hace editable el campo `descuenta` **solo** con `ENFERMEDAD` y lista `CON_AVISO`,

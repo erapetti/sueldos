@@ -22,6 +22,7 @@ import { aColumnaCantidad, aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { normalizarDescuenta } from '@/constants/causales'
+import { aporteBpsALaFecha } from '@/lib/consultas/aporteBps'
 import {
   aISO,
   formatearPeriodo,
@@ -110,6 +111,20 @@ export async function guardarHorasExtras(entrada: unknown) {
       verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'FIN_DEL_MES_EN_CURSO')
     }
 
+    /*
+      §6.6 — la marca «con BPS» no puede quedar puesta en un mes en el que la empleada no
+      aporta: el motor pagaría esas horas al valor hora calculado y la liquidación mostraría
+      una línea «con BPS» para alguien sin aportes. La UI ya deshabilita el interruptor; acá
+      se fuerza igual, sin confiar en lo que llegue del cliente, como hace
+      `normalizarDescuenta` con las faltas.
+
+      El aporte se resuelve **al período de la planilla** y no a hoy (§4.4.1, §5.2): cargar un
+      mes anterior a un cambio de aporte se rige por el que valía entonces. Sin ningún registro
+      no se normaliza nada: no se sabe, y ese mes tampoco se puede liquidar (§6.8).
+    */
+    const aporte = await aporteBpsALaFecha(empleado.id, desde)
+    const normalizarConBps = (conBps: boolean) => (aporte?.aportaBps === false ? false : conBps)
+
     const auditoria = { creadoPor: usuario.id, modificadoPor: usuario.id }
 
     await prisma.$transaction(async (tx) => {
@@ -123,7 +138,7 @@ export async function guardarHorasExtras(entrada: unknown) {
         const comun = {
           fecha: parseFechaISO(renglon.fecha),
           horas: aColumnaCantidad(new Decimal(renglon.horas)),
-          conBps: renglon.conBps,
+          conBps: normalizarConBps(renglon.conBps),
           recargoPct: renglon.recargoPct,
           nota: renglon.nota?.trim() || null,
         }

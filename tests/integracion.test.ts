@@ -331,6 +331,119 @@ describe('§4.4.1 — el aporte a BPS es una serie con vigencia', () => {
   })
 })
 
+describe('§6.6 — la marca «con BPS» no se puede cargar en un mes sin aportes', () => {
+  /*
+    El servidor no confía en el cliente: la planilla deshabilita el interruptor, pero la acción
+    fuerza igual la marca, como `normalizarDescuenta` con las faltas.
+  */
+  it('la acción fuerza con_bps = false para una empleada que no aporta', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: false })
+
+    const r = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: '2026-05',
+      renglones: [{ fecha: '2026-05-04', horas: 2, conBps: true, recargoPct: 0 }],
+      borrar: [],
+    })
+    expect(r.ok).toBe(true)
+
+    const guardadas = await prisma.horaExtra.findMany({ where: { empleadoId: empleado.id } })
+    expect(guardadas.map((h) => h.conBps)).toEqual([false])
+  })
+
+  it('a una empleada que aporta no le toca la marca', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+
+    const r = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: '2026-05',
+      renglones: [{ fecha: '2026-05-04', horas: 2, conBps: true, recargoPct: 0 }],
+      borrar: [],
+    })
+    expect(r.ok).toBe(true)
+
+    const guardadas = await prisma.horaExtra.findMany({ where: { empleadoId: empleado.id } })
+    expect(guardadas.map((h) => h.conBps)).toEqual([true])
+  })
+
+  /**
+   * §4.4.1 — el aporte es una serie, así que la marca se resuelve **al mes de la planilla**.
+   * Cargar un mes anterior al cambio se rige por el aporte que valía entonces, no por el de
+   * hoy: es la misma razón por la que recalcular un período viejo no le mueve las líneas.
+   */
+  it('se resuelve al mes de la planilla y no al aporte de hoy', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: true })
+    expect(
+      (
+        await registrarAporteBps({
+          empleadoId: empleado.id,
+          fechaVigencia: '2026-06-01',
+          aportaBps: false,
+        })
+      ).ok,
+    ).toBe(true)
+
+    for (const periodo of ['2026-05', '2026-06']) {
+      const r = await guardarHorasExtras({
+        empleadoId: empleado.id,
+        periodo,
+        renglones: [{ fecha: `${periodo}-04`, horas: 2, conBps: true, recargoPct: 0 }],
+        borrar: [],
+      })
+      expect(r.ok, periodo).toBe(true)
+    }
+
+    const guardadas = await prisma.horaExtra.findMany({
+      where: { empleadoId: empleado.id },
+      orderBy: { fecha: 'asc' },
+    })
+    // Mayo conserva la marca —ahí aportaba— y junio la pierde.
+    expect(guardadas.map((h) => h.conBps)).toEqual([true, false])
+  })
+
+  it('sin ningún registro de aporte no se normaliza nada: no se sabe', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+    await prisma.empleadoAporteBps.deleteMany({ where: { empleadoId: empleado.id } })
+
+    const r = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: '2026-05',
+      renglones: [{ fecha: '2026-05-04', horas: 2, conBps: true, recargoPct: 0 }],
+      borrar: [],
+    })
+    expect(r.ok).toBe(true)
+
+    const guardadas = await prisma.horaExtra.findMany({ where: { empleadoId: empleado.id } })
+    expect(guardadas.map((h) => h.conBps)).toEqual([true])
+  })
+
+  it('el guardado normaliza también los renglones viejos que quedaron con la marca', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: false })
+
+    // Un renglón cargado antes de que existiera el bloqueo, escrito derecho en la base.
+    const viejo = await prisma.horaExtra.create({
+      data: {
+        empleadoId: empleado.id,
+        fecha: fecha(2026, 5, 4),
+        horas: '2.00',
+        conBps: true,
+        recargoPct: 0,
+      },
+    })
+
+    const r = await guardarHorasExtras({
+      empleadoId: empleado.id,
+      periodo: '2026-05',
+      renglones: [{ id: viejo.id, fecha: '2026-05-04', horas: 2, conBps: true, recargoPct: 0 }],
+      borrar: [],
+    })
+    expect(r.ok).toBe(true)
+
+    const actualizado = await prisma.horaExtra.findUniqueOrThrow({ where: { id: viejo.id } })
+    expect(actualizado.conBps).toBe(false)
+  })
+})
+
 describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
   it('con diferencia positiva genera un único asiento por la diferencia', async () => {
     const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })

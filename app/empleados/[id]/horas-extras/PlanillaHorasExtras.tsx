@@ -5,6 +5,13 @@
  *
  * El recargo y el switch de BPS son persistentes entre cargas: el día siguiente arranca con
  * los mismos valores que el anterior.
+ *
+ * §6.6 — la marca «con BPS» tiene sentido propio (decide el valor hora y en qué paso del
+ * cálculo entra), pero para una empleada que **no aporta** ese mes es un dato inconsistente:
+ * el motor la pagaría al valor hora calculado y la dejaría en la tabla informal, y la
+ * liquidación mostraría dos líneas de horas extras con «con BPS» para alguien sin aportes.
+ * Por decisión del dueño del proyecto no se arregla en la presentación sino **en el ingreso**:
+ * el interruptor queda apagado y deshabilitado, y el servidor fuerza lo mismo.
  */
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -53,14 +60,22 @@ export function PlanillaHorasExtras(props: {
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
   valorHoraCalculado: string | null
   valorHoraNegro: string | null
+  /** §4.4.1 — el aporte vigente **en este mes**. `null` es «no hay registro». */
+  aportaBps: boolean | null
   soloLectura: boolean
 }) {
   const router = useRouter()
   const { ejecutar, enviando } = useAccion<{ guardados: number; borrados: number }>()
 
+  /**
+   * Solo se bloquea cuando se sabe que no aporta. Sin registro de aporte (`null`) no se
+   * adivina: ese mes no se puede liquidar igual (§6.8), y el bloqueo no arreglaría nada.
+   */
+  const bpsEditable = props.aportaBps !== false
+
   // Persistentes entre cargas (§7.1).
   const [recargo, setRecargo] = useState(100)
-  const [conBps, setConBps] = useState(true)
+  const [conBps, setConBps] = useState(bpsEditable)
 
   function alGuardar(renglones: Renglon[], borrar: string[]) {
     ejecutar(
@@ -114,7 +129,7 @@ export function PlanillaHorasExtras(props: {
       }
       signo="+"
       // La excepción es la hora extra que no lleva descuento de BPS.
-      esPlena={(renglon) => extra(renglon).conBps}
+      esPlena={(renglon) => bpsEditable && extra(renglon).conBps}
       // §6.5 — el renglón en cero no paga nada: incluye el día en el pago de boletos.
       admiteCero
       confirmacionAlGuardar={(renglones) =>
@@ -128,7 +143,8 @@ export function PlanillaHorasExtras(props: {
           contexto={contexto}
           renglones={renglones}
           recargo={recargo}
-          conBps={conBps}
+          conBps={bpsEditable && conBps}
+          bpsEditable={bpsEditable}
           setRecargo={setRecargo}
           setConBps={setConBps}
           agregar={agregar}
@@ -181,7 +197,11 @@ export function PlanillaHorasExtras(props: {
           <CampoLista etiqueta="BPS">
             <div className={cn('flex min-h-9 items-center', COL_INTERRUPTOR)}>
               <Switch
-                checked={extra(renglon).conBps}
+                // Se muestra apagado y no con lo que hay guardado: es lo que va a quedar
+                // grabado cuando se guarde, y un renglón viejo con la marca puesta se
+                // normaliza en ese mismo guardado.
+                checked={bpsEditable && extra(renglon).conBps}
+                disabled={!bpsEditable}
                 onCheckedChange={(v) => {
                   setConBps(v)
                   actualizar({ extra: { ...extra(renglon), conBps: v } })
@@ -205,13 +225,17 @@ export function PlanillaHorasExtras(props: {
       etiquetaEntrada="Horas extra"
       etiquetaOpcion="Recargo"
       etiquetaInterruptor="BPS"
-      extraNuevoRenglon={() => ({ conBps, recargoPct: recargo })}
+      extraNuevoRenglon={() => ({ conBps: bpsEditable && conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
+        // Con el interruptor bloqueado no hay renglones con BPS, ni siquiera los viejos que
+        // quedaron con la marca puesta: el guardado los normaliza (§6.6).
+        const conBpsDe = (renglon: Renglon) => bpsEditable && extra(renglon).conBps
+
         const conBpsHoras = renglones
-          .filter((r) => extra(r).conBps)
+          .filter((r) => conBpsDe(r))
           .reduce((a, r) => a.plus(r.horas), new Decimal(0))
         const sinBpsHoras = renglones
-          .filter((r) => !extra(r).conBps)
+          .filter((r) => !conBpsDe(r))
           .reduce((a, r) => a.plus(r.horas), new Decimal(0))
 
         const vhc = props.valorHoraCalculado ? new Decimal(props.valorHoraCalculado) : null
@@ -221,7 +245,7 @@ export function PlanillaHorasExtras(props: {
           valorHora === null
             ? null
             : renglones
-                .filter((r) => extra(r).conBps === soloConBps)
+                .filter((r) => conBpsDe(r) === soloConBps)
                 .reduce(
                   (a, r) =>
                     a.plus(
@@ -248,14 +272,27 @@ export function PlanillaHorasExtras(props: {
             <span>
               {renglones.length} renglones · {formatearHoras(conBpsHoras.plus(sinBpsHoras))}
             </span>
-            <span className="text-muted-foreground">
-              Con BPS {formatearHoras(conBpsHoras)}
-              {conBpsImporte ? ` (${formatearImporte(conBpsImporte)})` : ''}
-            </span>
-            <span className="text-muted-foreground">
-              Sin BPS {formatearHoras(sinBpsHoras)}
-              {sinBpsImporte ? ` (${formatearImporte(sinBpsImporte)})` : ''}
-            </span>
+            {/*
+              Partir el total en «con BPS» y «sin BPS» solo dice algo cuando puede haber de
+              los dos. Sin aporte ese mes son todas sin BPS, así que va un importe solo.
+            */}
+            {bpsEditable ? (
+              <>
+                <span className="text-muted-foreground">
+                  Con BPS {formatearHoras(conBpsHoras)}
+                  {conBpsImporte ? ` (${formatearImporte(conBpsImporte)})` : ''}
+                </span>
+                <span className="text-muted-foreground">
+                  Sin BPS {formatearHoras(sinBpsHoras)}
+                  {sinBpsImporte ? ` (${formatearImporte(sinBpsImporte)})` : ''}
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                Sin aportes al BPS este mes
+                {sinBpsImporte ? ` (${formatearImporte(sinBpsImporte)})` : ''}
+              </span>
+            )}
             {boletosExtra > 0 ? (
               <span className="text-muted-foreground">
                 +{boletosExtra * 2} boletos adicionales
@@ -274,6 +311,7 @@ function PopoverHoras({
   renglones,
   recargo,
   conBps,
+  bpsEditable,
   setRecargo,
   setConBps,
   agregar,
@@ -285,6 +323,7 @@ function PopoverHoras({
   renglones: Renglon[]
   recargo: number
   conBps: boolean
+  bpsEditable: boolean
   setRecargo: (v: number) => void
   setConBps: (v: boolean) => void
   agregar: (r: Omit<Renglon, 'clave' | 'fecha'>) => void
@@ -389,9 +428,22 @@ function PopoverHoras({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <Label htmlFor="he-bps">¿Lleva descuento BPS?</Label>
-        <Switch id="he-bps" checked={conBps} onCheckedChange={setConBps} />
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="he-bps">¿Lleva descuento BPS?</Label>
+          <Switch
+            id="he-bps"
+            checked={conBps}
+            disabled={!bpsEditable}
+            onCheckedChange={setConBps}
+          />
+        </div>
+        {!bpsEditable ? (
+          <p className="text-xs text-muted-foreground">
+            Este mes la empleada no aporta al BPS: sus horas extras se pagan al valor hora sin
+            aportes.
+          </p>
+        ) : null}
       </div>
 
       <Textarea
