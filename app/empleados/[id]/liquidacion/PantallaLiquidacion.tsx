@@ -7,16 +7,6 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
@@ -27,6 +17,7 @@ import {
   parseFechaISO,
   parsePeriodo,
 } from '@/lib/format/dates'
+import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
@@ -493,49 +484,37 @@ export function PantallaLiquidacion(props: {
         </>
       )}
 
-      <AlertDialog open={dialogo === 'COMPLEMENTARIA'} onOpenChange={(v) => !v && setDialogo(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Generar liquidación complementaria</AlertDialogTitle>
-            <AlertDialogDescription>
-              {hayPagada && ultima?.confirmadaEn
-                ? `La liquidación de ${formatearPeriodoCapitalizado(periodo)} ya fue pagada el ${formatearFecha(
-                    new Date(ultima.confirmadaEn),
-                  )} por ${formatearImporteEntero(ultima.totalAPagar)}. No se puede modificar. `
-                : `${formatearPeriodoCapitalizado(periodo)} ya tiene una liquidación confirmada. `}
-              Se generará una liquidación complementaria por la diferencia de{' '}
-              {formatearImporteEntero(props.totalAPagar)}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={enviando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmar(true)} disabled={enviando}>
-              Generar complementaria
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DialogoDeAccion
+        abierto={dialogo === 'COMPLEMENTARIA'}
+        onCerrar={() => setDialogo(null)}
+        titulo="Generar liquidación complementaria"
+        descripcion={
+          <>
+            {hayPagada && ultima?.confirmadaEn
+              ? `La liquidación de ${formatearPeriodoCapitalizado(periodo)} ya fue pagada el ${formatearFecha(
+                  new Date(ultima.confirmadaEn),
+                )} por ${formatearImporteEntero(ultima.totalAPagar)}. No se puede modificar. `
+              : `${formatearPeriodoCapitalizado(periodo)} ya tiene una liquidación confirmada. `}
+            Se generará una liquidación complementaria por la diferencia de{' '}
+            {formatearImporteEntero(props.totalAPagar)}.
+          </>
+        }
+        etiquetaConfirmar="Generar complementaria"
+        onConfirmar={() => confirmar(true)}
+        enviando={enviando}
+      />
 
-      <AlertDialog open={dialogo === 'ANULAR'} onOpenChange={(v) => !v && setDialogo(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Anular la liquidación</AlertDialogTitle>
-            <AlertDialogDescription>
-              Las cuotas del plan de pagos que había aplicado vuelven a pendientes y el asiento
-              de cuenta corriente se revierte con un contra-asiento. No se borra nada.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {/* Anular revierte una liquidación confirmada: el acento va en «Cancelar». */}
-          <AlertDialogFooter>
-            <AlertDialogCancel variant="default" disabled={enviando}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={anular} disabled={enviando}>
-              Anular
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Anular revierte una liquidación confirmada: el acento va en «Cancelar». */}
+      <DialogoDeAccion
+        abierto={dialogo === 'ANULAR'}
+        onCerrar={() => setDialogo(null)}
+        titulo="Anular la liquidación"
+        descripcion="Las cuotas del plan de pagos que había aplicado vuelven a pendientes y el asiento de cuenta corriente se revierte con un contra-asiento. No se borra nada."
+        etiquetaConfirmar="Anular"
+        onConfirmar={anular}
+        enviando={enviando}
+        peligrosa
+      />
     </div>
   )
 }

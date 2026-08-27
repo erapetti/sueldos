@@ -11,17 +11,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { CampoTexto } from '@/components/dominio/CampoMonto'
+import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { SelectorFecha } from '@/components/dominio/SelectorFecha'
 import { useAccion } from '@/hooks/useAccion'
 import {
@@ -211,54 +202,39 @@ export function FormularioDatos({
         </div>
       ) : null}
 
-      <AlertDialog open={dialogoBaja} onOpenChange={setDialogoBaja}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Dar de baja a {valores.alias}</AlertDialogTitle>
-            <AlertDialogDescription>
-              No se borra nada. La empleada sigue apareciendo en el listado con su estado hasta
-              que lo ocultes, y queda excluido del aumento masivo de sueldos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="fecha-egreso">Fecha de egreso</Label>
-            <SelectorFecha
-              id="fecha-egreso"
-              valor={fechaEgreso}
-              onChange={setFechaEgreso}
-              minimo={valores.fechaIngreso}
-              disabled={baja.enviando}
-              aria-label="Fecha de egreso"
-            />
-            {baja.campos.fechaEgreso ? (
-              <p className="text-sm text-destructive">{baja.campos.fechaEgreso}</p>
-            ) : null}
-          </div>
-
-          {/* La baja cierra el vínculo laboral: el acento va en «Cancelar». */}
-          <AlertDialogFooter>
-            <AlertDialogCancel variant="default" disabled={baja.enviando}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={(e) => {
-                e.preventDefault()
-                baja.ejecutar(() => darDeBajaEmpleado({ empleadoId, fechaEgreso }), {
-                  onExito: () => {
-                    setDialogoBaja(false)
-                    router.refresh()
-                  },
-                })
-              }}
-              disabled={baja.enviando}
-            >
-              Dar de baja
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* La baja cierra el vínculo laboral: el acento va en «Cancelar». */}
+      <DialogoDeAccion
+        abierto={dialogoBaja}
+        onCerrar={() => setDialogoBaja(false)}
+        titulo={`Dar de baja a ${valores.alias}`}
+        descripcion="No se borra nada. La empleada sigue apareciendo en el listado con su estado hasta que lo ocultes, y queda excluido del aumento masivo de sueldos."
+        etiquetaConfirmar="Dar de baja"
+        onConfirmar={() =>
+          baja.ejecutar(() => darDeBajaEmpleado({ empleadoId, fechaEgreso }), {
+            onExito: () => {
+              setDialogoBaja(false)
+              router.refresh()
+            },
+          })
+        }
+        enviando={baja.enviando}
+        peligrosa
+      >
+        <div className="space-y-1.5">
+          <Label htmlFor="fecha-egreso">Fecha de egreso</Label>
+          <SelectorFecha
+            id="fecha-egreso"
+            valor={fechaEgreso}
+            onChange={setFechaEgreso}
+            minimo={valores.fechaIngreso}
+            disabled={baja.enviando}
+            aria-label="Fecha de egreso"
+          />
+          {baja.campos.fechaEgreso ? (
+            <p className="text-sm text-destructive">{baja.campos.fechaEgreso}</p>
+          ) : null}
+        </div>
+      </DialogoDeAccion>
     </div>
   )
 }

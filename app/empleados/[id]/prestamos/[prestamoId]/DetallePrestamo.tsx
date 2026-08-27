@@ -18,17 +18,8 @@ import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
+import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { DetalleDeMovimiento } from '@/components/dominio/DetalleDeMovimiento'
 import type { EmpleadaDelMarco } from '@/components/dominio/MarcoDeMovimientos'
 import { useAccion } from '@/hooks/useAccion'
@@ -240,28 +231,24 @@ export function DetallePrestamo({
         </section>
       </DetalleDeMovimiento>
 
-      {/* Sigue siendo un `AlertDialog`: migrarlo a `DialogoDeAccion` es parte de la Tarea 1. */}
-      <AlertDialog open={!!aCancelar} onOpenChange={(v) => !v && setACancelar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Cancelar esta cuota?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {aCancelar
-                ? `La cuota de ${formatearPeriodoCapitalizado(
-                    parseFechaISO(aCancelar.fechaISO),
-                  )} deja de descontarse del sueldo. El préstamo se sigue debiendo: el saldo no
-                     baja, solo desaparece la cuota prevista. No se puede deshacer.`
-                : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={enviando}>Volver</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarCancelacion} disabled={enviando}>
-              Cancelar la cuota
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* «Cancelar» acá es la acción, así que el botón de salir dice «Volver». */}
+      <DialogoDeAccion
+        abierto={!!aCancelar}
+        onCerrar={() => setACancelar(null)}
+        titulo="¿Cancelar esta cuota?"
+        descripcion={
+          aCancelar
+            ? `La cuota de ${formatearPeriodoCapitalizado(
+                parseFechaISO(aCancelar.fechaISO),
+              )} deja de descontarse del sueldo. El préstamo se sigue debiendo: el saldo no
+                 baja, solo desaparece la cuota prevista. No se puede deshacer.`
+            : null
+        }
+        etiquetaCancelar="Volver"
+        etiquetaConfirmar="Cancelar la cuota"
+        onConfirmar={confirmarCancelacion}
+        enviando={enviando}
+      />
     </>
   )
 }

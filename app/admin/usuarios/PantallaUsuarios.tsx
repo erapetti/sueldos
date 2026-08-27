@@ -15,15 +15,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
 import { CampoTexto } from '@/components/dominio/CampoMonto'
+import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { useAccion } from '@/hooks/useAccion'
 import { actualizarUsuario, borrarUsuario, crearUsuario } from '@/actions/admin'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
@@ -234,55 +226,45 @@ export function PantallaUsuarios({
         <Tabla columnas={columnasDeUsuarios} filas={usuarios} />
       </section>
 
-      <AlertDialog open={aBorrar !== null} onOpenChange={(v) => !v && setABorrar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Borrar a {aBorrar?.nombre ?? aBorrar?.email}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {aBorrar && aBorrar.empleados > 0
-                ? `Es dueño de ${aBorrar.empleados} empleada(s). Elegí a quién transferirlas: sin eso no se puede borrar.`
-                : 'Se borra el usuario y sus permisos sobre el personal compartido. La auditoría se conserva.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {aBorrar && aBorrar.empleados > 0 ? (
-            <div className="space-y-1.5">
-              <Label htmlFor="nuevo-dueno">Nuevo dueño de su personal</Label>
-              <Select value={nuevoDuenoId} onValueChange={setNuevoDuenoId} disabled={enviando}>
-                <SelectTrigger id="nuevo-dueno">
-                  <SelectValue placeholder="Elegí un usuario" />
-                </SelectTrigger>
-                <SelectContent>
-                  {usuarios
-                    .filter((u) => u.id !== aBorrar.id && u.activo)
-                    .map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.nombre ?? u.email}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {cambio.campos.nuevoDuenoId ? (
-                <p className="text-sm text-destructive">{cambio.campos.nuevoDuenoId}</p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Borrar es irreversible: el acento va en «Cancelar». */}
-          <AlertDialogFooter>
-            <AlertDialogCancel variant="default" disabled={enviando}>
-              Cancelar
-            </AlertDialogCancel>
-            <Button
-              variant="destructive"
-              onClick={borrar}
-              disabled={enviando || (aBorrar !== null && aBorrar.empleados > 0 && !nuevoDuenoId)}
-            >
-              Borrar
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Borrar es irreversible: el acento va en «Cancelar». */}
+      <DialogoDeAccion
+        abierto={aBorrar !== null}
+        onCerrar={() => setABorrar(null)}
+        titulo={`Borrar a ${aBorrar?.nombre ?? aBorrar?.email}`}
+        descripcion={
+          aBorrar && aBorrar.empleados > 0
+            ? `Es dueño de ${aBorrar.empleados} empleada(s). Elegí a quién transferirlas: sin eso no se puede borrar.`
+            : 'Se borra el usuario y sus permisos sobre el personal compartido. La auditoría se conserva.'
+        }
+        etiquetaConfirmar="Borrar"
+        onConfirmar={borrar}
+        enviando={enviando}
+        confirmarDeshabilitado={aBorrar !== null && aBorrar.empleados > 0 && !nuevoDuenoId}
+        peligrosa
+      >
+        {aBorrar && aBorrar.empleados > 0 ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="nuevo-dueno">Nuevo dueño de su personal</Label>
+            <Select value={nuevoDuenoId} onValueChange={setNuevoDuenoId} disabled={enviando}>
+              <SelectTrigger id="nuevo-dueno">
+                <SelectValue placeholder="Elegí un usuario" />
+              </SelectTrigger>
+              <SelectContent>
+                {usuarios
+                  .filter((u) => u.id !== aBorrar.id && u.activo)
+                  .map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nombre ?? u.email}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {cambio.campos.nuevoDuenoId ? (
+              <p className="text-sm text-destructive">{cambio.campos.nuevoDuenoId}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </DialogoDeAccion>
     </div>
   )
 }

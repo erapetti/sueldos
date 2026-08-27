@@ -3,16 +3,8 @@
 /** §7.3 — registrar un pago adicional: fecha, monto y concepto. */
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { DialogoDeAccion } from './DialogoDeAccion'
 import { SelectorFecha } from './SelectorFecha'
 import { CampoMonto, CampoTexto } from './CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
@@ -29,16 +21,11 @@ export type DialogoNovedadProps = {
 
 /**
  * El cuerpo se monta solo mientras el diálogo está abierto: así el formulario arranca limpio
- * en cada apertura, sin un efecto que lo resetee.
+ * en cada apertura, sin un efecto que lo resetee. El diálogo entero vive adentro del cuerpo
+ * porque el pie depende de su estado —qué se está enviando, si falta completar algo—.
  */
 export function DialogoPagoAdicional(props: DialogoNovedadProps) {
-  return (
-    <Dialog open={props.abierto} onOpenChange={(v) => !v && props.onCerrar()}>
-      <DialogContent className="sm:max-w-md">
-        {props.abierto ? <Cuerpo {...props} /> : null}
-      </DialogContent>
-    </Dialog>
-  )
+  return props.abierto ? <Cuerpo {...props} /> : null
 }
 
 function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
@@ -60,14 +47,16 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Registrar pago adicional</DialogTitle>
-        <DialogDescription>
-          {alias} — no lleva descuentos de ningún tipo y se liquida en el mes de la fecha.
-        </DialogDescription>
-      </DialogHeader>
-
+    <DialogoDeAccion
+      abierto
+      onCerrar={onCerrar}
+      titulo="Registrar pago adicional"
+      descripcion={`${alias} — no lleva descuentos de ningún tipo y se liquida en el mes de la fecha.`}
+      etiquetaConfirmar="Guardar"
+      etiquetaEnviando="Guardando…"
+      onConfirmar={guardar}
+      enviando={enviando}
+    >
       <div className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="pago-fecha">Fecha</Label>
@@ -103,15 +92,6 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
           maxLength={255}
         />
       </div>
-
-      <DialogFooter>
-        <Button variant="outline" onClick={onCerrar} disabled={enviando}>
-          Cancelar
-        </Button>
-        <Button onClick={guardar} disabled={enviando}>
-          {enviando ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </DialogFooter>
-    </>
+    </DialogoDeAccion>
   )
 }
