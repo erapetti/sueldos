@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * §8.4 — ficha del empleado, con sus ocho secciones.
+ * §8.4 — ficha del empleado. La licencia se fue a `Movimientos/Licencias` (§7.11).
  */
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ import { MovimientosEmpleado } from '@/components/dominio/MovimientosEmpleado'
 import { ItemSubmenu, SubmenuSeccion } from '@/components/dominio/SubmenuSeccion'
 import { FormularioDatos } from './FormularioDatos'
 import { PanelCompartir } from './PanelCompartir'
-import { formatearDias, formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
+import { formatearImporte, formatearImporteEntero, todosEnteros } from '@/lib/format/money'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
 import { ETIQUETA_LIBRO } from '@/constants/etiquetas'
 import {
@@ -92,25 +92,6 @@ export type FichaProps = {
   saldo: string
   mesesSinLiquidar: string[]
   cuotas: { id: string; fecha: string; fechaISO: string; monto: string; estado: string }[]
-  licencias: {
-    id: string
-    desde: string
-    hasta: string
-    diasHabiles: string
-    salarioVacacional: string | null
-    liquidacionAnulada: boolean
-    nota: string | null
-  }[]
-  licenciaMovimientos: {
-    id: string
-    fecha: string
-    tipo: string
-    concepto: string
-    debe: string
-    haber: string
-    saldoAcumulado: string
-  }[]
-  saldoDias: string
   liquidaciones: {
     id: string
     periodo: string
@@ -236,31 +217,6 @@ export function FichaEmpleado(props: FichaProps) {
     },
   ]
 
-  const columnasDeLicenciaMovimientos: Columna<FichaProps['licenciaMovimientos'][number]>[] = [
-    { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (m) => m.fecha },
-    { clave: 'concepto', etiqueta: 'Concepto', celda: (m) => m.concepto },
-    { clave: 'consumidos', etiqueta: 'Consumidos', numerica: true, celda: (m) => (Number(m.debe) > 0 ? m.debe : '') },
-    { clave: 'generados', etiqueta: 'Generados', numerica: true, celda: (m) => (Number(m.haber) > 0 ? m.haber : '') },
-    { clave: 'saldo', etiqueta: 'Saldo', numerica: true, celda: (m) => m.saldoAcumulado },
-  ]
-
-  const columnasDeLicencias: Columna<FichaProps['licencias'][number]>[] = [
-    { clave: 'desde', etiqueta: 'Desde', className: 'tabular', celda: (l) => l.desde },
-    { clave: 'hasta', etiqueta: 'Hasta', className: 'tabular', celda: (l) => l.hasta },
-    { clave: 'dias', etiqueta: 'Días hábiles', numerica: true, celda: (l) => l.diasHabiles },
-    {
-      clave: 'vacacional',
-      etiqueta: 'Salario vacacional',
-      numerica: true,
-      celda: (l) => (
-        <>
-          {l.salarioVacacional ? formatearImporte(l.salarioVacacional) : '—'}
-          {l.liquidacionAnulada ? <span className="ml-1 text-muted-foreground">(anulada)</span> : null}
-        </>
-      ),
-    },
-  ]
-
   return (
     <div className="space-y-5">
       <EncabezadoEmpleada
@@ -380,7 +336,6 @@ export function FichaEmpleado(props: FichaProps) {
           <MovimientosEmpleado
             empleadoId={props.empleadoId}
             alias={props.empleado.alias}
-            fechaIngreso={props.empleado.fechaIngreso}
             puedeEditar={!props.soloLectura}
             dadoDeBaja={!props.empleado.activo}
             // Oculta se puede volver a mostrar siempre; ocultar, solo si está de baja
@@ -464,36 +419,6 @@ export function FichaEmpleado(props: FichaProps) {
             <section className="space-y-2">
               <h2 className="text-[20px]">Plan de pagos</h2>
               <Tabla columnas={columnasDeCuotas} filas={props.cuotas} />
-            </section>
-          ) : null}
-          </div>
-        ) : null}
-
-        {/* 6 — Licencia */}
-        {seccion === 'licencia' ? (
-          <div className="space-y-4">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <span className="text-sm text-muted-foreground">Saldo de días</span>
-            <span
-              className={cn(
-                'text-2xl font-semibold tabular',
-                Number(props.saldoDias) < 0 && 'text-destructive',
-              )}
-            >
-              {formatearDias(props.saldoDias)}
-            </span>
-          </div>
-
-          <Tabla
-            columnas={columnasDeLicenciaMovimientos}
-            filas={props.licenciaMovimientos}
-            vacio="Todavía no hay movimientos de licencia."
-          />
-
-          {props.licencias.length > 0 ? (
-            <section className="space-y-2">
-              <h2 className="text-[20px]">Períodos gozados</h2>
-              <Tabla columnas={columnasDeLicencias} filas={props.licencias} />
             </section>
           ) : null}
           </div>

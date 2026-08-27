@@ -1,5 +1,8 @@
 /**
  * §8.4 — datos de la ficha del empleado.
+ *
+ * La licencia no está: se la llevó entera `Movimientos/Licencias` (§7.11), con su estado de
+ * cuenta de días, y sale de `listarLicencias` en `lib/consultas/movimientos.ts`.
  */
 import 'server-only'
 import Decimal from 'decimal.js'
@@ -8,7 +11,6 @@ import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { horasSemanalesDelRegimen } from '@/lib/calculo/boletos'
 import { conSaldoAcumulado, LIBROS } from '@/lib/calculo/cuentaCorriente'
-import { saldoDiasLicencia } from '@/lib/calculo/licencias'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { aISO, formatearFecha, formatearPeriodo, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
 
@@ -20,8 +22,6 @@ export async function datosDeFicha(empleadoId: string) {
     regimenes,
     movimientos,
     cuotas,
-    licencias,
-    licenciaMovimientos,
     liquidaciones,
     permisos,
   ] = await Promise.all([
@@ -48,15 +48,6 @@ export async function datosDeFicha(empleadoId: string) {
     prisma.planPago.findMany({
       where: { empleadoId, estado: { not: 'CANCELADA' } },
       orderBy: { fecha: 'asc' },
-    }),
-    prisma.licencia.findMany({
-      where: { empleadoId },
-      include: { liquidacion: { select: { totalAPagar: true, estado: true } } },
-      orderBy: { fechaDesde: 'desc' },
-    }),
-    prisma.licenciaMovimiento.findMany({
-      where: { empleadoId },
-      orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }],
     }),
     prisma.liquidacion.findMany({
       where: { empleadoId },
@@ -176,33 +167,6 @@ export async function datosDeFicha(empleadoId: string) {
       monto: aDecimal(c.monto).toFixed(2),
       estado: c.estado,
     })),
-    licencias: licencias.map((l) => ({
-      id: l.id,
-      desde: formatearFecha(l.fechaDesde),
-      hasta: formatearFecha(l.fechaHasta),
-      diasHabiles: aDecimal(l.diasHabiles).toString(),
-      salarioVacacional: l.liquidacion ? aDecimal(l.liquidacion.totalAPagar).toFixed(2) : null,
-      liquidacionAnulada: l.liquidacion?.estado === 'ANULADA',
-      nota: l.nota,
-    })),
-    licenciaMovimientos: conSaldoAcumulado(
-      licenciaMovimientos.map((m) => ({
-        id: m.id,
-        fecha: formatearFecha(m.fecha),
-        tipo: m.tipo,
-        concepto: m.concepto,
-        debe: aDecimal(m.debe),
-        haber: aDecimal(m.haber),
-      })),
-    ).map((m) => ({
-      ...m,
-      debe: m.debe.toString(),
-      haber: m.haber.toString(),
-      saldoAcumulado: m.saldoAcumulado.toString(),
-    })),
-    saldoDias: saldoDiasLicencia(
-      licenciaMovimientos.map((m) => ({ debe: aDecimal(m.debe), haber: aDecimal(m.haber) })),
-    ).toString(),
     liquidaciones: liquidaciones.map((l) => ({
       id: l.id,
       periodo: formatearPeriodo(l.periodo),

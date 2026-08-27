@@ -78,9 +78,6 @@ export default async function PaginaFicha({
       saldo={datos.saldo}
       mesesSinLiquidar={datos.mesesSinLiquidar}
       cuotas={datos.cuotas}
-      licencias={datos.licencias}
-      licenciaMovimientos={datos.licenciaMovimientos}
-      saldoDias={datos.saldoDias}
       liquidaciones={datos.liquidaciones}
       totalesPorPeriodo={Object.fromEntries(totales)}
       permisos={datos.permisos}

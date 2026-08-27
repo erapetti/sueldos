@@ -9,7 +9,7 @@
  * Las otras tres acciones de a una —pago adicional, licencia y pago bancario— son el mismo
  * caso, así que este módulo está partido para que cada una entre al lado de la de acá: una
  * función de listado que devuelve filas ya formateadas y una de detalle. Están las de pago
- * adicional y las de pago bancario; falta licencia.
+ * adicional, las de pago bancario y las de licencia.
  *
  * **El detalle siempre devuelve `null` si el id no es de esa empleada**, y no lanza: es lo que
  * la página traduce a 404, y así el id de otra empleada no filtra ni que exista.
@@ -18,6 +18,8 @@ import 'server-only'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { aDecimal, type DecimalPrisma } from '@/lib/db/mapeo'
+import { conSaldoAcumulado } from '@/lib/calculo/cuentaCorriente'
+import { saldoDiasLicencia } from '@/lib/calculo/licencias'
 import { aISO, formatearFecha, formatearPeriodo, primerDiaDelMes } from '@/lib/format/dates'
 import type { Libro } from '@/lib/calculo/tipos'
 
@@ -309,4 +311,102 @@ export async function detalleDePagoBancario(
   if (!pago) return null
 
   return { ...aFilaDePagoBancario(pago), empleadoId: pago.empleadoId }
+}
+
+// ── §7.11 licencias ──────────────────────────────────────────────────────────
+
+/** Lo que aportó el período gozado, en la fila de su goce. */
+export type PeriodoGozado = {
+  licenciaId: string
+  desde: string
+  hasta: string
+  /** §4.15.3 — los días hábiles del período, que son los que consumió. */
+  diasHabiles: string
+  salarioVacacional: string | null
+  liquidacionAnulada: boolean
+}
+
+/** Fila del estado de cuenta de días (§4.15.1). */
+export type FilaLicencia = {
+  id: string
+  fecha: string
+  fechaISO: string
+  tipo: string
+  concepto: string
+  /** Días consumidos y generados, como los guarda el libro. */
+  debe: string
+  haber: string
+  saldoAcumulado: string
+  /** El período gozado, en las filas de tipo `GOCE`: hay uno por licencia. */
+  periodo: PeriodoGozado | null
+}
+
+export type LibroDeLicencia = {
+  /** §4.15.1 — Σ haber − Σ debe. Puede ser negativo: licencia adelantada. */
+  saldoDias: string
+  filas: FilaLicencia[]
+}
+
+/**
+ * §4.15.1 — el estado de cuenta de días, que es a la vez el listado de licencias: las filas de
+ * goce traen el período que las generó, así que las dos tablas que había en Datos/Licencia
+ * —el libro y «Períodos gozados»— quedan condensadas en una.
+ *
+ * **Ordenado por fecha**, como cualquier libro, y el saldo acumulado corre en ese orden. Los días
+ * no se imputan a un año: el §4.15.1 define un saldo único —`Σ haber − Σ debe`— y el año solo
+ * existe en el haber, porque la generación anual acredita un asiento por aniversario (§4.15.4).
+ * Con una licencia adelantada el saldo queda negativo hasta que llega la generación que la cubre,
+ * igual que en la cuenta corriente de dinero.
+ */
+export async function listarLicencias(empleadoId: string): Promise<LibroDeLicencia> {
+  const movimientos = await prisma.licenciaMovimiento.findMany({
+    where: { empleadoId },
+    include: {
+      licencia: {
+        include: { liquidacion: { select: { totalAPagar: true, estado: true } } },
+      },
+    },
+    orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }],
+  })
+
+  const conSaldo = conSaldoAcumulado(
+    movimientos.map((m) => ({
+      id: m.id,
+      fecha: formatearFecha(m.fecha),
+      fechaISO: aISO(m.fecha),
+      tipo: m.tipo,
+      concepto: m.concepto,
+      debe: aDecimal(m.debe),
+      haber: aDecimal(m.haber),
+      licencia: m.licencia,
+    })),
+  )
+
+  return {
+    saldoDias: saldoDiasLicencia(
+      movimientos.map((m) => ({ debe: aDecimal(m.debe), haber: aDecimal(m.haber) })),
+    ).toString(),
+    filas: conSaldo.map((m) => ({
+      id: m.id,
+      fecha: m.fecha,
+      fechaISO: m.fechaISO,
+      tipo: m.tipo,
+      concepto: m.concepto,
+      debe: m.debe.toString(),
+      haber: m.haber.toString(),
+      saldoAcumulado: m.saldoAcumulado.toString(),
+      periodo: m.licencia
+        ? {
+            licenciaId: m.licencia.id,
+            desde: formatearFecha(m.licencia.fechaDesde),
+            hasta: formatearFecha(m.licencia.fechaHasta),
+            diasHabiles: aDecimal(m.licencia.diasHabiles).toString(),
+            salarioVacacional: m.licencia.liquidacion
+              ? aDecimal(m.licencia.liquidacion.totalAPagar).toFixed(2)
+              : null,
+            liquidacionAnulada: m.licencia.liquidacion?.estado === 'ANULADA',
+          }
+        : null,
+    })),
+  }
 }

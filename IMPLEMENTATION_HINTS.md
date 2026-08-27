@@ -28,7 +28,14 @@ pueda expresar restricciones que en PostgreSQL serían índices parciales.
 | `liquidacion_aplicada_id` | `plan_pagos` | Qué liquidación marcó la cuota como `APLICADA`. Permite que anular una complementaria devuelva a `PENDIENTE` exactamente las cuotas que ella aplicó, y no las de una secuencia anterior del mismo período (§7.6.1) |
 
 **Si tocás alguna de estas tres, releé el §4.14, §4.11 o §7.6.1 antes.** Son restricciones de
-negocio disfrazadas de detalle técnico.
+negocio disfrazadas de detalle técnico. La cuarta candidata es
+`licencia_movimientos.anio_aniversario`, cuyo único parcial de §4.15.1 también se apoya en que la
+columna sea NULL fuera de `GENERACION_ANUAL` (§1.10.1).
+
+**El motor real es MariaDB**, no MySQL 8, y en los `ALTER TABLE` no siempre son intercambiables:
+un CHECK se saca con `DROP CONSTRAINT` y no con `DROP CHECK`, y una columna generada se declara
+`GENERATED ALWAYS AS (…) PERSISTENT` y no `STORED`. Las formas portables son las que están
+escritas en las migraciones.
 
 Las migraciones son cuatro y hay una escrita a mano:
 
@@ -39,6 +46,8 @@ Las migraciones son cuatro y hay una escrita a mano:
 - `20260823000000_cuenta_opcional` y `20260823000100_banco_opcional`
 - `20260824000000_recupera_otro_dia` — **a mano**: la quinta causal y el CHECK de horas
   extras relajado a `>= 0` (§1.6)
+- `20260826000000_liquidacion_en_dos_tablas` y `20260826000100_dos_libros` — los totales por
+  tabla y el libro de cada asiento (§1.7.1 y §1.7.2)
 
 `prisma migrate dev` no conoce los `CHECK` y los reporta como drift. Para cambiar el modelo:
 `prisma migrate dev --create-only` y volver a agregarlos si la migración generada recrea
@@ -349,12 +358,11 @@ El §7.4 y el §7.5 describen las cuatro acciones que se cargan de a una —pré
 adicional, licencia y pago bancario— **solo como diálogos de alta**. Con eso, lo registrado no
 se podía volver a mirar ni corregir: el préstamo quedaba como un asiento en la cuenta corriente
 y sus cuotas en el plan de pagos, sin ninguna pantalla que las juntara. Por pedido del usuario
-cada una pasa a tener **listado y detalle**, empezando por préstamos. Ya lo tienen **tres de las
-cuatro** —préstamo, pago adicional y pago bancario—; **licencia queda pendiente**, porque su
-pantalla además tiene que hacerse cargo de la cuenta corriente de días (§4.15.1) y de dónde va
-el saldo, y eso lo decide el dueño del proyecto.
+cada una pasa a tener **listado y detalle**, empezando por préstamos. Las cuatro tienen su
+pantalla, y **licencia es la distinta**: no tiene detalle y su listado es el estado de cuenta de
+días (§1.10.1).
 
-**Las tres pantallas son la misma, y eso está factorizado.** Lo que comparten no se copió:
+**Las cuatro pantallas son la misma, y eso está factorizado.** Lo que comparten no se copió:
 
 | Pieza | Qué pone |
 |---|---|
@@ -394,18 +402,18 @@ editarlo también cambia el resultado del recálculo.
 marca la liquidación como pagada, así que cambiarlo movería el estado de otra pantalla sin
 decirlo; el camino es anular y registrar de nuevo.
 
-**El préstamo no tiene botón de anular** y las otras dos sí. No es una decisión: `anularMovimiento`
-existe desde antes y nunca tuvo desde dónde llamarse, así que el chip «Anulado» de su listado
-hoy no se puede producir desde la UI. Falta agregárselo.
+**El préstamo no tiene botón de anular** y los dos pagos sí. No es una decisión:
+`anularMovimiento` existe desde antes y nunca tuvo desde dónde llamarse, así que el chip
+«Anulado» de su listado hoy no se puede producir desde la UI. Falta agregárselo.
 
 **No se creó una tabla `prestamos`, y no hace falta.** Un préstamo *es* el asiento `PRESTAMO`
 de `cuenta_corriente` (§4.9): `plan_pagos.prestamo_id` ya es FK a esa tabla y el §4.8 la
 describe como «préstamo que originó el plan». Darle tabla propia duplicaría la identidad del
 movimiento y obligaría a migrar esa FK. El listado se arma leyendo el asiento con sus cuotas,
-en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado: dos
-ya entraron —pago adicional y pago bancario, cada una con su función de listado y su función de
-detalle— y falta licencia. **El detalle siempre devuelve `null` si el id no es de esa empleada**,
-y es la página la que lo traduce a 404: así el id de otra empleada no filtra ni que exista.
+en `lib/consultas/movimientos.ts`, que está partido para que las otras tres entren al lado: las
+cuatro están ahí, cada una con su función de listado, y las tres que tienen detalle con la suya.
+**El detalle siempre devuelve `null` si el id no es de esa empleada**, y es la página la que lo
+traduce a 404: así el id de otra empleada no filtra ni que exista.
 
 **El menú de fila de «Todo el Personal» no ofrece «abrir la ficha».** La fila entera ya enlaza
 a la empleada desde que las tablas siguen el criterio de arriba, así que era ofrecer dos
@@ -417,10 +425,9 @@ deshabilita sobre una empleada ajena, porque `cambiarVisibilidad` pasa por `exig
 un administrador primero tiene que compartírsela (§8.7).
 
 **El ítem «Acciones» del menú se llama ahora «Movimientos»** y dejó de ser solo botonera: es el
-índice desde donde se entra a cada listado. Tres de los cuatro son links a su pantalla y el alta
-vive ahí; el único que todavía abre un diálogo es «Registrar licencia», hasta que tenga la suya.
-Con permiso `VER` los links siguen activos —mirar no pide permiso de edición, y el alta la
-esconde la propia pantalla— y el que registra queda deshabilitado.
+índice desde donde se entra a cada listado. Los cuatro son links a su pantalla y el alta vive
+ahí: ninguno abre un diálogo. Con permiso `VER` siguen todos activos —mirar no pide permiso de
+edición— y el alta la esconde cada pantalla.
 
 **Los dos submenús se dibujan con `SubmenuSeccion`.** «Datos» y «Movimientos» son lo mismo —una
 rama del menú de la empleada con varias hojas— y se dibujaban distinto: Datos como una fila de
@@ -430,17 +437,17 @@ la forma de Datos, que es la que se comporta como submenú: está a la vista en 
 `default` con `aria-current="page"`.
 
 Es un **`<nav>`** y no un `<div>`: un submenú es navegación, y el landmark le da al lector de
-pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salvedad quedó reducida
-a uno: en Movimientos, «Registrar licencia» abre un diálogo en vez de navegar; se corrige cuando
-tenga su pantalla.
+pantalla cómo saltar hasta acá y saber que esos botones son hermanos. La salvedad que tenía
+—«tres de los cuatro abren un diálogo en vez de navegar»— ya no existe: los cuatro navegan.
 
 **Las diez tablas se dibujan con `Tabla`** (`components/dominio/Tabla.tsx`), y siguen un
 criterio único:
 
 - **La fila tiene detalle** → la primera columna es el enlace, con `ENLACE_PRINCIPAL`
   (`text-lg font-medium hover:underline`), y la fila entera lleva al mismo lado y se resalta
-  con `hover:bg-muted/5`. Son cinco: los tres listados de movimientos —préstamos, pagos
-  adicionales, pagos bancarios—, la vista «Lista» de liquidaciones y «Todo el Personal».
+  con `hover:bg-muted/5`. Son cinco: los tres listados de movimientos que tienen detalle
+  —préstamos, pagos adicionales, pagos bancarios—, la vista «Lista» de liquidaciones y «Todo el
+  Personal». **Licencias no**, y por eso su tabla va sin enlace ni resaltado (§1.10.1).
 - **La fila no tiene detalle** —el desglose de la liquidación, la cuenta corriente, el plan de
   pagos, las licencias, los listados de administración, compartido con— → ni enlace ni
   resaltado, y la primera columna se dibuja como le convenga.
@@ -520,6 +527,47 @@ incluidas: si cancelar la cuarta convirtiera la quinta en «4 de 4», la misma c
 nombre entre una liquidación y la siguiente. Como `lib/calculo` es puro (§2.1), el ordinal, el
 total y la fecha del préstamo se resuelven en `lib/liquidacion/datos.ts` y entran por
 `CuotaPlanCalculo`.
+
+### 1.10.1 Licencias es la pantalla distinta: no tiene detalle y su listado es el libro de días
+
+`Movimientos/Licencias` reemplazó a **dos** pantallas: la sección `Datos/Licencia` de la ficha y
+el botón «Registrar licencia» del submenú. Las dos tablas que tenía la ficha —el libro de días y
+«Períodos gozados»— quedaron condensadas en **una sola**, y el motivo es que eran la misma cosa:
+cada asiento `GOCE` *es* una licencia gozada, así que el período y el salario vacacional que
+generó (§7.11) van en su propia fila. El saldo de días va arriba de la tabla.
+
+**El menú de la empleada perdió el ítem «Licencia» y quedó con seis.** Un `?seccion=licencia`
+guardado en favoritos ahora da 404, que es mejor que dibujar el encabezado con el cuerpo vacío, y
+`datosDeFicha` dejó de hacer tres de sus consultas.
+
+**La tabla se ordena por fecha**, como cualquier libro, y el saldo acumulado corre en ese orden.
+Con una licencia adelantada el saldo queda negativo hasta que llega la generación que la cubre,
+igual que en la cuenta corriente de dinero.
+
+**El consumo no se imputa a un año, y es a propósito.** El §4.15.1 define un saldo único
+—`Σ haber − Σ debe`—; lo único partido por año es el **haber**, porque la generación anual
+acredita un asiento por aniversario (§4.15.4). Se probó lo contrario —imputar cada goce al año
+cuyos días gasta, los más viejos primero, partiendo la licencia en un asiento por año para poder
+ordenar la tabla por `(anio_aniversario, fecha)`— y **se descartó por decisión del dueño del
+proyecto**: obligaba a que `anio_aniversario` llevara dos sentidos distintos según el tipo de
+asiento, y con eso se caían las dos garantías que la columna tiene encima —el único parcial de la
+generación anual, que es lo que hace idempotente al cron de §7.12, y el CHECK que hoy la exige
+solo ahí—. Ordenar por fecha da la misma lectura sin tocar la base.
+
+Lo que se resigna con eso es poder leer el libro por año —«el año 3 generó 20 y se gastaron 15»—.
+Los números no cambian: los días son fungibles y el saldo total es el mismo. Si alguna vez hace
+falta, hay que deducirlo en la consulta y no guardarlo.
+
+**Lo que quedó afuera, por decisión del dueño del proyecto:** ninguna fila lleva a un detalle, así
+que editar la nota de una licencia y borrarla no tienen desde dónde dispararse todavía, y
+`borrarLicencia` quedó como estaba. Falta decidir si va una segunda tabla o si las filas de goce
+llevan a un detalle.
+
+Cuando se haga, **la regla del borrado ya está fijada y no es la que está implementada**: se puede
+borrar una licencia que **no tenga hecho el pago del salario vacacional**, y al borrarla se van
+también su asiento de cuenta corriente y la liquidación de salario vacacional prevista. Hoy
+`borrarLicencia` pide otra cosa —que la liquidación esté **anulada**— así que ese cambio es parte
+del trabajo.
 
 ### 1.11 El loopback del cron no se puede implementar como está escrito
 

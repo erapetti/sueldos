@@ -29,7 +29,6 @@ export function itemsDeMenu(empleadoId: string): ItemMenu[] {
     { clave: 'faltas', etiqueta: 'Inasistencias', href: `${base}/faltas` },
     { clave: 'liquidaciones', etiqueta: 'Liquidaciones', href: `${base}/liquidacion` },
     { clave: 'cuenta', etiqueta: 'Cuenta corriente', href: `${base}?seccion=cuenta` },
-    { clave: 'licencia', etiqueta: 'Licencia', href: `${base}?seccion=licencia` },
     { clave: 'movimientos', etiqueta: 'Movimientos', href: `${base}?seccion=movimientos` },
   ]
 }
@@ -41,16 +40,15 @@ export function itemsDeMenu(empleadoId: string): ItemMenu[] {
 export const SECCIONES_DE_DATOS = ['datos', 'salario', 'regimen', 'compartido'] as const
 
 /**
- * Todas las secciones que viven en la ficha: las de la tarjeta de Datos más las tres del
- * menú que no tienen ruta propia. La ficha no tiene `else`, así que un `?seccion=` que no
- * esté acá dibujaría el encabezado con el cuerpo vacío; con la lista, da 404.
+ * Todas las secciones que viven en la ficha: las de la tarjeta de Datos más las dos del menú
+ * que no tienen ruta propia. La ficha no tiene `else`, así que un `?seccion=` que no esté acá
+ * dibujaría el encabezado con el cuerpo vacío; con la lista, da 404.
+ *
+ * `licencia` **salió**: se la llevó entera `Movimientos/Licencias`, con el estado de cuenta de
+ * días adentro (§4.15.1). Un `?seccion=licencia` guardado en favoritos ahora da 404, que es
+ * mejor que un cuerpo vacío.
  */
-export const SECCIONES_DE_FICHA = [
-  ...SECCIONES_DE_DATOS,
-  'cuenta',
-  'licencia',
-  'movimientos',
-] as const
+export const SECCIONES_DE_FICHA = [...SECCIONES_DE_DATOS, 'cuenta', 'movimientos'] as const
 
 export function EncabezadoEmpleada({
   empleadoId,
@@ -100,7 +98,7 @@ export function EncabezadoEmpleada({
         y la navegación es real. `aria-current` es lo que le dice al lector de pantalla dónde
         está parado; `role="tab"` sería mentira en un link.
 
-        Abajo de `sm` los siete ítems envuelven en tres renglones y la píldora quedaba como
+        Abajo de `sm` los ítems envuelven en varios renglones y la píldora quedaba como
         una elipse enorme. Ahí se convierte en un listón recto de borde a borde de la pantalla:
         los márgenes negativos compensan el padding del contenido, y el padding propio devuelve
         los ítems a la misma alineación que el resto de la página.
