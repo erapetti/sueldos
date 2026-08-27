@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+ * Tailwind v4 detecta las clases escaneando **todo el proyecto**, y los `.md` entran en ese
+ * barrido: nombrar una clase en la documentación alcanza para que su regla aparezca en la hoja
+ * de estilos. Pasó con `hover:-translate-y-px`, que se sacó del botón y volvió sola porque la
+ * nota que explica por qué se sacó la menciona.
+ *
+ * Son reglas que nadie usa. Los `.md` de este repositorio son documentación, nunca plantillas,
+ * así que quedan afuera del escaneo.
+ */
+@source not "../**/*.md";
+
 @custom-variant dark (&:is(.dark *));
 
 /*
