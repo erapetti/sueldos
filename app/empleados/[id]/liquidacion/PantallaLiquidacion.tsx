@@ -48,6 +48,17 @@ const ETIQUETA_LIBRO: Record<Libro, string> = {
   INFORMAL: 'sin aportes',
 }
 
+/**
+ * §7.6.1 — la etiqueta de la diferencia depende de su signo, y hay dos cifras que pueden
+ * tenerlo distinto: la del período y la del libro formal, que es la única que sale impresa.
+ */
+function etiquetaDeLaDiferencia(monto: number) {
+  return monto < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'
+}
+
+const SALDO_A_FAVOR_DE_LA_EMPRESA =
+  'Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta que se compense.'
+
 type Previa = {
   id: string
   secuencia: number
@@ -152,6 +163,14 @@ export function PantallaLiquidacion(props: {
   })
   const dosLibrosEnElCierre = librosDelCierre.length > 1
 
+  /**
+   * En papel no sale nada informal, ni acá: de las columnas del cierre se imprime solo la
+   * formal. Si el cierre no tiene columna formal —una empleada que no aporta—, el bloque
+   * entero se queda afuera, porque en la hoja serían tres rótulos sin ninguna cifra.
+   */
+  const cierreEnPapel = librosDelCierre.includes('FORMAL')
+  const diferenciaFormal = Number(props.porLibro.FORMAL.aPagar)
+
   /** Una celda por libro y, si hay dos, la del total. */
   function celdasDelCierre(
     campo: 'recalculado' | 'yaLiquidado' | 'aPagar',
@@ -165,6 +184,8 @@ export function PantallaLiquidacion(props: {
           'pl-4 text-right tabular',
           borde && 'border-t pt-2',
           negativoEnRojo && Number(valor) < 0 && 'text-destructive',
+          // La columna informal y la del total delatarían lo que las tablas ya esconden.
+          clave !== 'FORMAL' && 'print:hidden',
         )}
       >
         {formatearImporteEntero(valor)}
@@ -317,9 +338,23 @@ export function PantallaLiquidacion(props: {
         {/*
           §6.2 — una tarjeta por tabla: la formal, la informal y, cuando existen las dos, la
           del total general. Cada una es una tabla independiente y no lleva rótulo.
+
+          En papel no sale nada informal: la tabla sin aportes es `no-print`, y con ella el
+          total general, que la delataría al restarlo del total. La hoja impresa cierra en el
+          total a pagar de la tabla formal.
+
+          El corte es por lo que la tabla **es**, no por su posición: para una empleada sin
+          aportes la informal es la única que hay, así que su hoja sale con el encabezado de
+          datos y ninguna tabla.
         */}
         {tablas.map((t) => (
-          <div key={t.tabla} className="overflow-hidden rounded-card border bg-card shadow-soft">
+          <div
+            key={t.tabla}
+            className={cn(
+              'overflow-hidden rounded-card border bg-card shadow-soft',
+              t.tabla === 'INFORMAL' && 'no-print',
+            )}
+          >
             <table
               className={cn(
                 'w-full text-sm',
@@ -372,9 +407,12 @@ export function PantallaLiquidacion(props: {
           </div>
         ))}
 
-        {/* Con las dos tablas, lo que se paga en total no está en ninguna de las dos. */}
+        {/*
+          Con las dos tablas, lo que se paga en total no está en ninguna de las dos. En papel no
+          va: incluye lo informal.
+        */}
         {dosTablas ? (
-          <div className="overflow-hidden rounded-card border bg-card shadow-soft">
+          <div className="no-print overflow-hidden rounded-card border bg-card shadow-soft">
             <table className="w-full text-sm">
               <tbody>
                 <tr className="font-semibold">
@@ -397,21 +435,34 @@ export function PantallaLiquidacion(props: {
           asiento no se vuelve a tocar.
 
           Con un solo libro en juego se muestra una sola columna, como antes.
+
+          En papel sale **solo la columna formal**, igual que en las tablas: la informal y la
+          del total no se imprimen, el rótulo y el aviso pasan a mirar la cifra del formal, y si
+          el cierre no tiene columna formal el bloque entero se queda afuera de la hoja.
         */}
         {esComplementaria ? (
-          <div className="overflow-x-auto rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5">
+          <div
+            className={cn(
+              'overflow-x-auto rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5',
+              !cierreEnPapel && 'no-print',
+            )}
+          >
             <table className="w-full text-sm">
               <caption className="sr-only">Cierre de la liquidación complementaria</caption>
               <thead>
                 <tr className="text-right text-muted-foreground">
                   <th scope="col" className="text-left font-normal"></th>
                   {librosDelCierre.map((libro) => (
-                    <th scope="col" key={libro} className="pl-4 font-normal">
+                    <th
+                      scope="col"
+                      key={libro}
+                      className={cn('pl-4 font-normal', libro !== 'FORMAL' && 'print:hidden')}
+                    >
                       {dosLibrosEnElCierre ? TITULO_LIBRO[libro] : ''}
                     </th>
                   ))}
                   {dosLibrosEnElCierre ? (
-                    <th scope="col" className="pl-4 font-normal">
+                    <th scope="col" className="pl-4 font-normal print:hidden">
                       Total
                     </th>
                   ) : null}
@@ -435,17 +486,30 @@ export function PantallaLiquidacion(props: {
                 </tr>
                 <tr className="font-semibold">
                   <th scope="row" className="border-t pt-2 text-left">
-                    {diferencia < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'}
+                    {/*
+                      En pantalla el rótulo mira la diferencia del período; en papel, la del
+                      libro formal, que es la única cifra impresa. Los dos signos pueden no
+                      coincidir: el formal puede dar a pagar y el informal darlo vuelta.
+                    */}
+                    <span className="print:hidden">{etiquetaDeLaDiferencia(diferencia)}</span>
+                    <span className="hidden print:inline">
+                      {etiquetaDeLaDiferencia(diferenciaFormal)}
+                    </span>
                   </th>
                   {celdasDelCierre('aPagar', props.totalAPagar, true)}
                 </tr>
               </tbody>
             </table>
 
+            {/* El aviso acompaña a la cifra negativa, y cada soporte muestra una cifra. */}
             {diferencia < 0 ? (
-              <p className="mt-2 text-sm text-destructive">
-                Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta
-                que se compense.
+              <p className="mt-2 text-sm text-destructive print:hidden">
+                {SALDO_A_FAVOR_DE_LA_EMPRESA}
+              </p>
+            ) : null}
+            {diferenciaFormal < 0 ? (
+              <p className="mt-2 hidden text-sm text-destructive print:block">
+                {SALDO_A_FAVOR_DE_LA_EMPRESA}
               </p>
             ) : null}
           </div>

@@ -246,4 +246,14 @@
     max-width: none !important;
     padding: 0 !important;
   }
+  /*
+    En papel no hay tarjetas. El radio de 28px del lienzo (`--radius-card`) y los chicos de los
+    carteles se leen como un recorte del formulario, así que en la hoja los bordes van rectos.
+    Es `!important` porque los radios vienen de utilidades de Tailwind, que están en su capa.
+  */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
 }
