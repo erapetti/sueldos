@@ -1112,7 +1112,7 @@ describe('§6.5 y §6.6 — feriados no laborables', () => {
     )
     expect(lineaFeriado(r)!.cantidad!.toFixed(2)).toBe('6.00')
     const generica = r.lineas.find((l) => l.codigo === CODIGOS.HORAS_EXTRAS_CON_BPS)!
-    expect(generica.descripcion).toBe('Horas extras con BPS (recargo 0 %)')
+    expect(generica.descripcion).toBe('Horas extras')
     expect(generica.cantidad!.toFixed(2)).toBe('2.00')
     // El tope reparte, no recorta: las 8 horas se pagan enteras.
     expect(lineaFeriado(r)!.importe.plus(generica.importe).toFixed(2)).toBe('4000.00')
@@ -1153,7 +1153,7 @@ describe('§6.5 y §6.6 — feriados no laborables', () => {
     expect(lineaFeriado(r)!.cantidad!.toFixed(2)).toBe('2.00')
     // Las de 100 % con BPS siguen en la línea genérica.
     const generica = r.lineas.find((l) => l.codigo === CODIGOS.HORAS_EXTRAS_CON_BPS)!
-    expect(generica.descripcion).toBe('Horas extras con BPS (recargo 100 %)')
+    expect(generica.descripcion).toBe('Horas extras (recargo 100 %)')
     expect(generica.cantidad!.toFixed(2)).toBe('3.00')
     // Las que no llevan BPS se pagan al valor hora «sin aportes», después del subtotal.
     expect(lineasCon(r.lineas, CODIGOS.HORAS_EXTRAS_SIN_BPS)).toBe(1)

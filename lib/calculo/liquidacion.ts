@@ -143,6 +143,24 @@ function agruparPorRecargo(
     .sort((a, b) => a.recargoPct - b.recargoPct)
 }
 
+/**
+ * El rótulo de una línea de horas extras. Dos cosas que **no** dice, por decisión del usuario:
+ *
+ * - **«con BPS» / «sin BPS»**: se deduce de la tabla en la que cayó la línea, que es justamente
+ *   lo que separa a las dos (§6.2). Decirlo era repetir el título de la tabla en cada renglón.
+ * - **«recargo 0 %»**: no hay recargo, así que no hay nada que informar.
+ *
+ * Queda un caso en el que las dos clases caen en la **misma** tabla y el rótulo no las
+ * distingue: una empleada con `aporta_bps = false` liquida todo en la informal, y si tiene
+ * renglones viejos marcados «con BPS» con el mismo recargo, se ven dos líneas iguales con
+ * valores unitarios distintos —el calculado y el «en negro»—. Ese dato ya no se puede cargar
+ * desde la UI (§1.7.4 de IMPLEMENTATION_HINTS), así que solo aparece en datos anteriores a esa
+ * restricción, y el primer guardado de la planilla lo normaliza.
+ */
+function descripcionDeHorasExtras(recargoPct: number): string {
+  return recargoPct === 0 ? 'Horas extras' : `Horas extras (recargo ${recargoPct} %)`
+}
+
 export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): ResultadoLiquidacion {
   verificarDatos(entrada)
 
@@ -260,7 +278,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     lineas.push({
       tabla: tablaBase,
       codigo: CODIGOS.HORAS_EXTRAS_CON_BPS,
-      descripcion: `Horas extras con BPS (recargo ${grupo.recargoPct} %)`,
+      descripcion: descripcionDeHorasExtras(grupo.recargoPct),
       cantidad: horas,
       valorUnitario: unitario,
       importe,
@@ -428,7 +446,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     lineas.push({
       tabla: 'INFORMAL',
       codigo: CODIGOS.HORAS_EXTRAS_SIN_BPS,
-      descripcion: `Horas extras sin BPS (recargo ${grupo.recargoPct} %)`,
+      descripcion: descripcionDeHorasExtras(grupo.recargoPct),
       cantidad: grupo.horas,
       valorUnitario: unitario,
       importe: redondearPesos(grupo.horas.times(unitario)),

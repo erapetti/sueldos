@@ -361,6 +361,10 @@ distintos, y una de ellas rotulada «con BPS» para alguien sin aportes. Decisi�
 proyecto: no arreglarlo en la presentación sino **en el ingreso**, que el dato inconsistente no
 se pueda cargar.
 
+Ese rótulo después se sacó (§6, «el rótulo de las horas extras»), así que hoy el síntoma es
+distinto y **peor de leer**: en datos viejos las dos líneas quedan con el mismo texto y valores
+unitarios distintos. Es un argumento más para la decisión de arriba, no en contra.
+
 **Cómo.** Misma mecánica que el interruptor de faltas (`descuentaEsEditable`): se muestra igual
 pero apagado y deshabilitado, para que se vea el efecto que tiene.
 
@@ -916,6 +920,11 @@ dependen de que `--set-xauthrequest=true` esté puesto.
 - **Agrupación de líneas.** Las horas extras se agrupan por porcentaje de recargo y emiten una
   línea por recargo; los pagos adicionales y las cuotas emiten una línea cada uno. El §6.7
   fija la línea como unidad de redondeo, así que la suma cierra igual.
+- **El rótulo de las horas extras no repite lo que ya dice el contexto.** Dice «Horas extras
+  (recargo 100 %)», y al 0 % simplemente «Horas extras». Se fue el «con BPS» / «sin BPS», que
+  lo dice la tabla en la que cae la línea (§1.7.1), y se fue el «recargo 0 %», que no informa
+  nada. Sale de `descripcionDeHorasExtras`, en el motor, que es el único lugar que lo arma;
+  ahí está anotado el único caso que el rótulo ya no distingue.
 - **La columna «cantidad» de la liquidación lleva la unidad de cada línea.** No cuenta lo mismo
   en todas: son horas, un porcentaje o una cantidad de boletos según la línea, y los números
   pelados se leían todos como lo mismo. La decisión vive en un mapa `código → formateador` en
