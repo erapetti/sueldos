@@ -59,6 +59,75 @@ flock .claude/pendientes.lock -c '<comando que toca PENDIENTES.md>'
 volver a leer bajo el candado antes de escribir: entre un `grep` suelto y el `sed` de después
 entra otra sesión.
 
+## Cada tarea se trabaja en su worktree
+
+**No se trabaja en el directorio compartido.** `/home/erapetti/claude/sueldos` es el directorio de
+todos: ahí hay un `next dev` levantado, y otra sesión puede tener su rama y su trabajo a medio
+hacer. La rama que está activa **cambia bajo tus pies**, así que:
+
+- un `git commit` cae en la rama de la tarea de otro —pasó el 27/08/2026: el commit del skill
+  terminó en `breadcrumb-encabezado-empleada`, que era la rama que otra sesión había abierto ahí
+  mientras tanto—;
+- un `git add -A` se lleva archivos ajenos al commit;
+- un `git switch` le mueve el checkout al que está trabajando.
+
+Ninguna de las tres se arregla con cuidado: se arreglan trabajando en otro directorio.
+
+### Crearlo
+
+Con la rama derivada del campo `Nombre` de la tarea: minúsculas, sin acentos, palabras con
+guiones, tres o cuatro palabras (`Corregir el hover de los botones activos` → `hover-boton-activo`).
+
+```bash
+git worktree add .claude/worktrees/<slug> -b <slug> main
+```
+
+Después, entrar con la herramienta **`EnterWorktree` pasándole `path`**, que mueve la sesión al
+directorio nuevo. Este skill es la instrucción de proyecto que la habilita: no hace falta volver a
+pedir permiso para usarla.
+
+**La base se pone explícita: `main` local.** Acá no se hace push, así que `origin/main` queda atrás
+de `main` en cuanto se mergea la primera tarea. `EnterWorktree` creando el worktree por su cuenta
+—con `name` en vez de `path`— parte de `origin/main`, y la rama arrancaría sobre código viejo.
+
+El worktree queda en `.claude/worktrees/`, que está ignorado: no aparece en `git status` del
+directorio compartido.
+
+### Prepararlo
+
+Un worktree nuevo no trae nada de lo que está ignorado, y sin eso el `typecheck` miente:
+
+```bash
+cp /home/erapetti/claude/sueldos/.env .env
+npm ci
+npx prisma generate
+```
+
+Para verificar en el navegador, el servidor va en **su propio puerto** —el 3000 es del directorio
+compartido—:
+
+```bash
+npx next dev -p <puerto>
+```
+
+### La base de datos sí es compartida
+
+El `.env` copiado apunta a la misma base. Dos consecuencias que no se ven venir:
+
+- **`npm run delete_all_data_and_test` borra la base de todos**, no la tuya. Avisar antes de
+  correrlo, y resembrar después con `SEED_DEMO=1 npm run db:seed`.
+- Un dato que cargás para probar aparece en la pantalla del que está al lado.
+
+El clon que está documentado al principio de `PENDIENTES.md` **no cambia esto**: copia el mismo
+`.env`, así que también cae en la base compartida. Aislarla pide apuntar el `.env` a otra base, y
+eso no está documentado ni probado: si la tarea lo necesita, plantearlo en vez de improvisarlo.
+
+### Al terminar
+
+El worktree se conserva hasta que el trabajo esté mergeado a `main`: `ExitWorktree` con
+`action: "keep"`. Con `remove` se borra el directorio **y la rama**, así que recién va cuando la
+tarea ya está mergeada o se abandona.
+
 ## Flujo 1 — Agregar un pendiente
 
 1. **Número siguiente**, siempre desde el archivo:
@@ -150,17 +219,14 @@ entra otra sesión.
    Si ya está `En curso`, **no la pises**: avisá al usuario y preguntá si la retoma igual —puede
    ser una rama suya que quedó a medias— o si prefiere otra.
 
-3. **Abrir la rama**, desde `main` actualizado. El nombre se deriva del campo `Nombre`:
-   minúsculas, sin acentos, palabras con guiones, tres o cuatro palabras
-   (`Corregir el hover de los botones activos` → `hover-boton-activo`).
+3. **Abrir el worktree de la tarea** y entrar, como está arriba en «Cada tarea se trabaja en su
+   worktree». Es el paso que no se saltea: sin él, el commit del final termina en la rama de
+   otro. Si el worktree ya existe —porque se retoma algo que quedó a medias— entrar al que hay
+   en vez de crear otro:
 
    ```bash
-   git switch main && git pull --ff-only && git switch -c <slug>
+   git worktree list
    ```
-
-   Si en vez de la rama en el directorio se va a trabajar en un worktree o en un clon aparte
-   —hay receta al principio de `PENDIENTES.md`—, ahí falta el `.env` y el cliente de Prisma:
-   copiar el `.env` y correr `npx prisma generate` **antes** de creerle al `typecheck`.
 
 4. **Devolver el contexto**: leer el bloque completo y trabajarlo desde ahí, no desde el resumen.
 
@@ -179,10 +245,22 @@ En orden, porque el sha del commit es lo último que aparece:
    tarea pida mirar. Si algo falla, no se registra: se arregla o se informa como está.
 2. **Hacer lo de «Al terminar»** — las notas de `IMPLEMENTATION_HINTS.md` / `README.md`— en el
    mismo commit que la solución.
-3. **Commitear en la rama de la tarea. No se hace push.** El mensaje va en español, en presente,
-   describiendo el efecto y no el diff, como el resto del `git log`. `PENDIENTES.md` queda afuera
-   del commit.
-4. **Tomar el sha corto** y escribirlo en el archivo:
+3. **Antes de commitear, verificar dónde estás.** Tres líneas, y las tres tienen que dar lo
+   esperado: el directorio es el worktree de la tarea, la rama es su slug, y lo modificado es
+   tuyo y nada más.
+
+   ```bash
+   git rev-parse --show-toplevel && git rev-parse --abbrev-ref HEAD && git status --short
+   ```
+
+   Si el directorio es el compartido, o aparecen archivos que no tocaste, **pará**: estás en el
+   checkout de otra tarea y el commit va a caer en su rama.
+
+4. **Commitear en la rama de la tarea. No se hace push.** El mensaje va en español, en presente,
+   describiendo el efecto y no el diff, como el resto del `git log`. Agregar los archivos por
+   nombre, no con `-A`. `PENDIENTES.md` queda afuera del commit —está ignorado— y también las
+   notas de `IMPLEMENTATION_HINTS.md` van adentro, no aparte.
+5. **Tomar el sha corto** y escribirlo en el archivo:
 
    ```bash
    SHA=$(git rev-parse --short HEAD)
@@ -192,7 +270,7 @@ En orden, porque el sha del commit es lo último que aparece:
 
    El sha es el del commit que **resuelve** la tarea, no el del merge a `main`.
 
-5. Si al resolverla apareció trabajo que quedó afuera del alcance, **es una tarea nueva**: volver
+6. Si al resolverla apareció trabajo que quedó afuera del alcance, **es una tarea nueva**: volver
    al flujo 1. El cuerpo de la tarea vieja no se reescribe para meterlo.
 
 ## Después de tocar el archivo
