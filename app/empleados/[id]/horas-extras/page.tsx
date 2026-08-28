@@ -69,6 +69,7 @@ export default async function PaginaHorasExtras({
       valorHoraCalculado={contexto.valorHoraCalculado}
       valorHoraNegro={contexto.valorHoraNegro}
       aportaBps={contexto.aportaBps}
+      cobraBoletos={acceso.empleado.cobraBoletos}
       soloLectura={!puedeEditar(acceso.nivel)}
     />
   )

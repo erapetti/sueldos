@@ -65,6 +65,8 @@ export function PlanillaFaltas(props: {
    * faltas en el tercio que le toca a la empleada.
    */
   aportaBps: boolean | null
+  /** §6.4 — si no cobra boletos, la falta de jornada completa no descuenta ninguno. */
+  cobraBoletos: boolean
   soloLectura: boolean
 }) {
   const router = useRouter()
@@ -246,7 +248,7 @@ export function PlanillaFaltas(props: {
             <span className="text-muted-foreground">
               Descuentan sueldo: {formatearHoras(queDescuentan)}
             </span>
-            {diasCompletos > 0 ? (
+            {props.cobraBoletos && diasCompletos > 0 ? (
               <span className="text-muted-foreground">
                 −{diasCompletos * 2} boletos por {diasCompletos} jornadas completas
               </span>

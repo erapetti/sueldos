@@ -67,6 +67,8 @@ export function PlanillaHorasExtras(props: {
   valorHoraNegro: string | null
   /** §4.4.1 — el aporte vigente **en este mes**. `null` es «no hay registro». */
   aportaBps: boolean | null
+  /** §6.4 — si no cobra boletos, no hay boletos que anunciar en el pie. */
+  cobraBoletos: boolean
   soloLectura: boolean
 }) {
   const router = useRouter()
@@ -288,13 +290,16 @@ export function PlanillaHorasExtras(props: {
         const { conBpsHoras, sinBpsHoras, conBpsImporte, sinBpsImporte, importe } =
           totalesDeLaSesion(renglones)
 
-        // §6.5 — días con horas extras en un día sin horas en el régimen.
+        // §6.5 — días con horas extras en un día sin horas en el régimen. Solo cuentan si la
+        // empleada cobra boletos (§6.4): sin eso el pie anunciaba boletos que la liquidación
+        // después no emite, y con una empleada sin régimen los anunciaba **todos los días**,
+        // porque para ella no hay ninguno con horas.
         const sinRegimen = new Set(
           props.dias.filter((d) => d.horasRegimen <= 0).map((d) => d.fecha),
         )
-        const boletosExtra = new Set(
-          renglones.filter((r) => sinRegimen.has(r.fecha)).map((r) => r.fecha),
-        ).size
+        const boletosExtra = props.cobraBoletos
+          ? new Set(renglones.filter((r) => sinRegimen.has(r.fecha)).map((r) => r.fecha)).size
+          : 0
 
         return (
           <span className="flex flex-wrap gap-x-4 gap-y-1">
