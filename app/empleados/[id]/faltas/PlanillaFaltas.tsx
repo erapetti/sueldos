@@ -59,6 +59,12 @@ export function PlanillaFaltas(props: {
   dias: DiaContexto[]
   guardados: Renglon[]
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
+  /**
+   * §1.7.3 — el aporte del mes. Acá no cambia ningún campo del formulario —una falta no lleva
+   * marca de BPS (§1.7.2)—: es para la celda del calendario, que muestra el régimen y las
+   * faltas en el tercio que le toca a la empleada.
+   */
+  aportaBps: boolean | null
   soloLectura: boolean
 }) {
   const router = useRouter()
@@ -115,6 +121,7 @@ export function PlanillaFaltas(props: {
         </span>
       }
       signo="−"
+      aportaBps={props.aportaBps}
       // §4.6.1 — la excepción es la falta que NO se descuenta del sueldo.
       esPlena={(renglon) => extra(renglon).descuenta}
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (

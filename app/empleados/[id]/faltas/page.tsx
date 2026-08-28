@@ -74,6 +74,7 @@ export default async function PaginaFaltas({
         dias={contexto.dias}
         guardados={guardados}
         estadoLiquidacion={contexto.estadoLiquidacion}
+        aportaBps={contexto.aportaBps}
         soloLectura={!puedeEditar(acceso.nivel)}
       />
     </>

@@ -31,7 +31,7 @@ import {
   parsePeriodo,
   sumarMeses,
 } from '@/lib/format/dates'
-import { formatearHoras } from '@/lib/format/money'
+import { formatearCantidad } from '@/lib/format/money'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
@@ -231,26 +231,118 @@ export type DiaContexto = {
   marcas: MarcaDia[]
 }
 
-/** Agrupa por color —signo, tratamiento y si está guardada— y suma las horas de cada grupo. */
-function agrupar(marcas: MarcaDia[]): MarcaDia[] {
-  const grupos = new Map<string, MarcaDia>()
-  for (const m of marcas) {
-    // El cero se muestra: es la marca de §6.5 que incluye el día en el pago de boletos, y si
-    // no se viera no habría forma de saber que está ni de abrirla para borrarla.
-    if (!(m.horas >= 0)) continue
-    const clave = `${m.signo}|${m.plena}|${m.guardada}`
-    const previo = grupos.get(clave)
-    if (previo) previo.horas += m.horas
-    else grupos.set(clave, { ...m })
+/**
+ * Lo que muestra una celda del calendario, ya sumado. La celda se lee en dos tercios —arriba
+ * lo que pasa por el BPS, abajo lo que no— y cada tercio dice lo mismo:
+ *
+ *     {régimen}  −{faltas}  +{extras}
+ *
+ * El **régimen y las faltas van al tercio que le toca a la empleada ese mes**: arriba si
+ * aporta, abajo si no. No se parten, porque no hay dos regímenes a la vez ni faltas «del otro
+ * libro» (§1.7.2 de IMPLEMENTATION_HINTS). Las **horas extras sí se parten**, por su marca de
+ * BPS, que es justamente lo que decide en qué tabla de la liquidación caen (§6.6).
+ */
+type CeldaDia = {
+  regimen: number
+  faltas: number
+  extrasConBps: number
+  extrasSinBps: number
+  /** Si el régimen y las faltas van arriba (aporta) o abajo (no aporta). */
+  regimenArriba: boolean
+}
+
+function contarCelda(marcas: MarcaDia[], regimen: number, aportaBps: boolean | null): CeldaDia {
+  const celda: CeldaDia = {
+    regimen,
+    faltas: 0,
+    extrasConBps: 0,
+    extrasSinBps: 0,
+    // `null` no es «no aporta» (§1.7.3): sin registro se lee como el caso normal, que es el
+    // que aporta. Ese mes tampoco se puede liquidar, así que no hay nada que adivinar acá.
+    regimenArriba: aportaBps !== false,
   }
-  // Orden estable: primero las extras, después las inasistencias; dentro, lo guardado antes
-  // que el borrador, y el tratamiento normal antes que la excepción.
-  return [...grupos.values()].sort(
-    (a, b) =>
-      Number(a.signo === '−') - Number(b.signo === '−') ||
-      Number(b.guardada) - Number(a.guardada) ||
-      Number(b.plena) - Number(a.plena),
+  for (const m of marcas) {
+    // El cero cuenta: es la marca de §6.5 que incluye el día en el pago de boletos. Suma 0,
+    // pero hace que el `+0` se dibuje y se pueda abrir para borrarlo.
+    if (!(m.horas >= 0)) continue
+    if (m.signo === '−') celda.faltas += m.horas
+    else if (m.plena) celda.extrasConBps += m.horas
+    else celda.extrasSinBps += m.horas
+  }
+  return celda
+}
+
+/** Si hay algún renglón de horas extras, aunque sea de cero horas (§6.5). */
+function hayExtras(marcas: MarcaDia[], plena: boolean): boolean {
+  return marcas.some((m) => m.signo === '+' && m.plena === plena && m.horas >= 0)
+}
+
+/**
+ * La cuenta de un tercio de la celda: el régimen en letra grande y, en letra normal, las faltas
+ * con `−` y las horas extras con `+`.
+ *
+ * Cada pieza se dibuja solo si tiene algo que decir: un tercio sin nada queda vacío en vez de
+ * mostrar ceros, que en una celda de 40px son ruido. La excepción es el `+0` de §6.5, que
+ * **tiene** que verse: es la marca que suma el boleto del día, y si no se viera no habría forma
+ * de saber que está ni de abrirla para borrarla.
+ */
+function CuentaDelTercio(props: {
+  /** Horas del régimen, o `null` si este no es el tercio de la empleada. */
+  regimen: number | null
+  faltas: number
+  extras: number
+  /** Si hay renglón de horas extras, aunque sume cero. */
+  hayExtras: boolean
+}) {
+  const regimen = props.regimen !== null && props.regimen > 0 ? props.regimen : null
+  if (regimen === null && props.faltas === 0 && !props.hayExtras) return null
+
+  return (
+    <span className="flex items-baseline gap-px tabular text-primary">
+      {regimen !== null ? (
+        <span className="text-sm leading-none font-medium sm:text-base lg:text-lg">
+          {formatearCantidad(regimen)}
+        </span>
+      ) : null}
+      {props.faltas > 0 ? (
+        <span className="text-[10px] leading-none sm:text-xs lg:text-sm">
+          −{formatearCantidad(props.faltas)}
+        </span>
+      ) : null}
+      {props.hayExtras ? (
+        <span className="text-[10px] leading-none sm:text-xs lg:text-sm">
+          +{formatearCantidad(props.extras)}
+        </span>
+      ) : null}
+    </span>
   )
+}
+
+/**
+ * La etiqueta accesible de la celda: dice con palabras lo que la celda dice con la posición de
+ * cada número, que para un lector de pantalla no existe.
+ */
+function etiquetaDeCelda(
+  dia: number,
+  contexto: DiaContexto | undefined,
+  celda: CeldaDia,
+  marcas: MarcaDia[],
+): string {
+  const cargas: string[] = []
+  if (celda.faltas > 0) cargas.push(`${formatearCantidad(celda.faltas)} h de falta`)
+  if (hayExtras(marcas, true))
+    cargas.push(`${formatearCantidad(celda.extrasConBps)} h extras con BPS`)
+  if (hayExtras(marcas, false))
+    cargas.push(`${formatearCantidad(celda.extrasSinBps)} h extras sin aportes`)
+
+  return [
+    String(dia),
+    contexto?.feriado,
+    celda.regimen > 0 ? `${formatearCantidad(celda.regimen)} h de régimen` : null,
+    cargas.length > 0 ? cargas.join(', ') : 'sin cargas',
+  ]
+    .filter(Boolean)
+    .join(' — ')
 }
 
 export type PlanillaMensualProps = {
@@ -284,6 +376,12 @@ export type PlanillaMensualProps = {
   }) => React.ReactNode
   /** Signo con el que esta planilla suma en la celda: `+` extras, `−` inasistencias. */
   signo: MarcaDia['signo']
+  /**
+   * §1.7.3 — el aporte a BPS **del mes de la planilla**, no el de hoy. Decide en qué tercio de
+   * la celda van el régimen y las faltas. `null` —sin registro de aporte— se lee como el caso
+   * normal: arriba.
+   */
+  aportaBps: boolean | null
   /**
    * §6.5 — las horas extras admiten renglones en cero: no pagan nada, marcan que ese día fue
    * a trabajar para que entre en el cálculo de boletos. Las inasistencias no.
@@ -666,6 +764,12 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   const diasDelMes = useMemo(() => diasDelPeriodo(periodo), [periodo])
   // Celdas vacías para que el 1° caiga en su columna (la semana arranca en lunes).
   const relleno = diaSemana(diasDelMes[0])
+  /**
+   * Y las de la cola, para que la cuadrícula cierre un rectángulo: sin ellas la última fila
+   * queda mordida y se ve el borde por dentro. Antes no hacían falta, porque las celdas tenían
+   * aire entre sí y cada fila terminaba donde terminaba.
+   */
+  const rellenoFinal = (7 - ((relleno + diasDelMes.length) % 7)) % 7
 
   const noPuedeAvanzar = periodo.getTime() >= parsePeriodo(aPeriodoISO(hoy())).getTime()
 
@@ -810,25 +914,49 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           ) : null}
         </div>
       ) : (
-        <div ref={grillaRef} className="rounded-card bg-card shadow-soft border px-[22px] py-5">
-          <div className="grid grid-cols-7 gap-1 pb-2 text-center text-xs font-medium text-muted-foreground">
+        <div
+          ref={grillaRef}
+          className="rounded-card bg-card shadow-soft border px-2 py-4 sm:px-[22px] sm:py-5"
+        >
+          <div className="grid grid-cols-7 pb-2 text-center text-xs font-medium text-muted-foreground">
             {NOMBRES_DIAS_CORTOS.map((d) => (
               <div key={d}>{d}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          {/*
+            Cuadrícula sin aire entre celdas: los bordes se comparten y las esquinas van rectas
+            —el redondeo de la tarjeta ya alcanza—. Las celdas llevan solo el borde de arriba y
+            el de la izquierda, y la primera fila y la primera columna lo pierden, así no queda
+            una línea doble contra el marco.
+
+            Los selectores apuntan a `button` y no a `*` a propósito: los huecos del principio y
+            del final del mes son `div` sin borde ni fondo, así que se ven como un vacío en la
+            cuadrícula en vez de como días que existen. Los de la cola siguen estando aunque no
+            se vean: sin ellos la última fila queda corta y la retícula se descuadra.
+          */}
+          <div
+            className={cn(
+              // El marco lleva el mismo ancho y el mismo color que las líneas internas: hace de
+              // borde de arriba de la primera fila y de la izquierda de la primera columna, así
+              // que si difiere se nota. El token de borde de la aplicación —7 % de alfa— sirve
+              // para un marco pero desaparece como retícula de datos.
+              'grid grid-cols-7 border-2 border-foreground/20',
+              '[&>button]:border-t-2 [&>button]:border-l-2 [&>button]:border-foreground/20',
+              '[&>button:nth-child(-n+7)]:border-t-0 [&>button:nth-child(7n+1)]:border-l-0',
+            )}
+          >
             {Array.from({ length: relleno }, (_, i) => (
               <div key={`hueco-${i}`} />
             ))}
 
-            {diasDelMes.map((fechaDia) => {
+            {diasDelMes.map((fechaDia, i) => {
               const fecha = aISO(fechaDia)
               const contexto = contextoPorDia.get(fecha)
               const delDia = porDia.get(fecha) ?? []
               // Las del propio signo salen de `renglones`, que ya incluye lo guardado y lo
               // que se está editando; del contexto solo se toman las del otro tipo.
-              const marcas = agrupar([
+              const marcas: MarcaDia[] = [
                 ...(contexto?.marcas ?? []).filter((m) => m.signo !== props.signo),
                 ...delDia.map((r) => ({
                   signo: props.signo,
@@ -836,7 +964,8 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                   plena: props.esPlena(r),
                   guardada: Boolean(r.id),
                 })),
-              ])
+              ]
+              const celda = contarCelda(marcas, contexto?.horasRegimen ?? 0, props.aportaBps)
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
               // El fondo marca los días en los que no se trabaja: domingos y feriados
@@ -845,6 +974,22 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               // del feriado queda en el tooltip y en la etiqueta accesible, no en la celda.
               const esFeriado = !!contexto?.feriado
               const fondoNoHabil = esDomingo(fechaDia) || !!contexto?.feriadoNoLaborable
+
+              /**
+               * Cada celda dibuja su borde de **arriba y de la izquierda**; el de abajo se lo
+               * pone el día siguiente de la misma columna y el de la derecha, el vecino. Con
+               * los huecos de la cola transparentes eso deja dos días sin cerrar —el último
+               * del mes por la derecha, y los de la fila anterior que quedan sobre un hueco—,
+               * así que esos dibujan también el borde que les falta.
+               *
+               * Los del **relleno inicial** no tienen el problema: están antes que los días,
+               * y cada día dibuja los dos bordes que lo tocan.
+               */
+              const enGrilla = relleno + i
+              const ultimo = relleno + diasDelMes.length - 1
+              const enUltimaFila = enGrilla >= relleno + diasDelMes.length + rellenoFinal - 7
+              const cierraDerecha = enGrilla === ultimo && (enGrilla + 1) % 7 !== 0
+              const cierraAbajo = !enUltimaFila && enGrilla + 7 > ultimo
 
               return (
                 <Popover
@@ -862,57 +1007,83 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                       tabIndex={foco === fecha || (!foco && fechaDia.getUTCDate() === 1) ? 0 : -1}
                       disabled={props.soloLectura}
                       title={contexto?.feriado ?? undefined}
-                      aria-label={`${fechaDia.getUTCDate()} — ${contexto?.feriado ?? ''} ${
-                        marcas.length > 0
-                          ? marcas.map((m) => `${m.signo}${m.horas} h`).join(' ')
-                          : 'sin cargas'
-                      }`}
+                      aria-label={etiquetaDeCelda(fechaDia.getUTCDate(), contexto, celda, marcas)}
                       className={cn(
-                        'flex min-h-20 flex-col items-start gap-1 rounded-md border p-1.5 text-left text-xs transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'flex min-h-16 flex-col text-left text-xs transition-colors sm:min-h-20 lg:min-h-24',
+                        'focus-visible:outline-none focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                         noTrabaja && !fondoNoHabil && 'bg-muted/50',
                         fondoNoHabil && 'bg-destructive/10',
-                        esFeriado && 'border-destructive/60',
-                        esHoy && 'ring-2 ring-primary',
+                        cierraDerecha && 'border-r-2 border-foreground/20',
+                        cierraAbajo && 'border-b-2 border-foreground/20',
+                        esFeriado && 'ring-1 ring-inset ring-destructive/60',
+                        esHoy && 'relative z-10 ring-2 ring-inset ring-primary',
                         !props.soloLectura && 'hover:bg-accent',
                       )}
                     >
-                      <span className="flex w-full items-baseline justify-between">
-                        <span className={cn('font-medium', esHoy && 'text-primary')}>
+                      {/*
+                        Los dos tercios. El de arriba lleva lo que pasa por el BPS y el de abajo
+                        lo que no; el número del día va de ancla en la esquina, chico.
+
+                        **El tercio grande es el que lleva el régimen**: arriba si la empleada
+                        aporta ese mes, abajo si no. El orden —con BPS arriba, sin aportes
+                        abajo— no cambia; lo que cambia es dónde está el espacio, que tiene que
+                        estar del lado que tiene números.
+
+                        Las dos cuentas se apoyan **contra la división**: la de arriba en su
+                        base y la de abajo en su tope, así se leen como un solo bloque de dos
+                        renglones en vez de dos datos en esquinas opuestas de la celda.
+
+                        El fondo tenue marca **el tercio que no es el de la empleada**: el de
+                        abajo si aporta, el de arriba si no. Así el gris cae siempre sobre la
+                        franja chica y vacía, y no sobre la que tiene los números.
+
+                        La tipografía sube por breakpoint: en mobile la celda mide 46px y no da
+                        para más, pero en pantalla grande sobra lugar y los números pueden
+                        leerse de lejos.
+                      */}
+                      <span
+                        className={cn(
+                          'flex items-start justify-between gap-0.5 px-1 pt-0.5',
+                          celda.regimenArriba ? 'flex-[2]' : 'flex-1 bg-foreground/[0.04]',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'text-[10px] leading-none text-muted-foreground sm:text-xs',
+                            esHoy && 'font-semibold text-primary',
+                          )}
+                        >
                           {fechaDia.getUTCDate()}
                         </span>
-                        {contexto && contexto.horasRegimen > 0 ? (
-                          <span className="text-[10px] text-muted-foreground">
-                            {contexto.horasRegimen} h
-                          </span>
-                        ) : null}
+                        <span className="self-end pb-0.5">
+                          <CuentaDelTercio
+                            regimen={celda.regimenArriba ? celda.regimen : null}
+                            faltas={celda.regimenArriba ? celda.faltas : 0}
+                            extras={celda.extrasConBps}
+                            hayExtras={hayExtras(marcas, true)}
+                          />
+                        </span>
                       </span>
 
-                      <span className="flex w-full flex-col gap-0.5">
-                        {marcas.map((m) => (
-                          <span
-                            key={`${m.signo}${m.plena}${m.guardada}`}
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]',
-                              m.guardada
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-warn-soft text-warn-ink',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'size-1.5 shrink-0 rounded-full',
-                                // El rojo quedó reservado al fondo de domingos y feriados, así
-                                // que acá lo distintivo es la excepción: la hora extra sin BPS
-                                // y la falta que no se descuenta (§4.6.1).
-                                m.plena ? 'bg-foreground/55' : 'bg-warn',
-                              )}
-                              aria-hidden
-                            />
-                            {m.signo}
-                            {formatearHoras(m.horas)}
-                          </span>
-                        ))}
+                      {/*
+                        La división es una **banda con fondo propio** y no una línea punteada:
+                        el token de borde de la aplicación es 7 % de alfa, así que dentro de una
+                        celda de 46px una línea más no se distingue de las de la cuadrícula. La
+                        banda además resuelve de quién es el número: cuelga de su propia franja
+                        en vez de apoyarse en el filo, donde se leía como de la celda siguiente.
+                      */}
+                      <span
+                        className={cn(
+                          'flex items-start justify-end px-1 pt-0.5',
+                          celda.regimenArriba ? 'flex-1 bg-foreground/[0.04]' : 'flex-[2]',
+                        )}
+                      >
+                        <CuentaDelTercio
+                          regimen={celda.regimenArriba ? null : celda.regimen}
+                          faltas={celda.regimenArriba ? 0 : celda.faltas}
+                          extras={celda.extrasSinBps}
+                          hayExtras={hayExtras(marcas, false)}
+                        />
                       </span>
                     </button>
                   </PopoverAnchor>
@@ -936,6 +1107,10 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                 </Popover>
               )
             })}
+
+            {Array.from({ length: rellenoFinal }, (_, i) => (
+              <div key={`cola-${i}`} />
+            ))}
           </div>
         </div>
       )}

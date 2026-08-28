@@ -128,6 +128,7 @@ export function PlanillaHorasExtras(props: {
         </span>
       }
       signo="+"
+      aportaBps={props.aportaBps}
       // La excepción es la hora extra que no lleva descuento de BPS.
       esPlena={(renglon) => bpsEditable && extra(renglon).conBps}
       // §6.5 — el renglón en cero no paga nada: incluye el día en el pago de boletos.
