@@ -35,6 +35,30 @@ export const importe = z
 
 export const importePositivo = importe.refine((v) => Number(v) > 0, 'Tiene que ser mayor que cero')
 
+/**
+ * §4.3 con la divergencia de la empleada sin régimen: salario y horas semanales van **los dos
+ * en cero o los dos en positivo**. El cero es la empleada que no tiene jornada —todo lo suyo
+ * son horas extras sin aportes y pagos adicionales—, y ahí el valor hora calculado no existe;
+ * con horas en cero y salario positivo habría que inventarle uno. Es la misma regla que el
+ * CHECK `ck_salarios_montos`.
+ */
+function salarioYHorasVanJuntos(
+  v: { salario: string; horasSemanales: number },
+  ctx: z.RefinementCtx,
+): void {
+  const sinSalario = Number(v.salario) === 0
+  const sinHoras = v.horasSemanales === 0
+  if (sinSalario === sinHoras) return
+
+  ctx.addIssue({
+    code: 'custom',
+    path: [sinHoras ? 'salario' : 'horasSemanales'],
+    message: sinHoras
+      ? 'Sin horas semanales el salario también tiene que ser cero'
+      : 'Con el salario en cero las horas semanales también tienen que ser cero',
+  })
+}
+
 /** Cantidad de horas: múltiplo de 0,5. */
 export const horasMultiploMedio = z
   .number()
@@ -123,11 +147,13 @@ export const altaEmpleado = datosEmpleado.extend({
     .enum(CODIGOS_SEGURO_SALUD as [string, ...string[]])
     .nullable()
     .optional(),
-  salario: importePositivo,
+  // El cero es la empleada sin régimen horario; va de la mano del salario en cero.
+  salario: importe,
   horasSemanales: z
     .number()
-    .positive('Tiene que ser mayor que cero')
+    .min(0, 'No puede ser negativo')
     .max(60, 'No puede superar las 60 horas'),
+  /** Sigue siendo obligatorio: es con lo que se le pagan las horas extras sin aportes. */
   valorHoraNegro: importePositivo,
   regimen: z.object({
     lunes: z.number().min(0).max(24),
@@ -139,6 +165,21 @@ export const altaEmpleado = datosEmpleado.extend({
     domingo: z.number().min(0).max(24),
   }),
 })
+  .superRefine(salarioYHorasVanJuntos)
+  /*
+    Sin régimen horario no hay aporte a BPS: la invariante en su dirección más simple, la del
+    alta, donde las dos cosas se eligen en la misma pantalla. En la ficha las dos son series
+    con vigencia y la verifica `actions/series.ts` período por período.
+  */
+  .superRefine((v, ctx) => {
+    if (v.horasSemanales === 0 && v.aportaBps) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['aportaBps'],
+        message: 'Sin horas semanales no puede aportar al BPS',
+      })
+    }
+  })
 
 export const bajaEmpleado = z.object({
   empleadoId: idUuid,
@@ -147,13 +188,16 @@ export const bajaEmpleado = z.object({
 
 // ── §4.3 / §4.3.1 / §4.4 / §4.4.1 series del empleado ────────────────────────
 
-export const nuevoSalario = z.object({
-  empleadoId: idUuid,
-  salario: importePositivo,
-  horasSemanales: z.number().positive().max(60),
-  fechaVigencia: fechaVigenciaISO,
-  reemplazar: z.boolean().default(false),
-})
+export const nuevoSalario = z
+  .object({
+    empleadoId: idUuid,
+    // Los dos admiten el cero, y tienen que estar en cero juntos.
+    salario: importe,
+    horasSemanales: z.number().min(0, 'No puede ser negativo').max(60),
+    fechaVigencia: fechaVigenciaISO,
+    reemplazar: z.boolean().default(false),
+  })
+  .superRefine(salarioYHorasVanJuntos)
 
 export const nuevoValorHoraNegro = z.object({
   empleadoId: idUuid,

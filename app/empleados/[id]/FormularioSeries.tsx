@@ -39,13 +39,37 @@ const TITULOS: Record<Tipo, string> = {
 
 const SIN_SEGURO = 'ninguno'
 
+/** Lo que las dos series que se condicionan necesitan de la otra, resuelto por vigencia. */
+type VigenciaDeRegimen = { fechaVigenciaISO: string; total: string }
+type VigenciaDeAporte = { fechaVigenciaISO: string; aportaBps: boolean }
+
+/**
+ * §5.2 — el registro vigente para ese mes. Para un mes anterior a toda la serie devuelve el
+ * más antiguo, igual que el servidor. Las vigencias son `AAAA-MM-01`, así que comparan como
+ * texto.
+ */
+function vigenteA<T extends { fechaVigenciaISO: string }>(
+  serie: readonly T[],
+  fechaVigencia: string,
+): T | null {
+  if (serie.length === 0) return null
+  const ordenada = [...serie].sort((a, b) => a.fechaVigenciaISO.localeCompare(b.fechaVigenciaISO))
+  const anteriores = ordenada.filter((r) => r.fechaVigenciaISO <= fechaVigencia)
+  return anteriores.at(-1) ?? ordenada[0]
+}
+
 export function FormularioSeries({
   tipo,
   empleadoId,
+  regimenes = [],
+  aportesBps = [],
   onGuardado,
 }: {
   tipo: Tipo
   empleadoId: string
+  /** Solo las usan `APORTE_BPS` y `REGIMEN`, que son las dos series que se condicionan. */
+  regimenes?: readonly VigenciaDeRegimen[]
+  aportesBps?: readonly VigenciaDeAporte[]
   onGuardado: () => void
 }) {
   const { ejecutar, enviando, campos } = useAccion<undefined>()
@@ -60,6 +84,26 @@ export function FormularioSeries({
   const [aportaBps, setAportaBps] = useState(true)
   const [seguroSalud, setSeguroSalud] = useState(SIN_SEGURO)
   const [dias, setDias] = useState<string[]>(['', '', '', '', '', '', ''])
+
+  const sumaRegimen = dias.reduce((a, d) => a + Number(d || 0), 0)
+
+  /**
+   * **Aportar al BPS exige un régimen con horas.** Con el régimen vigente a esa fecha en cero
+   * el interruptor se muestra apagado y deshabilitado —la mecánica del §1.7.4—, para que se
+   * lea el efecto; al cargarle un régimen con horas se habilita solo.
+   *
+   * Es una ayuda de la pantalla y se resuelve al mes de la vigencia elegida. El control está
+   * en `actions/series.ts`, que además mira los meses siguientes: apagar el aporte desde el
+   * mes que viene no habilita un régimen vacío este mes (§1.7.3).
+   */
+  const regimenVigente = vigenteA(regimenes, fechaVigencia)
+  const sinRegimen = regimenVigente !== null && Number(regimenVigente.total) === 0
+
+  const aporteVigente = vigenteA(aportesBps, fechaVigencia)
+  const sumaEnCero = sumaRegimen === 0
+  const regimenChocaConElAporte = sumaEnCero && (aporteVigente?.aportaBps ?? false)
+
+  const aportaBpsEfectivo = sinRegimen ? false : aportaBps
 
   function guardar() {
     const comun = { empleadoId, fechaVigencia, reemplazar }
@@ -78,7 +122,7 @@ export function FormularioSeries({
             ? () =>
                 registrarAporteBps({
                   ...comun,
-                  aportaBps,
+                  aportaBps: aportaBpsEfectivo,
                   seguroSalud: seguroSalud === SIN_SEGURO ? null : seguroSalud,
                 })
             : () =>
@@ -111,8 +155,6 @@ export function FormularioSeries({
       </Button>
     )
   }
-
-  const sumaRegimen = dias.reduce((a, d) => a + Number(d || 0), 0)
 
   return (
     <div className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">
@@ -166,14 +208,16 @@ export function FormularioSeries({
             <div>
               <Label htmlFor="serie-aporta-bps">Aporta BPS</Label>
               <p className="text-sm text-muted-foreground">
-                Si se apaga, no se le aplica ningún descuento de BPS desde ese mes.
+                {sinRegimen
+                  ? 'El régimen horario vigente desde ese mes no tiene horas, así que no puede aportar. Cargale un régimen con horas y se habilita.'
+                  : 'Si se apaga, no se le aplica ningún descuento de BPS desde ese mes.'}
               </p>
             </div>
             <Switch
               id="serie-aporta-bps"
-              checked={aportaBps}
+              checked={aportaBpsEfectivo}
               onCheckedChange={setAportaBps}
-              disabled={enviando}
+              disabled={enviando || sinRegimen}
             />
           </div>
 
@@ -182,7 +226,7 @@ export function FormularioSeries({
             <Select
               value={seguroSalud}
               onValueChange={setSeguroSalud}
-              disabled={enviando || !aportaBps}
+              disabled={enviando || !aportaBpsEfectivo}
             >
               <SelectTrigger id="serie-seguro-salud">
                 <SelectValue placeholder="Sin seguro" />
@@ -196,7 +240,7 @@ export function FormularioSeries({
                 ))}
               </SelectContent>
             </Select>
-            {!aportaBps ? (
+            {!aportaBpsEfectivo ? (
               <p className="text-sm text-muted-foreground">
                 Sin aporte al BPS el seguro de salud no tiene efecto.
               </p>
@@ -229,8 +273,15 @@ export function FormularioSeries({
           </div>
           <p className="text-sm text-muted-foreground">
             Suma: <span className="font-medium tabular">{sumaRegimen} h</span>. Tiene que coincidir
-            con las horas semanales del salario vigente a esa fecha.
+            con las horas semanales del salario vigente a esa fecha, que van en cero si el
+            régimen queda vacío.
           </p>
+          {regimenChocaConElAporte ? (
+            <p className="text-sm text-destructive">
+              Desde ese mes la empleada aporta al BPS, así que el régimen no puede quedar sin
+              horas. Registrá primero que deja de aportar.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

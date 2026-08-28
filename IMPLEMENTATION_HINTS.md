@@ -51,6 +51,8 @@ Las migraciones son cuatro y hay una escrita a mano:
 - `20260827000000_aporte_bps_serie` — **a mano**: la tabla `empleado_aporte_bps` con su CHECK,
   la fila por empleada que rellena la serie y el borrado de las dos columnas de `empleados`
   (§1.7.3)
+- `20260828000000_salario_sin_regimen` — **a mano**: `ck_salarios_montos` relajado para admitir
+  el par (0, 0) de la empleada sin régimen horario (§1.13)
 
 `prisma migrate dev` no conoce los `CHECK` y los reporta como drift. Para cambiar el modelo:
 `prisma migrate dev --create-only` y volver a agregarlos si la migración generada recrea
@@ -64,6 +66,9 @@ falta descontarían $52.000 de un sueldo de $60.000.
 
 Se implementó `salario / (horas_semanales × 52/12)` — el salario dividido las ~173,33 horas
 del mes—, **confirmado con el usuario**. El §4.3 sigue diciendo lo otro.
+
+**Con 0 horas semanales devuelve 0 y no divide.** Es la empleada sin régimen horario (§1.13),
+que tiene el salario en cero: no hay valor hora que calcular.
 
 ### 1.3 Los importes se redondean a pesos enteros, en el cálculo
 
@@ -338,7 +343,9 @@ Las tres últimas pasan por `lib/consultas/aporteBps.ts`, que es el único lugar
 serie fuera de la liquidación. `lib/auth/guards.ts` **dejó de traer** el aporte: servía a tres
 llamadores con tres fechas distintas, y una sola de ellas era «hoy».
 
-**Siempre hay un registro desde el mes de ingreso.** Lo crea el alta en su transacción (§4.2.2)
+**Siempre hay un registro desde el mes de ingreso**, y desde §1.13 eso vale también para el
+régimen horario: la empleada sin jornada tiene un registro con los siete días en cero, no la
+ausencia de registro. Lo crea el alta en su transacción (§4.2.2)
 y la migración lo hizo para las que ya existían. De eso depende que todo mes con vínculo
 resuelva, así que el helper solo devuelve `null` cuando la empleada no tiene **ningún** registro,
 y ahí el préstamo y la licencia se rechazan en vez de adivinar el libro. Para una fecha anterior
@@ -745,6 +752,62 @@ aún»**, por pedido del usuario. Pero no están vacíos:
   misma vigencia y el mismo porcentaje ya funciona.
 - El aguinaldo solo tiene `esMesDeAguinaldo` y el semestre, que es lo único que el §7.7 deja
   cerrado.
+
+### 1.13 La empleada sin régimen horario, y el salario que va con él
+
+**Divergencia con el §4.3 y con el §4.4.** El §4.3 pide `horas_semanales > 0` y el §4.4 que la
+suma de los siete días del régimen sea igual a esas horas: de las dos juntas salía que **toda**
+empleada tuviera jornada, porque un régimen vacío suma 0 h y las horas semanales tendrían que
+dar 0, que ni el zod ni el CHECK admitían. El SPECS no se edita sin permiso del dueño (§2.7): la
+actualización queda planteada.
+
+**Por qué.** Hay empleadas que no tienen jornada: todo lo que cobran son horas extras sin
+aportes y pagos adicionales. Antes había que inventarles un régimen para poder darlas de alta.
+
+**El régimen vacío es un registro con los siete días en cero, no la ausencia de registro.** Si se
+resolviera borrando el registro, el §6.8 cortaría con razón —`verificarDatos` emite `REGIMEN` y
+la pantalla de cálculo muestra el cartel de dato faltante en vez de números—. Con el registro en
+cero la resolución de series del §5.2 sigue funcionando igual y el motor no se entera.
+
+**El salario la acompaña, por decisión del dueño del proyecto.** Salario y horas semanales van
+**los dos en cero o los dos en positivo**: sin jornada tampoco hay salario. La otra lectura
+—conservar el salario y apagar solo el régimen— obligaba a inventar un valor hora que el §4.3 no
+define. Se verifica en tres lugares:
+
+| Dónde | Qué |
+|---|---|
+| `lib/validacion/esquemas.ts` | `salarioYHorasVanJuntos`, compartido por `altaEmpleado` y `nuevoSalario` |
+| `prisma/migrations/20260828000000_salario_sin_regimen` | `ck_salarios_montos` relajado a `(salario > 0) = (horas_semanales > 0)` |
+| `lib/calculo/liquidacion.ts` | `valorHoraCalculado` devuelve 0 con 0 horas, en vez de dividir por cero |
+
+**La invariante que sale de ahí: aportar al BPS exige un régimen con horas.** No habría materia
+gravada sobre la cual aportar. Va en las dos direcciones —sin régimen el aporte no se puede
+prender, y con el aporte prendido el régimen no se puede vaciar— y **es por período, no «hoy»**:
+son las dos series con `fecha_vigencia` (§1.7.3), así que apagar el aporte desde el mes que viene
+no habilita un régimen vacío este mes.
+
+- `exigirAporteConRegimen` en `actions/series.ts` es el control (§2.3). Mira el mes del cambio y
+  los meses en los que alguna de las dos series vuelve a cambiar de ahí en adelante: entre dos
+  quiebres ninguna se mueve. Sin ningún registro de una de las dos no bloquea nada, con el mismo
+  criterio del §1.7.4.
+- En el alta las dos cosas se eligen en la misma pantalla, así que ahí alcanza con el esquema.
+- En la pantalla, el interruptor del aporte se muestra **apagado y deshabilitado** cuando el
+  régimen vigente a esa fecha no tiene horas —la mecánica del §1.7.4, para que se lea el
+  efecto—, y el formulario del régimen avisa cuando la empleada aporta desde ese mes.
+
+**Volver atrás son tres pasos, y el orden no es libre**: primero el salario con horas, después el
+régimen que las iguala (§4.4), y recién ahí el aporte. Al revés no se puede, y es correcto: el
+§4.4 hace que el régimen siga al salario, no al revés.
+
+**Lo que ya funcionaba solo y no se tocó:** con el régimen en cero `días_a_trabajar` da 0 y los
+boletos salen por §6.5 —los días con horas extras en un día sin horas de régimen—, que es justo
+el caso de esta empleada; y las faltas quedan topeadas en 0 h por §4.6, que también corresponde:
+no falta quien no tiene jornada. El aviso de «no hay régimen» de las planillas
+(`contexto.hayRegimen`) tampoco cambia: mira si hay registro, y el registro está.
+
+**Lo que queda feo y se dejó a propósito:** su liquidación emite igual la línea de salario base
+en cero. Filtrarla es una decisión de presentación que el §6.2 no cubre, así que quedó afuera del
+alcance.
 
 ---
 

@@ -49,6 +49,15 @@ import {
  * sin decimales. Ver `redondearPesos`.
  */
 export function valorHoraCalculado(salario: SalarioVigente): Decimal {
+  /*
+    La empleada sin régimen horario: salario y horas semanales van los dos en cero (§4.3 con
+    la divergencia anotada en IMPLEMENTATION_HINTS §1.2), así que no hay valor hora que
+    calcular y la fórmula sería una división por cero. El cero es inocuo donde se usa: las
+    faltas quedan topeadas en 0 h por §4.6 —no falta quien no tiene jornada— y sin aporte a
+    BPS no puede tener horas extras «con BPS» (§1.7.4).
+  */
+  if (salario.horasSemanales.isZero()) return new Decimal(0)
+
   const horasDelMes = salario.horasSemanales.times(52).dividedBy(12)
   return redondearPesos(salario.salario.dividedBy(horasDelMes))
 }

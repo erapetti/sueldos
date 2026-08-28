@@ -78,6 +78,15 @@ export function FormularioAlta() {
   const horas = parsearNumero(horasSemanales)
   const regimenCuadra = horas ? sumaRegimen.equals(horas) : false
 
+  /**
+   * La empleada sin régimen horario: 0 horas semanales, salario en cero y los siete días
+   * vacíos. Todo lo suyo son horas extras sin aportes y pagos adicionales, así que **no puede
+   * aportar al BPS**: el switch se muestra apagado y deshabilitado, con la mecánica del
+   * §1.7.4, para que se lea el efecto en vez de desaparecer.
+   */
+  const sinRegimen = horas !== null && horas.isZero()
+  const aportaBps = sinRegimen ? false : datos.aportaBps
+
   function cambiar<K extends keyof typeof datos>(clave: K, valor: (typeof datos)[K]) {
     setDatos((previos) => ({ ...previos, [clave]: valor }))
   }
@@ -87,6 +96,7 @@ export function FormularioAlta() {
       () =>
         crearEmpleado({
           ...datos,
+          aportaBps,
           seguroSalud: datos.seguroSalud === SIN_SEGURO ? null : datos.seguroSalud,
           fechaIngreso,
           salario,
@@ -209,14 +219,16 @@ export function FormularioAlta() {
           <div>
             <Label htmlFor="aporta-bps">Aporta BPS</Label>
             <p className="text-sm text-muted-foreground">
-              Después se cambia con vigencia desde un mes, en «Datos › Salario».
+              {sinRegimen
+                ? 'Sin régimen horario no puede aportar. Se habilita al cargarle horas semanales.'
+                : 'Después se cambia con vigencia desde un mes, en «Datos › Salario».'}
             </p>
           </div>
           <Switch
             id="aporta-bps"
-            checked={datos.aportaBps}
+            checked={aportaBps}
             onCheckedChange={(v) => cambiar('aportaBps', v)}
-            disabled={enviando}
+            disabled={enviando || sinRegimen}
           />
         </div>
 
@@ -225,7 +237,7 @@ export function FormularioAlta() {
           <Select
             value={datos.seguroSalud}
             onValueChange={(v) => cambiar('seguroSalud', v)}
-            disabled={enviando || !datos.aportaBps}
+            disabled={enviando || !aportaBps}
           >
             <SelectTrigger id="seguro-salud">
               <SelectValue placeholder="Sin seguro" />
@@ -266,7 +278,13 @@ export function FormularioAlta() {
             />
             {campos.horasSemanales ? (
               <p className="text-sm text-destructive">{campos.horasSemanales}</p>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {sinRegimen
+                  ? 'Sin horas semanales: el salario va en cero y los siete días vacíos.'
+                  : 'Cero si no tiene régimen horario.'}
+              </p>
+            )}
           </div>
           <CampoMonto
             id="valor-hora-negro"
@@ -312,7 +330,9 @@ export function FormularioAlta() {
             Suma: <span className="font-medium tabular">{sumaRegimen.toString()} h</span>
             {horas
               ? regimenCuadra
-                ? ' — coincide con las horas semanales.'
+                ? sinRegimen
+                  ? ' — sin régimen horario.'
+                  : ' — coincide con las horas semanales.'
                 : ` — tiene que dar ${horas.toString()} h (diferencia de ${sumaRegimen.minus(horas).toString()} h).`
               : ''}
           </p>

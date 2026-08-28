@@ -20,7 +20,7 @@ import { prisma } from '@/lib/db/prisma'
 import { fecha } from '@/lib/format/dates'
 import { confirmarLiquidacionMensual, anularLiquidacionConfirmada } from '@/actions/liquidaciones'
 import { registrarPagoBancario, registrarPrestamo } from '@/actions/prestamos'
-import { registrarAporteBps } from '@/actions/series'
+import { registrarAporteBps, registrarRegimen, registrarSalario } from '@/actions/series'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { guardarHorasExtras, guardarFaltas, guardarPagoAdicional } from '@/actions/novedades'
 import { registrarLicencia } from '@/actions/licencias'
@@ -1007,5 +1007,206 @@ describe('§6.11 aviso de período ya liquidado', () => {
       expect(resultado.aviso).toContain('ya tiene una liquidación confirmada')
       expect(resultado.datos.guardados).toBe(3)
     }
+  })
+})
+
+
+/**
+ * La empleada sin régimen horario, y la invariante que la sostiene: **aportar al BPS exige un
+ * régimen con horas**. Las dos son series con vigencia, así que la invariante es por período
+ * y no «hoy» (§1.7.3).
+ */
+describe('empleada sin régimen y sin aporte a BPS', () => {
+  const REGIMEN_VACIO = {
+    lunes: 0,
+    martes: 0,
+    miercoles: 0,
+    jueves: 0,
+    viernes: 0,
+    sabado: 0,
+    domingo: 0,
+  }
+
+  /** Salario y horas semanales van juntos: el régimen vacío exige el par en cero (§4.4). */
+  const sinSalarioDesde = (empleadoId: string, fechaVigencia: string) =>
+    registrarSalario({ empleadoId, salario: '0', horasSemanales: 0, fechaVigencia })
+
+  it('no la deja quedarse sin horas de régimen mientras aporta', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: true })
+    expect((await sinSalarioDesde(empleado.id, '2026-06-01')).ok).toBe(true)
+
+    const rechazado = await registrarRegimen({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      ...REGIMEN_VACIO,
+    })
+
+    expect(rechazado.ok).toBe(false)
+    if (!rechazado.ok) expect(rechazado.error).toContain('aporta al BPS')
+  })
+
+  it('apagando el aporte desde ese mes, el régimen vacío se guarda', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: true })
+    expect((await sinSalarioDesde(empleado.id, '2026-06-01')).ok).toBe(true)
+
+    const apagado = await registrarAporteBps({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      aportaBps: false,
+    })
+    expect(apagado.ok).toBe(true)
+
+    const guardado = await registrarRegimen({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      ...REGIMEN_VACIO,
+    })
+    expect(guardado.ok).toBe(true)
+  })
+
+  /*
+    La trampa que documenta el §1.7.3 y que acá vuelve con dos series que se condicionan: el
+    aporte se apaga desde julio, así que junio sigue aportando y no admite el régimen vacío.
+  */
+  it('apagar el aporte desde el mes que viene no habilita un régimen vacío este mes', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, aportaBps: true })
+    expect((await sinSalarioDesde(empleado.id, '2026-06-01')).ok).toBe(true)
+    expect(
+      (
+        await registrarAporteBps({
+          empleadoId: empleado.id,
+          fechaVigencia: '2026-07-01',
+          aportaBps: false,
+        })
+      ).ok,
+    ).toBe(true)
+
+    const rechazado = await registrarRegimen({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      ...REGIMEN_VACIO,
+    })
+
+    expect(rechazado.ok).toBe(false)
+    if (!rechazado.ok) expect(rechazado.error).toContain('junio 2026')
+  })
+
+  it('la otra dirección: sin horas de régimen no se puede volver a aportar', async () => {
+    const empleado = await crearEmpleadoDePrueba({
+      duenoId: dueno.id,
+      aportaBps: false,
+      salario: '0.00',
+      horasSemanales: '0.00',
+      horasPorDiaHabil: '0.00',
+    })
+
+    const rechazado = await registrarAporteBps({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      aportaBps: true,
+    })
+
+    expect(rechazado.ok).toBe(false)
+    if (!rechazado.ok) expect(rechazado.error).toContain('no tiene horas')
+  })
+
+  it('con un régimen con horas desde ese mes, el aporte se vuelve a habilitar', async () => {
+    const empleado = await crearEmpleadoDePrueba({
+      duenoId: dueno.id,
+      aportaBps: false,
+      salario: '0.00',
+      horasSemanales: '0.00',
+      horasPorDiaHabil: '0.00',
+    })
+
+    expect(
+      (
+        await registrarSalario({
+          empleadoId: empleado.id,
+          salario: '65000',
+          horasSemanales: 30,
+          fechaVigencia: '2026-06-01',
+        })
+      ).ok,
+    ).toBe(true)
+    expect(
+      (
+        await registrarRegimen({
+          empleadoId: empleado.id,
+          fechaVigencia: '2026-06-01',
+          ...REGIMEN_VACIO,
+          lunes: 6,
+          martes: 6,
+          miercoles: 6,
+          jueves: 6,
+          viernes: 6,
+        })
+      ).ok,
+    ).toBe(true)
+
+    const habilitado = await registrarAporteBps({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      aportaBps: true,
+    })
+    expect(habilitado.ok).toBe(true)
+  })
+
+  it('el alta la crea sin régimen, y su mes liquida sin cortar por el §6.8', async () => {
+    const creada = await crearEmpleado({
+      alias: 'Sin régimen',
+      nombreCompleto: 'Rosa Sin Régimen',
+      fechaIngreso: '2026-04-01',
+      cobraBoletos: true,
+      aportaBps: false,
+      seguroSalud: null,
+      salario: '0',
+      horasSemanales: 0,
+      valorHoraNegro: '300',
+      regimen: REGIMEN_VACIO,
+    })
+    expect(creada.ok).toBe(true)
+    if (!creada.ok) return
+
+    // Un sábado de mayo: sus horas extras sin aportes, que es todo lo que cobra.
+    expect(
+      (
+        await guardarHorasExtras({
+          empleadoId: creada.datos.id,
+          periodo: '2026-05',
+          renglones: [{ fecha: '2026-05-09', horas: 4, conBps: false, recargoPct: 0 }],
+          borrar: [],
+        })
+      ).ok,
+    ).toBe(true)
+
+    expect((await liquidar(creada.datos.id, '2026-05')).ok).toBe(true)
+
+    const lineas = await prisma.liquidacionLinea.findMany({
+      where: { liquidacion: { empleadoId: creada.datos.id, periodo: fecha(2026, 5, 1) } },
+    })
+    // §6.2 — sin aporte no tiene tabla formal: todo lo suyo cae en la informal.
+    expect(lineas.every((l) => l.tabla === 'INFORMAL')).toBe(true)
+    // 4 h × $300, más los boletos del día que fue a trabajar (§6.5): 2 × $50.
+    expect(lineas.find((l) => l.codigo === 'HE_SIN_BPS')!.importe.toString()).toBe('1200')
+    expect(lineas.find((l) => l.codigo === 'BOLETOS')!.importe.toString()).toBe('100')
+  })
+
+  it('no se puede dar de alta sin régimen y aportando al BPS', async () => {
+    const rechazada = await crearEmpleado({
+      alias: 'Imposible',
+      nombreCompleto: 'Empleada Imposible',
+      fechaIngreso: '2026-04-01',
+      cobraBoletos: true,
+      aportaBps: true,
+      seguroSalud: null,
+      salario: '0',
+      horasSemanales: 0,
+      valorHoraNegro: '300',
+      regimen: REGIMEN_VACIO,
+    })
+
+    expect(rechazada.ok).toBe(false)
+    if (!rechazada.ok) expect(rechazada.campos?.aportaBps).toBeTruthy()
   })
 })

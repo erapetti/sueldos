@@ -374,6 +374,7 @@ export function FichaEmpleado(props: FichaProps) {
               <FormularioSeries
                 tipo="APORTE_BPS"
                 empleadoId={props.empleadoId}
+                regimenes={props.regimenes}
                 onGuardado={() => router.refresh()}
               />
             ) : null}
@@ -390,6 +391,7 @@ export function FichaEmpleado(props: FichaProps) {
             <FormularioSeries
               tipo="REGIMEN"
               empleadoId={props.empleadoId}
+              aportesBps={props.aportesBps}
               onGuardado={() => router.refresh()}
             />
           ) : null}

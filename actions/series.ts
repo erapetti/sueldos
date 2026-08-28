@@ -18,12 +18,81 @@ import {
   nuevoSalario,
   nuevoValorHoraNegro,
 } from '@/lib/validacion/esquemas'
-import { aColumnaCantidad } from '@/lib/db/mapeo'
-import { aDecimal } from '@/lib/db/mapeo'
+import { aColumnaCantidad, aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
+import { horasSemanalesDelRegimen } from '@/lib/calculo/boletos'
 import { formatearPeriodo, hoy, parseFechaISO, primerDiaDelMes } from '@/lib/format/dates'
 
 const YA_EXISTE =
   'Ya hay un valor vigente desde ese mes. Confirmá el reemplazo para sobrescribirlo.'
+
+/**
+ * **Aportar al BPS exige un régimen con horas.** Una empleada puede no tener jornada —todo lo
+ * suyo son horas extras sin aportes y pagos adicionales— y ahí el régimen es un registro con
+ * los siete días en cero. Lo que no puede es aportar al BPS sin jornada: no habría materia
+ * gravada sobre la cual aportar, y el valor hora calculado con 0 horas no existe.
+ *
+ * Es una sola invariante en las dos direcciones, y se verifica en el servidor porque es
+ * control de acceso a un dato inconsistente, no ayuda de la UI (§2.3).
+ *
+ * **Es por período, no «hoy».** Régimen y aporte son las dos series con `fecha_vigencia`
+ * (§1.7.3): apagar el aporte desde el mes que viene no habilita un régimen vacío este mes.
+ * Entre dos cambios ninguna de las dos se mueve, así que alcanza con mirar el mes del cambio
+ * y los meses en los que alguna de las dos vuelve a cambiar de ahí en adelante.
+ */
+async function exigirAporteConRegimen(
+  empleadoId: string,
+  cambio:
+    | { serie: 'REGIMEN'; fechaVigencia: Date; horasSemanales: Decimal }
+    | { serie: 'APORTE_BPS'; fechaVigencia: Date; aportaBps: boolean },
+): Promise<void> {
+  const [regimenes, aportes] = await Promise.all([
+    prisma.empleadoRegimen.findMany({ where: { empleadoId }, orderBy: { fechaVigencia: 'asc' } }),
+    prisma.empleadoAporteBps.findMany({ where: { empleadoId }, orderBy: { fechaVigencia: 'asc' } }),
+  ])
+
+  // Sin ninguno de los dos no hay nada que contradecir: ese mes no se liquida igual (§6.8),
+  // así que bloquear la carga no arreglaría nada. Es el mismo criterio del §1.7.4.
+  if (regimenes.length === 0 || aportes.length === 0) return
+
+  // Las dos series con el cambio propuesto ya aplicado; con la misma vigencia lo reemplaza.
+  const horas = new Map<number, Decimal>(
+    regimenes.map((r) => [r.fechaVigencia.getTime(), horasSemanalesDelRegimen(aRegimenHoras(r))]),
+  )
+  const aporta = new Map<number, boolean>(
+    aportes.map((a) => [a.fechaVigencia.getTime(), a.aportaBps]),
+  )
+
+  if (cambio.serie === 'REGIMEN') horas.set(cambio.fechaVigencia.getTime(), cambio.horasSemanales)
+  else aporta.set(cambio.fechaVigencia.getTime(), cambio.aportaBps)
+
+  /**
+   * §5.2 — el registro vigente para ese mes. Para un mes anterior a toda la serie devuelve el
+   * más antiguo, que es con el que la empleada empezó: el mismo criterio de `aporteBpsALaFecha`.
+   */
+  function vigente<T>(serie: Map<number, T>, mes: number): T {
+    const vigencias = [...serie.keys()].sort((a, b) => a - b)
+    const anteriores = vigencias.filter((v) => v <= mes)
+    return serie.get(anteriores.at(-1) ?? vigencias[0])!
+  }
+
+  const desde = cambio.fechaVigencia.getTime()
+  const meses = [...new Set([desde, ...horas.keys(), ...aporta.keys()])]
+    .filter((m) => m >= desde)
+    .sort((a, b) => a - b)
+
+  for (const mes of meses) {
+    if (!vigente(aporta, mes)) continue
+    if (vigente(horas, mes).greaterThan(0)) continue
+
+    const cuando = formatearPeriodo(new Date(mes))
+    throw new ErrorNegocio(
+      cambio.serie === 'REGIMEN'
+        ? `En ${cuando} la empleada aporta al BPS, así que no puede quedarse sin horas de régimen. Registrá primero que deja de aportar desde ese mes.`
+        : `En ${cuando} el régimen horario no tiene horas, así que no puede aportar al BPS. Registrá primero un régimen con horas desde ese mes.`,
+      { _: 'Aportar al BPS exige un régimen con horas' },
+    )
+  }
+}
 
 /**
  * §5.3 — al registrar un cambio con vigencia igual o anterior a un período ya liquidado, se
@@ -139,6 +208,12 @@ export async function registrarAporteBps(entrada: unknown) {
     })
     if (existente && !datos.reemplazar) throw new ErrorNegocio(YA_EXISTE)
 
+    await exigirAporteConRegimen(empleado.id, {
+      serie: 'APORTE_BPS',
+      fechaVigencia,
+      aportaBps: datos.aportaBps,
+    })
+
     const comun = {
       aportaBps: datos.aportaBps,
       seguroSalud: datos.aportaBps ? (datos.seguroSalud ?? null) : null,
@@ -196,6 +271,12 @@ export async function registrarRegimen(entrada: unknown) {
         { _: 'La suma de los días tiene que coincidir con las horas semanales' },
       )
     }
+
+    await exigirAporteConRegimen(empleado.id, {
+      serie: 'REGIMEN',
+      fechaVigencia,
+      horasSemanales: suma,
+    })
 
     const existente = await prisma.empleadoRegimen.findUnique({
       where: { empleadoId_fechaVigencia: { empleadoId: empleado.id, fechaVigencia } },
