@@ -40,7 +40,12 @@ import type { ListadoDePersonal } from '@/constants/listados'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarHorasExtras } from '@/actions/novedades'
 import { RECARGOS } from '@/constants/recargos'
-import { formatearHoras, formatearImporte } from '@/lib/format/money'
+import {
+  formatearHoras,
+  formatearImporte,
+  formatearImporteEntero,
+  todosEnteros,
+} from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
 
 type Extra = { conBps: boolean; recargoPct: number }
@@ -102,6 +107,53 @@ export function PlanillaHorasExtras(props: {
     )
   }
 
+  /**
+   * Los totales de lo cargado en la sesión, y **el formato de los importes de toda la
+   * pantalla**. Lo usan el encabezado y el pie, que hasta ahora calculaban por su cuenta.
+   *
+   * Los decimales siguen el criterio del §1.3: si ningún importe de la pantalla tiene
+   * centavos no se muestran, y si alguno los tiene se muestran en todos, para que no queden
+   * dos formatos a la vista. Por eso entran en la misma decisión los dos valores hora —que
+   * son datos fijos del mes— y los dos totales, que cambian mientras se carga: 2,5 h a $395
+   * dan $987,50 y ponen centavos también arriba.
+   */
+  function totalesDeLaSesion(renglones: Renglon[]) {
+    // Con el interruptor bloqueado no hay renglones con BPS, ni siquiera los viejos que
+    // quedaron con la marca puesta: el guardado los normaliza (§6.6).
+    const conBpsDe = (renglon: Renglon) => bpsEditable && extra(renglon).conBps
+    const horas = (soloConBps: boolean) =>
+      renglones
+        .filter((r) => conBpsDe(r) === soloConBps)
+        .reduce((a, r) => a.plus(r.horas), new Decimal(0))
+
+    const vhc = props.valorHoraCalculado ? new Decimal(props.valorHoraCalculado) : null
+    const vhn = props.valorHoraNegro ? new Decimal(props.valorHoraNegro) : null
+
+    const importeDe = (soloConBps: boolean, valorHora: Decimal | null) =>
+      valorHora === null
+        ? null
+        : renglones
+            .filter((r) => conBpsDe(r) === soloConBps)
+            .reduce(
+              (a, r) =>
+                a.plus(new Decimal(r.horas).times(valorHora).times(1 + extra(r).recargoPct / 100)),
+              new Decimal(0),
+            )
+
+    const conBpsImporte = importeDe(true, vhc)
+    const sinBpsImporte = importeDe(false, vhn)
+
+    return {
+      conBpsHoras: horas(true),
+      sinBpsHoras: horas(false),
+      conBpsImporte,
+      sinBpsImporte,
+      importe: todosEnteros([vhc, vhn, conBpsImporte, sinBpsImporte])
+        ? formatearImporteEntero
+        : formatearImporte,
+    }
+  }
+
   return (
     <PlanillaMensual
       empleadoId={props.empleadoId}
@@ -118,15 +170,20 @@ export function PlanillaHorasExtras(props: {
       enviando={enviando}
       soloLectura={props.soloLectura}
       onGuardar={alGuardar}
-      encabezado={
-        <span>
-          Valor hora calculado:{' '}
-          <strong>{props.valorHoraCalculado ? formatearImporte(props.valorHoraCalculado) : '—'}</strong>
-          {' · '}
-          Valor hora sin aportes:{' '}
-          <strong>{props.valorHoraNegro ? formatearImporte(props.valorHoraNegro) : '—'}</strong>
-        </span>
-      }
+      encabezado={(renglones) => {
+        const { importe } = totalesDeLaSesion(renglones)
+        return (
+          <span>
+            Valor hora calculado:{' '}
+            <strong>
+              {props.valorHoraCalculado ? importe(props.valorHoraCalculado) : '—'}
+            </strong>
+            {' · '}
+            Valor hora sin aportes:{' '}
+            <strong>{props.valorHoraNegro ? importe(props.valorHoraNegro) : '—'}</strong>
+          </span>
+        )
+      }}
       signo="+"
       aportaBps={props.aportaBps}
       // La excepción es la hora extra que no lleva descuento de BPS.
@@ -228,37 +285,8 @@ export function PlanillaHorasExtras(props: {
       etiquetaInterruptor="BPS"
       extraNuevoRenglon={() => ({ conBps: bpsEditable && conBps, recargoPct: recargo })}
       renderResumen={(renglones) => {
-        // Con el interruptor bloqueado no hay renglones con BPS, ni siquiera los viejos que
-        // quedaron con la marca puesta: el guardado los normaliza (§6.6).
-        const conBpsDe = (renglon: Renglon) => bpsEditable && extra(renglon).conBps
-
-        const conBpsHoras = renglones
-          .filter((r) => conBpsDe(r))
-          .reduce((a, r) => a.plus(r.horas), new Decimal(0))
-        const sinBpsHoras = renglones
-          .filter((r) => !conBpsDe(r))
-          .reduce((a, r) => a.plus(r.horas), new Decimal(0))
-
-        const vhc = props.valorHoraCalculado ? new Decimal(props.valorHoraCalculado) : null
-        const vhn = props.valorHoraNegro ? new Decimal(props.valorHoraNegro) : null
-
-        const importe = (soloConBps: boolean, valorHora: Decimal | null) =>
-          valorHora === null
-            ? null
-            : renglones
-                .filter((r) => conBpsDe(r) === soloConBps)
-                .reduce(
-                  (a, r) =>
-                    a.plus(
-                      new Decimal(r.horas)
-                        .times(valorHora)
-                        .times(1 + extra(r).recargoPct / 100),
-                    ),
-                  new Decimal(0),
-                )
-
-        const conBpsImporte = importe(true, vhc)
-        const sinBpsImporte = importe(false, vhn)
+        const { conBpsHoras, sinBpsHoras, conBpsImporte, sinBpsImporte, importe } =
+          totalesDeLaSesion(renglones)
 
         // §6.5 — días con horas extras en un día sin horas en el régimen.
         const sinRegimen = new Set(
@@ -281,17 +309,17 @@ export function PlanillaHorasExtras(props: {
               <>
                 <span className="text-muted-foreground">
                   Con BPS {formatearHoras(conBpsHoras)}
-                  {conBpsImporte ? ` (${formatearImporte(conBpsImporte)})` : ''}
+                  {conBpsImporte ? ` (${importe(conBpsImporte)})` : ''}
                 </span>
                 <span className="text-muted-foreground">
                   Sin BPS {formatearHoras(sinBpsHoras)}
-                  {sinBpsImporte ? ` (${formatearImporte(sinBpsImporte)})` : ''}
+                  {sinBpsImporte ? ` (${importe(sinBpsImporte)})` : ''}
                 </span>
               </>
             ) : (
               <span className="text-muted-foreground">
                 Sin aportes al BPS este mes
-                {sinBpsImporte ? ` (${formatearImporte(sinBpsImporte)})` : ''}
+                {sinBpsImporte ? ` (${importe(sinBpsImporte)})` : ''}
               </span>
             )}
             {boletosExtra > 0 ? (

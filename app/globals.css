@@ -64,6 +64,13 @@
   --warn-soft: #f6e3d9;
   --warn-ink: #a84a26;
 
+  /* Resalte del día abierto en las planillas. No viene del diseño: es el punto medio entre
+     `--warn-soft` y un amarillo de marcador, y tiene que estar ahí por descarte. Más apagado
+     se confunde con los fondos que ya conviven en la celda —el día sin régimen, el domingo,
+     la banda del tercio, el hover—, que están todos dentro de los 11 puntos de distancia
+     entre sí; más saturado deja de pertenecer a la paleta cálida. */
+  --resalte: #f6e5be;
+
   /* El diseño no define un botón destructivo; se deriva de su familia cálida. */
   --destructive: #b8462a;
   --destructive-foreground: #fdfcfa;
@@ -119,6 +126,9 @@
   --warn-soft: #3a2620;
   --warn-ink: #f0b49b;
 
+  /* En oscuro el resalte se apaga: a plena luz quemaría la celda. */
+  --resalte: #4a3d22;
+
   --destructive: #d4592f;
   --destructive-foreground: #fdfcfa;
 
@@ -154,6 +164,7 @@
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-warn-ink: var(--warn-ink);
+  --color-resalte: var(--resalte);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);

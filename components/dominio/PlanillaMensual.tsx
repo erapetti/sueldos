@@ -363,8 +363,12 @@ export type PlanillaMensualProps = {
   guardados: Renglon[]
   /** Estado de la liquidación del período, para el encabezado. */
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
-  /** Información extra del encabezado (valores hora vigentes). */
-  encabezado: React.ReactNode
+  /**
+   * Información extra del encabezado (valores hora vigentes). Recibe los renglones de la
+   * sesión porque el formato de sus importes depende de ellos: los decimales se muestran u
+   * ocultan mirando **todos** los importes de la pantalla, los de arriba y los del pie (§1.3).
+   */
+  encabezado: (renglones: Renglon[]) => React.ReactNode
   /** Contenido del popover de carga de un día. */
   renderPopover: (props: {
     fecha: string
@@ -838,7 +842,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           </Button>
         </div>
 
-        <div className="text-sm text-muted-foreground">{props.encabezado}</div>
+        <div className="text-sm text-muted-foreground">{props.encabezado(renglones)}</div>
       </div>
 
       {/* Cuerpo */}
@@ -1018,6 +1022,14 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                         esFeriado && 'ring-1 ring-inset ring-destructive/60',
                         esHoy && 'relative z-10 ring-2 ring-inset ring-primary',
                         !props.soloLectura && 'hover:bg-accent',
+                        // El día abierto se resalta como con marcador: el popover puede quedar
+                        // lejos de la celda —se acomoda al borde de la pantalla— y sin esto no
+                        // hay nada que diga a qué día se le está cargando. El color es
+                        // `--resalte`, que existe porque ningún token servía: los fondos que ya
+                        // conviven acá están todos a menos de 11 puntos de distancia entre sí.
+                        // Gana al hover para que no se apague justo cuando el puntero está
+                        // encima, que es casi siempre mientras se carga.
+                        diaAbierto === fecha && 'bg-resalte hover:bg-resalte',
                       )}
                     >
                       {/*

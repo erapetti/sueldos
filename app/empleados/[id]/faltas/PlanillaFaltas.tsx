@@ -114,12 +114,12 @@ export function PlanillaFaltas(props: {
       enviando={enviando}
       soloLectura={props.soloLectura}
       onGuardar={alGuardar}
-      encabezado={
+      encabezado={() => (
         <span>
           Las inasistencias registradas pueden descontar horas no trabajadas del régimen base y
           pueden descontar boletos.
         </span>
-      }
+      )}
       signo="−"
       aportaBps={props.aportaBps}
       // §4.6.1 — la excepción es la falta que NO se descuenta del sueldo.
