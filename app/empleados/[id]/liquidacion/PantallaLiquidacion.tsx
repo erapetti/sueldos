@@ -420,8 +420,8 @@ export function PantallaLiquidacion(props: {
                       key={`${linea.orden}-${linea.codigo}`}
                       className={cn(
                         'border-b last:border-0',
-                        linea.destacada && 'bg-muted/60 font-semibold',
-                        linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/30 font-medium',
+                        linea.destacada && 'bg-muted/90 font-semibold',
+                        linea.codigo === 'MATERIA_GRAVADA' && 'bg-muted/60 font-medium',
                       )}
                     >
                       <td className="py-3 pr-2 pl-[22px]">{linea.descripcion}</td>
