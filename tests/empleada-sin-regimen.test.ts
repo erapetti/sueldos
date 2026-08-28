@@ -57,10 +57,28 @@ describe('liquidación de la empleada sin régimen', () => {
     expect(extras.importe.toFixed(2)).toBe('1200.00')
   })
 
-  it('el salario base queda en cero y no hay descuentos de BPS', () => {
+  /*
+    No tiene salario, así que la línea de salario base no se emite: un renglón en cero todos
+    los meses no informa nada. El mes anterior al ingreso de una empleada **con** salario sí
+    la emite, porque ahí el cero es el dato.
+  */
+  it('no emite la línea de salario base, y no hay descuentos de BPS', () => {
     const r = calcularLiquidacionMensual(sinRegimen())
-    expect(r.lineas.find((l) => l.codigo === CODIGOS.SALARIO_BASE)!.importe.toFixed(2)).toBe('0.00')
+    expect(r.lineas.some((l) => l.codigo === CODIGOS.SALARIO_BASE)).toBe(false)
     expect(r.totalDescuentosBps.toFixed(2)).toBe('0.00')
+    expect(r.totalRecalculado.toFixed(2)).toBe('0.00')
+  })
+
+  it('sus líneas son solo las que cobra: horas extras, boletos y el subtotal', () => {
+    const r = calcularLiquidacionMensual(
+      sinRegimen({ horasExtras: [horaExtra('2026-04-08', 4, false, 0)] }),
+    )
+    expect(r.lineas.map((l) => l.codigo)).toEqual([
+      CODIGOS.SUBTOTAL,
+      CODIGOS.BOLETOS,
+      CODIGOS.HORAS_EXTRAS_SIN_BPS,
+      CODIGOS.TOTAL,
+    ])
   })
 
   /*

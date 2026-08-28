@@ -805,9 +805,11 @@ el caso de esta empleada; y las faltas quedan topeadas en 0 h por §4.6, que tam
 no falta quien no tiene jornada. El aviso de «no hay régimen» de las planillas
 (`contexto.hayRegimen`) tampoco cambia: mira si hay registro, y el registro está.
 
-**Lo que queda feo y se dejó a propósito:** su liquidación emite igual la línea de salario base
-en cero. Filtrarla es una decisión de presentación que el §6.2 no cubre, así que quedó afuera del
-alcance.
+**Su liquidación no lleva línea de salario base.** Un renglón en cero todos los meses no informa
+nada, así que se omite —decisión del dueño del proyecto—. Es la única línea que se filtra, y el
+filtro mira el **salario vigente**, no el importe de la línea: el mes anterior al ingreso de una
+empleada con salario también da cero, pero ahí el cero es el dato —tiene salario y no lo cobró—
+y la línea se emite con sus días y su valor unitario.
 
 ---
 

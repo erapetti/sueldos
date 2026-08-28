@@ -206,17 +206,26 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     )
   }
 
-  lineas.push({
-    tabla: tablaBase,
-    codigo: CODIGOS.SALARIO_BASE,
-    descripcion: prorrateo.factor.equals(1)
-      ? 'Salario base'
-      : `Salario base (${prorrateo.diasConVinculo}/${prorrateo.diasDelMes} días)`,
-    cantidad: prorrateo.factor.equals(1) ? null : new Decimal(prorrateo.diasConVinculo),
-    valorUnitario: prorrateo.factor.equals(1) ? null : salario.salario,
-    importe: salarioBase,
-    signo: 1,
-  })
+  /*
+    La empleada sin régimen horario no tiene salario (§1.13 de IMPLEMENTATION_HINTS), y una
+    línea de salario base en cero todos los meses no informa nada: se omite. Es la única línea
+    que se filtra por su importe, y por el del salario vigente y no por el de la línea: el mes
+    anterior al ingreso también da cero, pero ahí el cero **es** el dato —la empleada tiene
+    salario y no lo cobró—, así que esa línea se emite con sus días y su valor unitario.
+  */
+  if (!salario.salario.isZero()) {
+    lineas.push({
+      tabla: tablaBase,
+      codigo: CODIGOS.SALARIO_BASE,
+      descripcion: prorrateo.factor.equals(1)
+        ? 'Salario base'
+        : `Salario base (${prorrateo.diasConVinculo}/${prorrateo.diasDelMes} días)`,
+      cantidad: prorrateo.factor.equals(1) ? null : new Decimal(prorrateo.diasConVinculo),
+      valorUnitario: prorrateo.factor.equals(1) ? null : salario.salario,
+      importe: salarioBase,
+      signo: 1,
+    })
+  }
 
   // ── Paso 2: faltas (solo las que descuentan, §4.6.1) ─────────────────────────────────
   const faltasQueDescuentan = entrada.faltas.filter((f) => f.descuenta)
