@@ -19,7 +19,7 @@ import {
 import { confirmarLiquidacionMensual } from '@/actions/liquidaciones'
 import { registrarPagoBancario } from '@/actions/prestamos'
 import { guardarHorasExtras } from '@/actions/novedades'
-import { aPeriodoISO, fecha, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
+import { aISO, aPeriodoISO, fecha, hoy, primerDiaDelMes, sumarMeses } from '@/lib/format/dates'
 
 let dueno: UsuarioDePrueba
 let otro: UsuarioDePrueba
@@ -146,7 +146,9 @@ describe('estado derivado en la consulta única (§4.2.3, §11)', () => {
 
     const pago = await registrarPagoBancario({
       empleadoId: empleado.id,
-      fecha: `${mesActual()}-05`,
+      // Hoy y no el día 5: §6.11 rechaza la fecha futura, así que un día fijo del mes en
+      // curso hacía fallar el caso del 1 al 4. El día no cambia lo que se prueba.
+      fecha: aISO(hoy()),
       monto: liquidacion.totalAPagarFormal.toString(),
       libro: 'FORMAL',
       concepto: 'Pago del formal',
