@@ -284,7 +284,16 @@ export function PantallaLiquidacion(props: {
   }
 
   return (
-    <div className="space-y-5">
+    /*
+      La separación entre bloques va en `gap` y no en `space-y-*`, por la hoja impresa. Con
+      `space-y-*` el margen lo lleva cada hijo que no es el último del DOM, y los últimos de esta
+      pantalla —la tabla informal, el total general y los botones— son `no-print`: en papel la
+      última tarjeta visible se queda con 20px de margen colgando debajo. Cuando el contenido
+      termina cerca del borde de la hoja, esos 20px caen en la página siguiente y sale una hoja en
+      blanco al final. El `gap` de flex solo se aplica entre elementos que existen —un
+      `display: none` no es ítem de flex—, así que no reserva nada después del último visible.
+    */
+    <div className="flex flex-col gap-5">
       <div className="no-print space-y-3">
         {/* El mismo encabezado y menú que la ficha: esto es una pantalla más de la empleada. */}
         <EncabezadoEmpleada

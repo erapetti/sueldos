@@ -407,9 +407,17 @@ pantalla sí, en la hoja impresa no, porque la hoja no lleva la tabla informal.
 **En pantalla, una tarjeta por tabla.** Antes era una sola tarjeta con el bloque de datos, las
 dos tablas separadas por líneas internas y el total general como un pie. Ahora son cuatro
 bloques hermanos —datos, tabla formal, tabla informal y total general—, cada uno en su tarjeta,
-con el `space-y-5` de la pantalla entre ellos. El total general pasó de `div` a tabla de una
+separados por el `gap-5` de la pantalla. El total general pasó de `div` a tabla de una
 fila, y **sigue apareciendo solo cuando existen las dos tablas**: con una sola, el total ya es
 su última línea.
+
+**La separación es `gap` y no `space-y-*`, por la hoja impresa.** Con `space-y-*` el margen lo
+lleva cada hijo que no es el último del DOM, y los últimos de esta pantalla —la tabla informal,
+el total general y los botones— son `no-print`: en papel la última tarjeta visible se quedaba
+con 20px de margen colgando debajo. Cuando el contenido termina cerca del borde de la hoja esos
+20px caen en la página siguiente y sale **una hoja en blanco al final**. El `gap` de flex solo
+se aplica entre elementos que existen —un `display: none` no es ítem de flex—, así que no
+reserva nada después del último visible.
 
 **Las tablas no llevan rótulo.** Decían «Conceptos con BPS» y «Conceptos sin BPS» en un
 `caption`; se sacó el `caption` entero, así que tampoco queda para el lector de pantalla. Cuál
@@ -1163,6 +1171,7 @@ que decide.
 | Un error de Prisma que no se corresponde con el código —`Argument 'dueno' is missing` con `duenoId` presente, o tipos `string` donde el schema dice `String?`— | El cliente generado quedó viejo respecto del schema | `lib/db/generated/` está en `.gitignore`. **En desarrollo**, después de `db:generate` hay que reiniciar el dev server: el proceso tiene el cliente anterior en memoria. **En el deploy**, ese directorio sobrevive de una vez a la siguiente y `git pull` no lo actualiza, así que `npm run build` corre `prisma generate` antes de compilar |
 | Una sombra o cualquier token de `@theme` no se aplica, sin error | En `@theme inline` la variable se definió apuntándose a sí misma | `--shadow-soft: var(--shadow-soft)` es circular y el valor queda inválido en silencio. Las variables de `:root` que alimentan el tema tienen que llamarse distinto: en `globals.css` son `--sombra-*` |
 | Un `<input type="number">` acepta valores fuera de `min`/`max` | Esos atributos solo limitan las flechas del spinner y la validación nativa, no lo que se tipea | Las planillas mensuales clampean en el `onChange`. El tope real de horas de falta contra el régimen lo valida el servidor (§4.6), que es donde tiene que estar |
+| Al imprimir sale una última hoja en blanco | El contenedor usaba `space-y-*` y sus últimos hijos son `no-print`: el último bloque visible se queda con el margen inferior, que empuja el documento unos píxeles más allá del borde de la hoja | Separar con `gap` en un contenedor flex, que no reserva nada alrededor de un `display: none`. Vale para cualquier pantalla imprimible que termine en elementos ocultos |
 | Al verificar el CSS de impresión, las utilidades `print:*` de Tailwind parecen no existir | Un recorrido de `document.styleSheets` que solo mira las reglas de primer nivel no las encuentra: viven dentro de `@layer utilities`, y ahí el `@media print` es una regla anidada | Hay que recorrer `CSSGroupingRule.cssRules` en recursión. Las de `globals.css` sí están arriba, así que el recorrido plano encuentra `.no-print` y hace parecer que Tailwind no emitió nada |
 | Un archivo de tests rompe el build de producción | `tsconfig.json` incluía `**/*.ts`, así que `next build` typechequeaba `tests/` | Resuelto: ver abajo |
 
