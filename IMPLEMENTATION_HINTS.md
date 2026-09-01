@@ -53,6 +53,9 @@ Las migraciones son cuatro y hay una escrita a mano:
   (§1.7.3)
 - `20260828000000_salario_sin_regimen` — **a mano**: `ck_salarios_montos` relajado para admitir
   el par (0, 0) de la empleada sin régimen horario (§1.13)
+- `20260828000100_cobra_boletos_serie` — **a mano**: la tabla `empleado_cobra_boletos` con su
+  CHECK, la fila por empleada que rellena la serie y el borrado de la columna de `empleados`
+  (§1.7.6)
 
 `prisma migrate dev` no conoce los `CHECK` y los reporta como drift. Para cambiar el modelo:
 `prisma migrate dev --create-only` y volver a agregarlos si la migración generada recrea
@@ -313,7 +316,8 @@ ninguno. La empleada que solo tocó un libro ve un solo listado sin rótulo, com
 `empleados`, y el §5 enumera las series una por una sin incluirla. Las dos cosas quedaron
 desactualizadas: el aporte es la tabla `empleado_aporte_bps`, con `fecha_vigencia`, y las dos
 columnas de `empleados` **ya no existen**. El SPECS no se edita sin permiso del dueño (§2.7): la
-actualización quedó anotada como pendiente aparte.
+actualización quedó anotada como pendiente aparte. Lo mismo pasó después con «cobra boletos»
+(§1.7.6).
 
 **Por qué.** Con el aporte suelto en `empleados`, cambiárselo a una empleada con historia y
 recalcular un período viejo le movía **todas** las líneas al otro libro, porque el motor leía el
@@ -437,6 +441,44 @@ tabla**. Es a propósito, y es la consecuencia que hay que tener presente antes 
 
 Lo que **no** se toca al imprimir es el encabezado de datos de la empleada: es lo único que
 identifica la hoja, porque el encabezado de la página es `no-print` (§7.6).
+
+### 1.7.6 «Cobra boletos» también es una serie, y el SPECS lo pone en `empleados`
+
+**Divergencia con el SPECS.** El §4.2 lista `cobra_boletos` como columna de `empleados` y el §5
+enumera las series sin incluirla. Las dos quedaron desactualizadas: es la tabla
+`empleado_cobra_boletos`, con `fecha_vigencia`, y la columna **ya no existe**. El SPECS no se
+edita sin permiso del dueño (§2.7): la actualización queda anotada aparte, junto con la del
+aporte a BPS (§1.7.3), que arrastra exactamente la misma divergencia.
+
+**Por qué.** El mismo problema del §1.7.3, con el mismo síntoma: con el valor suelto en
+`empleados`, cambiárselo a una empleada con historia y recalcular un período viejo le quitaba
+—o le agregaba— los boletos de **todos** los meses, porque el motor leía el valor de hoy y no el
+que regía ese mes. Las liquidaciones confirmadas nunca corrieron peligro —tienen su snapshot
+(§4.14)—, pero el recálculo daba un resultado que nunca fue cierto.
+
+**`null` no es «no cobra».** Es el sexto caso del §6.8, `COBRA_BOLETOS`: tomarlo como `false`
+le quitaría los boletos en silencio a quien sí los cobra. Que no llegue a dispararse depende de
+que el alta cree el primer registro en su transacción (§4.2.2) y de que la migración lo haya
+hecho para las que ya existían.
+
+**Cada lectura con su fecha.** Es la trampa que el §1.7.3 ya documenta, y acá se cobró una
+víctima: el commit que hizo que el pie de las planillas no anunciara boletos a quien no los
+cobra lo tomó de `accesoAEmpleado`, que resuelve **hoy**. Ahora sale de `contextoDePlanilla`,
+resuelto al mes de la planilla, igual que `aportaBps`. `lib/auth/guards.ts` **dejó de traerlo**:
+era su único consumidor.
+
+| Dónde | Con qué fecha |
+|---|---|
+| `lib/liquidacion/datos.ts` | La del período liquidado, junto con las otras series |
+| `lib/consultas/planilla.ts` → el pie de las dos planillas | La del mes de la planilla |
+
+**No es lo mismo que el valor del boleto.** `valor_boleto` (§7.9) también es una serie, pero
+**global** y de administración; esta es por empleada. El §6.8 las cruza: solo se reclama el
+valor del boleto si esa empleada, ese mes, cobra boletos.
+
+**En la ficha es el cuarto bloque de «Datos › Salario»**, con su tabla de vigencias y su
+`FormularioSeries`. Vive ahí y no en «Generales» —donde estaba el switch— por decisión del dueño
+del proyecto: las cosas que se registran con vigencia se leen juntas.
 
 ### 1.8 «Con aviso» también puede no descontar
 

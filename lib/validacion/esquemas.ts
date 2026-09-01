@@ -123,7 +123,6 @@ export const datosEmpleado = z.object({
     )
     .optional(),
   fechaIngreso: fechaNoFutura,
-  cobraBoletos: z.boolean(),
   celular: z.string().trim().max(60).optional().or(z.literal('')),
   direccion: z.string().trim().max(255).optional().or(z.literal('')),
   cedula: z
@@ -135,14 +134,15 @@ export const datosEmpleado = z.object({
 })
 
 /**
- * §4.2.2 — el alta crea el empleado y los cuatro primeros registros de serie en una
- * transacción, todos con vigencia el 1° del mes de `fechaIngreso`.
+ * §4.2.2 — el alta crea el empleado y los primeros registros de serie en una transacción,
+ * todos con vigencia el 1° del mes de `fechaIngreso`.
  *
- * El aporte a BPS y el seguro de salud entran acá y no en `datosEmpleado` porque no son
- * columnas de `empleados`: son el primer registro de su serie (§4.4.1).
+ * El aporte a BPS con su seguro de salud (§4.4.1) y «cobra boletos» (§6.4) entran acá y no en
+ * `datosEmpleado` porque no son columnas de `empleados`: son el primer registro de su serie.
  */
 export const altaEmpleado = datosEmpleado.extend({
   aportaBps: z.boolean(),
+  cobraBoletos: z.boolean(),
   seguroSalud: z
     .enum(CODIGOS_SEGURO_SALUD as [string, ...string[]])
     .nullable()
@@ -215,6 +215,17 @@ export const nuevoAporteBps = z.object({
     .enum(CODIGOS_SEGURO_SALUD as [string, ...string[]])
     .nullable()
     .optional(),
+  reemplazar: z.boolean().default(false),
+})
+
+/**
+ * §6.4 — «cobra boletos» también es una serie: cambiarlo rige desde un mes y no hacia atrás,
+ * así que recalcular un período viejo sigue dando lo que dio.
+ */
+export const nuevoCobraBoletos = z.object({
+  empleadoId: idUuid,
+  fechaVigencia: fechaVigenciaISO,
+  cobraBoletos: z.boolean(),
   reemplazar: z.boolean().default(false),
 })
 

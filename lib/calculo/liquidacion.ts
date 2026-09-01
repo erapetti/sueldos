@@ -126,7 +126,18 @@ function verificarDatos(entrada: EntradaLiquidacion): void {
       destino: 'salario',
     })
   }
-  if (entrada.empleado.cobraBoletos && !entrada.valorBoleto) {
+  /*
+    §6.4 — «cobra boletos» también es una serie (§5), así que puede faltar, y faltar **no** es
+    «no cobra»: tomarlo como `false` le quitaría los boletos en silencio a quien sí los cobra.
+    Mismo razonamiento que con el aporte.
+  */
+  if (entrada.cobraBoletos === null) {
+    faltantes.push({
+      codigo: 'COBRA_BOLETOS',
+      mensaje: `No hay «cobra boletos» vigente para ${formatearPeriodo(entrada.periodo)}`,
+      destino: 'salario',
+    })
+  } else if (entrada.cobraBoletos && !entrada.valorBoleto) {
     faltantes.push({
       codigo: 'VALOR_BOLETO',
       mensaje: `La empleada cobra boletos y no hay valor de boleto vigente para ${formatearPeriodo(entrada.periodo)}`,
@@ -177,6 +188,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   const salario = entrada.salario!
   const regimen = entrada.regimen!
   const aportaBps = entrada.aporteBps!.aportaBps
+  const cobraBoletos = entrada.cobraBoletos!
 
   const { empleado, periodo } = entrada
   const avisos: string[] = []
@@ -411,7 +423,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
   // Cada línea se emite solo si tiene días: un renglón de «0 días» por $0 no dice nada.
   let detalleBoletos = null
 
-  if (empleado.cobraBoletos) {
+  if (cobraBoletos) {
     detalleBoletos = calcularBoletos({
       periodo,
       empleado,

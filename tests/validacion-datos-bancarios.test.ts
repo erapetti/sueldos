@@ -14,7 +14,6 @@ function validar(campos: { banco?: string; cuenta?: string }) {
     banco: 'BROU',
     ...campos,
     fechaIngreso: '2026-01-01',
-    cobraBoletos: true,
   })
   const clave = 'banco' in campos ? 'banco' : 'cuenta'
   if (resultado.success) return { ok: true as const, valor: resultado.data[clave] }

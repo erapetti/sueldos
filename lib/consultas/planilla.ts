@@ -24,6 +24,14 @@ export type ContextoPlanilla = {
    * `null` es «no hay registro»: no es lo mismo que «no aporta», y el que consume decide.
    */
   aportaBps: boolean | null
+  /**
+   * §6.4 — si cobra boletos **en ese mes**. También es una serie, así que sale de acá y no de
+   * `accesoAEmpleado`, que resuelve hoy: el pie de un mes viejo anuncia los boletos que ese
+   * mes correspondían.
+   *
+   * `null` es «no hay registro». El pie no anuncia nada: ese mes tampoco liquida (§6.8).
+   */
+  cobraBoletos: boolean | null
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
   hayRegimen: boolean
 }
@@ -35,8 +43,17 @@ export async function contextoDePlanilla(
   const desde = primerDiaDelMes(periodo)
   const hasta = ultimoDiaDelMes(periodo)
 
-  const [regimenFila, salario, valorHoraNegro, aporteBps, feriados, liquidacion, extras, faltas] =
-    await Promise.all([
+  const [
+    regimenFila,
+    salario,
+    valorHoraNegro,
+    aporteBps,
+    cobraBoletos,
+    feriados,
+    liquidacion,
+    extras,
+    faltas,
+  ] = await Promise.all([
     prisma.empleadoRegimen.findFirst({
       where: { empleadoId, fechaVigencia: { lte: desde } },
       orderBy: { fechaVigencia: 'desc' },
@@ -50,6 +67,10 @@ export async function contextoDePlanilla(
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.empleadoAporteBps.findFirst({
+      where: { empleadoId, fechaVigencia: { lte: desde } },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    prisma.empleadoCobraBoletos.findFirst({
       where: { empleadoId, fechaVigencia: { lte: desde } },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -122,6 +143,7 @@ export async function contextoDePlanilla(
       : null,
     valorHoraNegro: valorHoraNegro ? aDecimal(valorHoraNegro.valor).toFixed(2) : null,
     aportaBps: aporteBps ? aporteBps.aportaBps : null,
+    cobraBoletos: cobraBoletos ? cobraBoletos.cobraBoletos : null,
     estadoLiquidacion: !liquidacion
       ? 'SIN_LIQUIDAR'
       // §4.14 — «pagada» es que no falte ningún libro: con el formal transferido y las horas

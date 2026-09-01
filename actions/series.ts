@@ -14,6 +14,7 @@ import { exigirEdicion } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
 import {
   nuevoAporteBps,
+  nuevoCobraBoletos,
   nuevoRegimen,
   nuevoSalario,
   nuevoValorHoraNegro,
@@ -234,6 +235,39 @@ export async function registrarAporteBps(entrada: unknown) {
 }
 
 /**
+ * §6.4 — «cobra boletos» es una serie con vigencia, como el aporte a BPS y por el mismo
+ * motivo: leerlo de un campo suelto hacía que recalcular un período viejo le quitara —o le
+ * agregara— los boletos de todos los meses, con el valor de hoy y no con el que regía entonces.
+ */
+export async function registrarCobraBoletos(entrada: unknown) {
+  return ejecutar('series.cobraBoletos', async (log) => {
+    const datos = validar(nuevoCobraBoletos, entrada)
+    const { usuario, empleado } = await exigirEdicion(datos.empleadoId)
+    log({ usuarioId: usuario.id, entidad: 'empleado_cobra_boletos', entidadId: empleado.id })
+
+    const fechaVigencia = parseFechaISO(datos.fechaVigencia)
+
+    const existente = await prisma.empleadoCobraBoletos.findUnique({
+      where: { empleadoId_fechaVigencia: { empleadoId: empleado.id, fechaVigencia } },
+    })
+    if (existente && !datos.reemplazar) throw new ErrorNegocio(YA_EXISTE)
+
+    const comun = { cobraBoletos: datos.cobraBoletos, modificadoPor: usuario.id }
+
+    if (existente) {
+      await prisma.empleadoCobraBoletos.update({ where: { id: existente.id }, data: comun })
+    } else {
+      await prisma.empleadoCobraBoletos.create({
+        data: { empleadoId: empleado.id, fechaVigencia, creadoPor: usuario.id, ...comun },
+      })
+    }
+
+    revalidatePath(`/empleados/${empleado.id}`)
+    return exito(undefined, await avisoPorLiquidacionesAfectadas(empleado.id, fechaVigencia))
+  })
+}
+
+/**
  * §4.4 — la suma de los 7 días debe ser igual a `horasSemanales` del salario vigente a esa
  * misma fecha. Si no coincide, se bloquea el guardado.
  */
@@ -315,7 +349,7 @@ export async function registrarRegimen(entrada: unknown) {
   })
 }
 
-type SerieDelEmpleado = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'APORTE_BPS' | 'REGIMEN'
+type SerieDelEmpleado = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'APORTE_BPS' | 'COBRA_BOLETOS' | 'REGIMEN'
 
 /**
  * §5.4 — un registro de serie se puede borrar únicamente si su `fechaVigencia` es futura y
@@ -330,7 +364,9 @@ export async function borrarRegistroDeSerie(serie: SerieDelEmpleado, id: string)
           ? await prisma.empleadoValorHoraNegro.findUnique({ where: { id } })
           : serie === 'APORTE_BPS'
             ? await prisma.empleadoAporteBps.findUnique({ where: { id } })
-            : await prisma.empleadoRegimen.findUnique({ where: { id } })
+            : serie === 'COBRA_BOLETOS'
+              ? await prisma.empleadoCobraBoletos.findUnique({ where: { id } })
+              : await prisma.empleadoRegimen.findUnique({ where: { id } })
 
     if (!registro) throw new ErrorNegocio('No se encontró el registro.')
 
@@ -356,6 +392,7 @@ export async function borrarRegistroDeSerie(serie: SerieDelEmpleado, id: string)
     if (serie === 'SALARIO') await prisma.empleadoSalario.delete({ where: { id } })
     else if (serie === 'VALOR_HORA_NEGRO') await prisma.empleadoValorHoraNegro.delete({ where: { id } })
     else if (serie === 'APORTE_BPS') await prisma.empleadoAporteBps.delete({ where: { id } })
+    else if (serie === 'COBRA_BOLETOS') await prisma.empleadoCobraBoletos.delete({ where: { id } })
     else await prisma.empleadoRegimen.delete({ where: { id } })
 
     revalidatePath(`/empleados/${empleado.id}`)

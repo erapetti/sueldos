@@ -20,7 +20,12 @@ import { prisma } from '@/lib/db/prisma'
 import { fecha } from '@/lib/format/dates'
 import { confirmarLiquidacionMensual, anularLiquidacionConfirmada } from '@/actions/liquidaciones'
 import { registrarPagoBancario, registrarPrestamo } from '@/actions/prestamos'
-import { registrarAporteBps, registrarRegimen, registrarSalario } from '@/actions/series'
+import {
+  registrarAporteBps,
+  registrarCobraBoletos,
+  registrarRegimen,
+  registrarSalario,
+} from '@/actions/series'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { guardarHorasExtras, guardarFaltas, guardarPagoAdicional } from '@/actions/novedades'
 import { registrarLicencia } from '@/actions/licencias'
@@ -1208,5 +1213,91 @@ describe('empleada sin régimen y sin aporte a BPS', () => {
 
     expect(rechazada.ok).toBe(false)
     if (!rechazada.ok) expect(rechazada.campos?.aportaBps).toBeTruthy()
+  })
+})
+
+
+/**
+ * §6.4 — «cobra boletos» es una serie con vigencia, por el mismo motivo que el aporte a BPS:
+ * leerlo de un campo suelto de `empleados` hacía que recalcular un período viejo usara el
+ * valor de hoy y no el que regía ese mes.
+ */
+describe('§6.4 — «cobra boletos» es una serie con vigencia', () => {
+  /** Los boletos que la liquidación confirmada de ese período dejó registrados. */
+  async function boletosDe(empleadoId: string, periodo: Date) {
+    const lineas = await prisma.liquidacionLinea.findMany({
+      where: { liquidacion: { empleadoId, periodo }, codigo: 'BOLETOS' },
+    })
+    return lineas.map((l) => l.importe.toString())
+  }
+
+  it('cada período se liquida con el valor que regía ese mes, y recalcular uno viejo no lo mueve', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id, cobraBoletos: true })
+
+    // Deja de cobrar boletos desde junio. Mayo queda cerrado por la vigencia, no por la fecha.
+    const cambio = await registrarCobraBoletos({
+      empleadoId: empleado.id,
+      fechaVigencia: '2026-06-01',
+      cobraBoletos: false,
+    })
+    expect(cambio.ok).toBe(true)
+
+    expect((await liquidar(empleado.id, '2026-05')).ok).toBe(true)
+    expect((await liquidar(empleado.id, '2026-06')).ok).toBe(true)
+
+    // Mayo de 2026 tiene 21 días de lunes a viernes: 42 boletos × $50 = $2.100.
+    expect(await boletosDe(empleado.id, fecha(2026, 5, 1))).toEqual(['2100'])
+    expect(await boletosDe(empleado.id, fecha(2026, 6, 1))).toEqual([])
+
+    // Recalcular mayo con el cambio ya registrado le sigue dando sus boletos: es lo que antes
+    // no pasaba, porque el motor leía el valor de hoy.
+    const recalculo = await calcularPeriodo(empleado.id, fecha(2026, 5, 1))
+    expect(recalculo.resultado.boletos).not.toBeNull()
+    expect(
+      recalculo.resultado.lineas
+        .filter((l) => l.codigo === 'BOLETOS')
+        .map((l) => l.importe.toFixed(2)),
+    ).toEqual(['2100.00'])
+  })
+
+  /*
+    §4.2.2 — el alta crea el primer registro junto con el empleado. Sin él la primera
+    liquidación fallaría por §6.8: `null` no es «no cobra».
+  */
+  it('el alta crea el primer registro con vigencia el 1° del mes de ingreso', async () => {
+    const alta = await crearEmpleado({
+      alias: 'Sin boletos',
+      nombreCompleto: 'Sonia Sin Boletos',
+      fechaIngreso: '2026-04-15',
+      cobraBoletos: false,
+      aportaBps: true,
+      seguroSalud: null,
+      salario: '50000',
+      horasSemanales: 30,
+      valorHoraNegro: '300',
+      regimen: { lunes: 6, martes: 6, miercoles: 6, jueves: 6, viernes: 6, sabado: 0, domingo: 0 },
+    })
+    expect(alta.ok).toBe(true)
+    if (!alta.ok) return
+
+    const registros = await prisma.empleadoCobraBoletos.findMany({
+      where: { empleadoId: alta.datos.id },
+    })
+    expect(registros).toHaveLength(1)
+    expect(registros[0].fechaVigencia).toEqual(fecha(2026, 4, 1))
+    expect(registros[0].cobraBoletos).toBe(false)
+
+    // Y su liquidación no lleva la línea de boletos, sin pedir el valor del boleto.
+    expect((await liquidar(alta.datos.id, '2026-05')).ok).toBe(true)
+    expect(await boletosDe(alta.datos.id, fecha(2026, 5, 1))).toEqual([])
+  })
+
+  it('sin ningún registro de la serie el período no liquida (§6.8)', async () => {
+    const empleado = await crearEmpleadoDePrueba({ duenoId: dueno.id })
+    await prisma.empleadoCobraBoletos.deleteMany({ where: { empleadoId: empleado.id } })
+
+    const rechazada = await liquidar(empleado.id, '2026-05')
+    expect(rechazada.ok).toBe(false)
+    if (!rechazada.ok) expect(rechazada.error).toContain('cobra boletos')
   })
 })

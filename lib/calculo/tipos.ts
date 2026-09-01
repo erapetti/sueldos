@@ -79,7 +79,6 @@ export type FeriadoCalculo = {
 export type EmpleadoCalculo = {
   fechaIngreso: Date
   fechaEgreso: Date | null
-  cobraBoletos: boolean
 }
 
 /**
@@ -103,6 +102,12 @@ export type EntradaLiquidacion = {
   periodo: Date
   empleado: EmpleadoCalculo
   aporteBps: AporteBpsVigente | null
+  /**
+   * §6.4 — «cobra boletos» vigente para el período, ya resuelto de la serie (§5.2). Como el
+   * aporte, puede faltar, y faltar **no** es «no cobra»: el motor falla por §6.8 en vez de
+   * quitarle en silencio los boletos a quien sí los cobra.
+   */
+  cobraBoletos: boolean | null
   salario: SalarioVigente | null
   regimen: RegimenHoras | null
   valorHoraNegro: Decimal | null

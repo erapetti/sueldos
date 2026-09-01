@@ -22,6 +22,7 @@ export async function datosDeFicha(empleadoId: string) {
     valoresHoraNegro,
     regimenes,
     aportesBps,
+    cobraBoletos,
     movimientos,
     cuotas,
     liquidaciones,
@@ -44,6 +45,10 @@ export async function datosDeFicha(empleadoId: string) {
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.empleadoAporteBps.findMany({
+      where: { empleadoId },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    prisma.empleadoCobraBoletos.findMany({
       where: { empleadoId },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -169,6 +174,12 @@ export async function datosDeFicha(empleadoId: string) {
       aportaBps: a.aportaBps,
       seguroSalud: a.seguroSalud,
       seguroSaludDescripcion: descripcionSeguroSalud(a.seguroSalud),
+    })),
+    cobraBoletos: cobraBoletos.map((c) => ({
+      id: c.id,
+      fechaVigencia: formatearFecha(c.fechaVigencia),
+      fechaVigenciaISO: aISO(c.fechaVigencia),
+      cobraBoletos: c.cobraBoletos,
     })),
     librosDeCuenta: librosDeCuenta.map((l) => ({ ...l, saldo: l.saldo.toFixed(2) })),
     // El saldo de la empleada es la suma de los dos libros: lo que se le debe en total.

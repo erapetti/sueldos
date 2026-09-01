@@ -85,9 +85,9 @@ export function entradaBase(over: Partial<EntradaLiquidacion> = {}): EntradaLiqu
     empleado: {
       fechaIngreso: f('2020-01-01'),
       fechaEgreso: null,
-      cobraBoletos: true,
     },
     aporteBps: { aportaBps: true, seguroSalud: null },
+    cobraBoletos: true,
     salario: { salario: D(65000), horasSemanales: D(30) },
     regimen: regimenLunesAViernes(6),
     valorHoraNegro: D(300),

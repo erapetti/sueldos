@@ -35,7 +35,7 @@ function limpiar(valor: string | undefined | null): string | null {
 
 /**
  * §4.2.2 — el alta es un único formulario que crea, en una transacción, el empleado y el
- * primer registro de cada una de las cuatro series, todos con vigencia el 1° del mes de
+ * primer registro de cada serie, todos con vigencia el 1° del mes de
  * `fechaIngreso`.
  */
 export async function crearEmpleado(entrada: unknown) {
@@ -76,10 +76,23 @@ export async function crearEmpleado(entrada: unknown) {
           banco: limpiar(datos.banco),
           cuenta: limpiar(datos.cuenta),
           fechaIngreso,
-          cobraBoletos: datos.cobraBoletos,
           celular: limpiar(datos.celular),
           direccion: limpiar(datos.direccion),
           cedula: limpiar(datos.cedula),
+          ...auditoria,
+        },
+      })
+
+      /*
+        §6.4 — el primer registro de «cobra boletos». Va por el mismo motivo que el del
+        aporte: sin él, la primera liquidación fallaría por §6.8, porque un `null` no es
+        «no cobra».
+      */
+      await tx.empleadoCobraBoletos.create({
+        data: {
+          empleadoId: creado.id,
+          fechaVigencia: vigencia,
+          cobraBoletos: datos.cobraBoletos,
           ...auditoria,
         },
       })
@@ -171,7 +184,6 @@ export async function actualizarEmpleado(empleadoId: string, entrada: unknown) {
         banco: limpiar(datos.banco),
         cuenta: limpiar(datos.cuenta),
         fechaIngreso: parseFechaISO(datos.fechaIngreso),
-        cobraBoletos: datos.cobraBoletos,
         celular: limpiar(datos.celular),
         direccion: limpiar(datos.direccion),
         cedula: limpiar(datos.cedula),
