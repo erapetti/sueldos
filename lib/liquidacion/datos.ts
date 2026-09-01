@@ -54,6 +54,7 @@ export async function armarContextoLiquidacion(
     salario,
     regimen,
     aporteBps,
+    cobraBoletos,
     valorHoraNegro,
     valorBoleto,
     filasBps,
@@ -76,6 +77,11 @@ export async function armarContextoLiquidacion(
     }),
     // §4.4.1 — el aporte a BPS es una serie más: se resuelve al período, no se lee de hoy.
     prisma.empleadoAporteBps.findFirst({
+      where: { empleadoId, ...vigenteAlPeriodo },
+      orderBy: { fechaVigencia: 'desc' },
+    }),
+    // §6.4 — «cobra boletos», por el mismo motivo y con la misma fecha.
+    prisma.empleadoCobraBoletos.findFirst({
       where: { empleadoId, ...vigenteAlPeriodo },
       orderBy: { fechaVigencia: 'desc' },
     }),
@@ -165,11 +171,11 @@ export async function armarContextoLiquidacion(
     empleado: {
       fechaIngreso: empleado.fechaIngreso,
       fechaEgreso: empleado.fechaEgreso,
-      cobraBoletos: empleado.cobraBoletos,
     },
     aporteBps: aporteBps
       ? { aportaBps: aporteBps.aportaBps, seguroSalud: aporteBps.seguroSalud }
       : null,
+    cobraBoletos: cobraBoletos ? cobraBoletos.cobraBoletos : null,
     salario: salario
       ? { salario: aDecimal(salario.salario), horasSemanales: aDecimal(salario.horasSemanales) }
       : null,

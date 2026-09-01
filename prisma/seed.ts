@@ -198,7 +198,6 @@ async function datosDemo() {
         banco: demo.banco,
         cuenta: demo.cuenta,
         fechaIngreso: vigencia,
-        cobraBoletos: demo.cobraBoletos,
         activo: demo.activo ?? true,
         visible: demo.visible ?? true,
         celular: '099 123 456',
@@ -207,7 +206,15 @@ async function datosDemo() {
       },
     })
 
-    // §4.2.2 — los cuatro registros de serie, con vigencia el 1° del mes de ingreso.
+    // §4.2.2 — el primer registro de cada serie, con vigencia el 1° del mes de ingreso.
+    await prisma.empleadoCobraBoletos.create({
+      data: {
+        empleadoId: empleado.id,
+        fechaVigencia: vigencia,
+        cobraBoletos: demo.cobraBoletos,
+        ...aud,
+      },
+    })
     await prisma.empleadoAporteBps.create({
       data: {
         empleadoId: empleado.id,

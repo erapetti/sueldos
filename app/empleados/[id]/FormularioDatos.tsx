@@ -10,7 +10,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { CampoTexto } from '@/components/dominio/CampoMonto'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { SelectorFecha } from '@/components/dominio/SelectorFecha'
@@ -36,7 +35,6 @@ export function FormularioDatos({
     cuenta: string | null
     fechaIngreso: string
     fechaEgreso: string | null
-    cobraBoletos: boolean
     celular: string | null
     direccion: string | null
     cedula: string | null
@@ -55,7 +53,6 @@ export function FormularioDatos({
     banco: valores.banco ?? '',
     cuenta: valores.cuenta ?? '',
     fechaIngreso: valores.fechaIngreso as string | null,
-    cobraBoletos: valores.cobraBoletos,
     celular: valores.celular ?? '',
     direccion: valores.direccion ?? '',
     cedula: valores.cedula ?? '',
@@ -160,18 +157,6 @@ export function FormularioDatos({
           error={campos.direccion}
           disabled={deshabilitado}
         />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <Label htmlFor="cobra-boletos">Cobra boletos</Label>
-          <Switch
-            id="cobra-boletos"
-            checked={datos.cobraBoletos}
-            onCheckedChange={(v) => cambiar('cobraBoletos', v)}
-            disabled={deshabilitado}
-          />
-        </div>
       </div>
 
       {!soloLectura ? (

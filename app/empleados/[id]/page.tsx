@@ -68,7 +68,6 @@ export default async function PaginaFicha({
         fechaEgreso: datos.empleado.fechaEgreso
           ? datos.empleado.fechaEgreso.toISOString().slice(0, 10)
           : null,
-        cobraBoletos: datos.empleado.cobraBoletos,
         celular: datos.empleado.celular,
         direccion: datos.empleado.direccion,
         cedula: datos.empleado.cedula,
@@ -78,6 +77,7 @@ export default async function PaginaFicha({
       salarios={datos.salarios}
       valoresHoraNegro={datos.valoresHoraNegro}
       aportesBps={datos.aportesBps}
+      cobraBoletos={datos.cobraBoletos}
       regimenes={datos.regimenes}
       librosDeCuenta={datos.librosDeCuenta}
       saldo={datos.saldo}

@@ -241,7 +241,7 @@ describe('5. horas extras en un día no laborable del régimen', () => {
   it('no genera boletos adicionales si el empleado no cobra boletos', () => {
     const r = calcularLiquidacionMensual(
       entradaBase({
-        empleado: { ...entradaBase().empleado, cobraBoletos: false },
+        cobraBoletos: false,
         horasExtras: [horaExtra('2026-04-11', 4, true, 0)],
       }),
     )
@@ -621,7 +621,7 @@ describe('11. plan de pagos', () => {
 describe('12. empleado que no cobra boletos', () => {
   it('no emite la línea de boletos', () => {
     const r = calcularLiquidacionMensual(
-      entradaBase({ empleado: { ...entradaBase().empleado, cobraBoletos: false } }),
+      entradaBase({ cobraBoletos: false }),
     )
     expect(lineasCon(r.lineas, CODIGOS.BOLETOS)).toBe(0)
     expect(r.boletos).toBeNull()
@@ -632,7 +632,7 @@ describe('12. empleado que no cobra boletos', () => {
     expect(() =>
       calcularLiquidacionMensual(
         entradaBase({
-          empleado: { ...entradaBase().empleado, cobraBoletos: false },
+          cobraBoletos: false,
           valorBoleto: null,
         }),
       ),
@@ -735,6 +735,31 @@ describe('14. datos faltantes: error explícito, no cálculo parcial (§6.8)', (
     } catch (e) {
       expect(e).toBeInstanceOf(ErrorDatosFaltantes)
       expect((e as ErrorDatosFaltantes).faltantes.map((x) => x.codigo)).toEqual(['APORTE_BPS'])
+    }
+  })
+
+  /*
+    §6.4 — «cobra boletos» es una serie, así que faltar es posible, y faltar **no** es «no
+    cobra»: tomarlo como false le quitaría los boletos en silencio a quien sí los cobra.
+  */
+  it('sin «cobra boletos» vigente', () => {
+    try {
+      calcularLiquidacionMensual(entradaBase({ cobraBoletos: null }))
+      expect.unreachable('debía lanzar')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ErrorDatosFaltantes)
+      expect((e as ErrorDatosFaltantes).faltantes.map((x) => x.codigo)).toEqual(['COBRA_BOLETOS'])
+    }
+  })
+
+  // Sin el registro no se sabe si cobra, así que tampoco se le exige el valor del boleto: el
+  // error que corresponde es uno solo, y es el de la serie que falta.
+  it('sin «cobra boletos» no se reclama además el valor del boleto', () => {
+    try {
+      calcularLiquidacionMensual(entradaBase({ cobraBoletos: null, valorBoleto: null }))
+      expect.unreachable('debía lanzar')
+    } catch (e) {
+      expect((e as ErrorDatosFaltantes).faltantes.map((x) => x.codigo)).toEqual(['COBRA_BOLETOS'])
     }
   })
 

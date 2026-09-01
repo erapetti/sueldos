@@ -75,7 +75,7 @@ export default async function PaginaFaltas({
         guardados={guardados}
         estadoLiquidacion={contexto.estadoLiquidacion}
         aportaBps={contexto.aportaBps}
-        cobraBoletos={acceso.empleado.cobraBoletos}
+        cobraBoletos={contexto.cobraBoletos ?? false}
         soloLectura={!puedeEditar(acceso.nivel)}
       />
     </>

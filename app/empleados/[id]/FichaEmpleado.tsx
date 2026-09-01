@@ -48,6 +48,13 @@ type AporteBps = {
   seguroSaludDescripcion: string | null
 }
 
+type CobraBoletos = {
+  id: string
+  fechaVigencia: string
+  fechaVigenciaISO: string
+  cobraBoletos: boolean
+}
+
 type Regimen = {
   id: string
   fechaVigencia: string
@@ -72,7 +79,6 @@ export type FichaProps = {
     cuenta: string | null
     fechaIngreso: string
     fechaEgreso: string | null
-    cobraBoletos: boolean
     celular: string | null
     direccion: string | null
     cedula: string | null
@@ -82,6 +88,7 @@ export type FichaProps = {
   salarios: Salario[]
   valoresHoraNegro: ValorHoraNegro[]
   aportesBps: AporteBps[]
+  cobraBoletos: CobraBoletos[]
   regimenes: Regimen[]
   /** §4.9 — un listado por libro, con su propio saldo. Solo los que tienen movimientos. */
   librosDeCuenta: {
@@ -179,6 +186,19 @@ export function FichaEmpleado(props: FichaProps) {
       etiqueta: 'Origen',
       className: 'text-sm text-muted-foreground',
       celda: (v) => (v.origen === 'AUMENTO_MASIVO' ? 'Aumento masivo' : 'Manual'),
+    },
+  ]
+
+  const columnasDeCobraBoletos: Columna<CobraBoletos>[] = [
+    { clave: 'vigencia', etiqueta: 'Vigente desde', className: 'tabular', celda: (c) => c.fechaVigencia },
+    {
+      clave: 'cobra',
+      etiqueta: 'Cobra boletos',
+      celda: (c) => (
+        <Badge variant={c.cobraBoletos ? 'secondary' : 'outline'}>
+          {c.cobraBoletos ? 'Sí' : 'No'}
+        </Badge>
+      ),
     },
   ]
 
@@ -375,6 +395,29 @@ export function FichaEmpleado(props: FichaProps) {
                 tipo="APORTE_BPS"
                 empleadoId={props.empleadoId}
                 regimenes={props.regimenes}
+                onGuardado={() => router.refresh()}
+              />
+            ) : null}
+          </section>
+
+          {/*
+            §6.4 — «cobra boletos» es una serie por el mismo motivo que el aporte, y vive acá
+            —y no en «Generales»— por decisión del dueño del proyecto: las cuatro cosas que se
+            registran con vigencia se leen juntas.
+          */}
+          <section className="space-y-3">
+            <h2 className="text-[20px]">Cobra boletos</h2>
+            <p className="text-sm text-muted-foreground">
+              Decide si la liquidación lleva la línea de boletos del mes (§6.4). El valor del
+              boleto no es de la empleada: es el parámetro de administración de «Costo boletos»
+              (§7.9).
+            </p>
+            <Tabla columnas={columnasDeCobraBoletos} filas={props.cobraBoletos} />
+
+            {!props.soloLectura ? (
+              <FormularioSeries
+                tipo="COBRA_BOLETOS"
+                empleadoId={props.empleadoId}
                 onGuardado={() => router.refresh()}
               />
             ) : null}

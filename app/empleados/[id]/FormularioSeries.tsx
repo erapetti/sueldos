@@ -21,6 +21,7 @@ import { CampoMonto } from '@/components/dominio/CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
 import {
   registrarAporteBps,
+  registrarCobraBoletos,
   registrarRegimen,
   registrarSalario,
   registrarValorHoraNegro,
@@ -28,12 +29,13 @@ import {
 import { SEGUROS_SALUD } from '@/constants/segurosSalud'
 import { NOMBRES_DIAS_CORTOS } from '@/lib/format/dates'
 
-type Tipo = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'APORTE_BPS' | 'REGIMEN'
+type Tipo = 'SALARIO' | 'VALOR_HORA_NEGRO' | 'APORTE_BPS' | 'COBRA_BOLETOS' | 'REGIMEN'
 
 const TITULOS: Record<Tipo, string> = {
   SALARIO: 'Nuevo salario',
   VALOR_HORA_NEGRO: 'Nuevo valor hora sin aportes',
   APORTE_BPS: 'Nuevo aporte a BPS',
+  COBRA_BOLETOS: 'Nuevo «cobra boletos»',
   REGIMEN: 'Nuevo régimen horario',
 }
 
@@ -82,6 +84,7 @@ export function FormularioSeries({
   const [horasSemanales, setHorasSemanales] = useState('')
   const [valor, setValor] = useState('')
   const [aportaBps, setAportaBps] = useState(true)
+  const [cobraBoletos, setCobraBoletos] = useState(true)
   const [seguroSalud, setSeguroSalud] = useState(SIN_SEGURO)
   const [dias, setDias] = useState<string[]>(['', '', '', '', '', '', ''])
 
@@ -125,17 +128,19 @@ export function FormularioSeries({
                   aportaBps: aportaBpsEfectivo,
                   seguroSalud: seguroSalud === SIN_SEGURO ? null : seguroSalud,
                 })
-            : () =>
-                registrarRegimen({
-                  ...comun,
-                  lunes: Number(dias[0] || 0),
-                  martes: Number(dias[1] || 0),
-                  miercoles: Number(dias[2] || 0),
-                  jueves: Number(dias[3] || 0),
-                  viernes: Number(dias[4] || 0),
-                  sabado: Number(dias[5] || 0),
-                  domingo: Number(dias[6] || 0),
-                })
+            : tipo === 'COBRA_BOLETOS'
+              ? () => registrarCobraBoletos({ ...comun, cobraBoletos })
+              : () =>
+                  registrarRegimen({
+                    ...comun,
+                    lunes: Number(dias[0] || 0),
+                    martes: Number(dias[1] || 0),
+                    miercoles: Number(dias[2] || 0),
+                    jueves: Number(dias[3] || 0),
+                    viernes: Number(dias[4] || 0),
+                    sabado: Number(dias[5] || 0),
+                    domingo: Number(dias[6] || 0),
+                  })
 
     ejecutar(accion, {
       exito: 'Registro guardado.',
@@ -246,6 +251,23 @@ export function FormularioSeries({
               </p>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {tipo === 'COBRA_BOLETOS' ? (
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label htmlFor="serie-cobra-boletos">Cobra boletos</Label>
+            <p className="text-sm text-muted-foreground">
+              Si se apaga, la liquidación no lleva línea de boletos desde ese mes.
+            </p>
+          </div>
+          <Switch
+            id="serie-cobra-boletos"
+            checked={cobraBoletos}
+            onCheckedChange={setCobraBoletos}
+            disabled={enviando}
+          />
         </div>
       ) : null}
 

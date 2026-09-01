@@ -93,12 +93,12 @@ model Usuario {
   activo       Boolean   @default(true)
   ultimoAcceso DateTime? @map("ultimo_acceso") @db.DateTime(3)
 
-  creadoEn        DateTime  @default(now()) @map("creado_en") @db.DateTime(3)
-  creadoPor       String?   @map("creado_por") @db.Char(36)
-  modificadoEn    DateTime  @updatedAt @map("modificado_en") @db.DateTime(3)
-  modificadoPor   String?   @map("modificado_por") @db.Char(36)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
+  creadoPor     String?  @map("creado_por") @db.Char(36)
+  modificadoEn  DateTime @updatedAt @map("modificado_en") @db.DateTime(3)
+  modificadoPor String?  @map("modificado_por") @db.Char(36)
 
-  empleados  Empleado[]         @relation("EmpleadoDueno")
+  empleados  Empleado[]        @relation("EmpleadoDueno")
   permisos   EmpleadoPermiso[]
   auditorias Auditoria[]
 
@@ -117,7 +117,6 @@ model Empleado {
   banco          String?   @db.VarChar(120)
   cuenta         String?   @db.VarChar(32)
   fechaIngreso   DateTime  @map("fecha_ingreso") @db.Date
-  cobraBoletos   Boolean   @map("cobra_boletos")
   celular        String?   @db.VarChar(60)
   direccion      String?   @db.VarChar(255)
   cedula         String?   @db.VarChar(20)
@@ -131,19 +130,20 @@ model Empleado {
   modificadoEn  DateTime @updatedAt @map("modificado_en") @db.DateTime(3)
   modificadoPor String?  @map("modificado_por") @db.Char(36)
 
-  dueno              Usuario                 @relation("EmpleadoDueno", fields: [duenoId], references: [id])
-  salarios           EmpleadoSalario[]
-  valoresHoraNegro   EmpleadoValorHoraNegro[]
-  regimenes          EmpleadoRegimen[]
-  aportesBps         EmpleadoAporteBps[]
-  horasExtras        HoraExtra[]
-  faltas             Falta[]
-  pagosAdicionales   PagoAdicional[]
-  planPagos          PlanPago[]
-  movimientos        CuentaCorriente[]
-  permisos           EmpleadoPermiso[]
-  liquidaciones      Liquidacion[]
-  licencias          Licencia[]
+  dueno               Usuario                  @relation("EmpleadoDueno", fields: [duenoId], references: [id])
+  salarios            EmpleadoSalario[]
+  valoresHoraNegro    EmpleadoValorHoraNegro[]
+  regimenes           EmpleadoRegimen[]
+  aportesBps          EmpleadoAporteBps[]
+  cobraBoletos        EmpleadoCobraBoletos[]
+  horasExtras         HoraExtra[]
+  faltas              Falta[]
+  pagosAdicionales    PagoAdicional[]
+  planPagos           PlanPago[]
+  movimientos         CuentaCorriente[]
+  permisos            EmpleadoPermiso[]
+  liquidaciones       Liquidacion[]
+  licencias           Licencia[]
   licenciaMovimientos LicenciaMovimiento[]
 
   @@unique([duenoId, alias])
@@ -202,16 +202,16 @@ model EmpleadoValorHoraNegro {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model EmpleadoRegimen {
-  id            String   @id @default(uuid(7)) @db.Char(36)
-  empleadoId    String   @map("empleado_id") @db.Char(36)
-  fechaVigencia DateTime @map("fecha_vigencia") @db.Date
-  horasLunes     Decimal @map("horas_lunes") @db.Decimal(4, 2)
-  horasMartes    Decimal @map("horas_martes") @db.Decimal(4, 2)
-  horasMiercoles Decimal @map("horas_miercoles") @db.Decimal(4, 2)
-  horasJueves    Decimal @map("horas_jueves") @db.Decimal(4, 2)
-  horasViernes   Decimal @map("horas_viernes") @db.Decimal(4, 2)
-  horasSabado    Decimal @map("horas_sabado") @db.Decimal(4, 2)
-  horasDomingo   Decimal @map("horas_domingo") @db.Decimal(4, 2)
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  empleadoId     String   @map("empleado_id") @db.Char(36)
+  fechaVigencia  DateTime @map("fecha_vigencia") @db.Date
+  horasLunes     Decimal  @map("horas_lunes") @db.Decimal(4, 2)
+  horasMartes    Decimal  @map("horas_martes") @db.Decimal(4, 2)
+  horasMiercoles Decimal  @map("horas_miercoles") @db.Decimal(4, 2)
+  horasJueves    Decimal  @map("horas_jueves") @db.Decimal(4, 2)
+  horasViernes   Decimal  @map("horas_viernes") @db.Decimal(4, 2)
+  horasSabado    Decimal  @map("horas_sabado") @db.Decimal(4, 2)
+  horasDomingo   Decimal  @map("horas_domingo") @db.Decimal(4, 2)
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)
@@ -253,6 +253,28 @@ model EmpleadoAporteBps {
 
   @@unique([empleadoId, fechaVigencia])
   @@map("empleado_aporte_bps")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6.4 empleado_cobra_boletos (serie)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EmpleadoCobraBoletos {
+  id            String   @id @default(uuid(7)) @db.Char(36)
+  empleadoId    String   @map("empleado_id") @db.Char(36)
+  /// Siempre el día 1 de un mes (§5.1). CHECK en la migración.
+  fechaVigencia DateTime @map("fecha_vigencia") @db.Date
+  cobraBoletos  Boolean  @map("cobra_boletos")
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
+  creadoPor     String?  @map("creado_por") @db.Char(36)
+  modificadoEn  DateTime @updatedAt @map("modificado_en") @db.DateTime(3)
+  modificadoPor String?  @map("modificado_por") @db.Char(36)
+
+  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, fechaVigencia])
+  @@map("empleado_cobra_boletos")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -332,17 +354,17 @@ model PagoAdicional {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model PlanPago {
-  id         String      @id @default(uuid(7)) @db.Char(36)
-  empleadoId String      @map("empleado_id") @db.Char(36)
-  prestamoId String      @map("prestamo_id") @db.Char(36)
+  id                    String      @id @default(uuid(7)) @db.Char(36)
+  empleadoId            String      @map("empleado_id") @db.Char(36)
+  prestamoId            String      @map("prestamo_id") @db.Char(36)
   /// Mes en el que se descuenta; se usa el año-mes.
-  fecha      DateTime    @db.Date
-  monto      Decimal     @db.Decimal(14, 2)
-  estado     EstadoCuota @default(PENDIENTE)
+  fecha                 DateTime    @db.Date
+  monto                 Decimal     @db.Decimal(14, 2)
+  estado                EstadoCuota @default(PENDIENTE)
   /// Liquidación que marcó la cuota como APLICADA. Permite que anular una liquidación
   /// devuelva a PENDIENTE exactamente las cuotas que ella aplicó, y no las que había
   /// aplicado una secuencia anterior del mismo período (§7.6.1).
-  liquidacionAplicadaId String? @map("liquidacion_aplicada_id") @db.Char(36)
+  liquidacionAplicadaId String?     @map("liquidacion_aplicada_id") @db.Char(36)
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)
@@ -419,17 +441,17 @@ model EmpleadoPermiso {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model BpsConcepto {
-  id         String   @id @default(uuid(7)) @db.Char(36)
-  concepto   String   @db.VarChar(80)
+  id               String   @id @default(uuid(7)) @db.Char(36)
+  concepto         String   @db.VarChar(80)
   /// NULL = el concepto deja de aplicarse desde esa fecha.
-  porcentaje Decimal? @db.Decimal(7, 4)
+  porcentaje       Decimal? @db.Decimal(7, 4)
   /// NULL = aplica a todos; con valor = solo a empleados con ese código de seguro de salud.
-  seguroSalud String? @map("seguro_salud") @db.VarChar(4)
+  seguroSalud      String?  @map("seguro_salud") @db.VarChar(4)
   /// `seguroSalud` normalizado a `*` cuando es NULL. Existe solo para que el índice único de
   /// §4.11 funcione: MySQL no compara NULL entre sí, así que un índice sobre la columna
   /// nullable dejaría entrar duplicados de los conceptos generales.
-  seguroSaludClave String @map("seguro_salud_clave") @db.VarChar(4)
-  fechaVigencia DateTime @map("fecha_vigencia") @db.Date
+  seguroSaludClave String   @map("seguro_salud_clave") @db.VarChar(4)
+  fechaVigencia    DateTime @map("fecha_vigencia") @db.Date
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)
@@ -463,9 +485,9 @@ model ValorBoleto {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Feriado {
-  fecha        DateTime @id @db.Date
-  descripcion  String   @db.VarChar(120)
-  noLaborable  Boolean  @default(true) @map("no_laborable")
+  fecha       DateTime @id @db.Date
+  descripcion String   @db.VarChar(120)
+  noLaborable Boolean  @default(true) @map("no_laborable")
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)
@@ -522,10 +544,10 @@ model Liquidacion {
   modificadoEn  DateTime @updatedAt @map("modificado_en") @db.DateTime(3)
   modificadoPor String?  @map("modificado_por") @db.Char(36)
 
-  empleado    Empleado           @relation(fields: [empleadoId], references: [id])
-  lineas       LiquidacionLinea[]
-  movimientos  CuentaCorriente[]
-  licencia     Licencia?
+  empleado        Empleado           @relation(fields: [empleadoId], references: [id])
+  lineas          LiquidacionLinea[]
+  movimientos     CuentaCorriente[]
+  licencia        Licencia?
   cuotasAplicadas PlanPago[]
 
   @@unique([empleadoId, periodo, tipo, secuencia, ukVigente], name: "liquidacion_vigente")
@@ -534,17 +556,17 @@ model Liquidacion {
 }
 
 model LiquidacionLinea {
-  id             String  @id @default(uuid(7)) @db.Char(36)
-  liquidacionId  String  @map("liquidacion_id") @db.Char(36)
-  orden          Int
-  tabla          Libro
-  codigo         String  @db.VarChar(40)
-  descripcion    String  @db.VarChar(255)
-  cantidad       Decimal? @db.Decimal(12, 4)
-  valorUnitario  Decimal? @map("valor_unitario") @db.Decimal(14, 4)
-  importe        Decimal @db.Decimal(14, 2)
+  id            String   @id @default(uuid(7)) @db.Char(36)
+  liquidacionId String   @map("liquidacion_id") @db.Char(36)
+  orden         Int
+  tabla         Libro
+  codigo        String   @db.VarChar(40)
+  descripcion   String   @db.VarChar(255)
+  cantidad      Decimal? @db.Decimal(12, 4)
+  valorUnitario Decimal? @map("valor_unitario") @db.Decimal(14, 4)
+  importe       Decimal  @db.Decimal(14, 2)
   /// 1 suma, -1 resta, 0 subtotal/informativa
-  signo          Int
+  signo         Int
 
   liquidacion Liquidacion @relation(fields: [liquidacionId], references: [id], onDelete: Cascade)
 
@@ -557,16 +579,16 @@ model LiquidacionLinea {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model LicenciaMovimiento {
-  id         String                 @id @default(uuid(7)) @db.Char(36)
-  empleadoId String                 @map("empleado_id") @db.Char(36)
-  fecha      DateTime               @db.Date
-  tipo       TipoLicenciaMovimiento
-  debe       Decimal                @default(0) @db.Decimal(6, 2)
-  haber      Decimal                @default(0) @db.Decimal(6, 2)
-  concepto   String                 @db.VarChar(255)
-  licenciaId String?                @map("licencia_id") @db.Char(36)
+  id              String                 @id @default(uuid(7)) @db.Char(36)
+  empleadoId      String                 @map("empleado_id") @db.Char(36)
+  fecha           DateTime               @db.Date
+  tipo            TipoLicenciaMovimiento
+  debe            Decimal                @default(0) @db.Decimal(6, 2)
+  haber           Decimal                @default(0) @db.Decimal(6, 2)
+  concepto        String                 @db.VarChar(255)
+  licenciaId      String?                @map("licencia_id") @db.Char(36)
   /// Años de antigüedad cumplidos, solo en los de tipo GENERACION_ANUAL.
-  anioAniversario Int?              @map("anio_aniversario")
+  anioAniversario Int?                   @map("anio_aniversario")
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)
@@ -584,14 +606,14 @@ model LicenciaMovimiento {
 }
 
 model Licencia {
-  id          String   @id @default(uuid(7)) @db.Char(36)
-  empleadoId  String   @map("empleado_id") @db.Char(36)
-  fechaDesde  DateTime @map("fecha_desde") @db.Date
-  fechaHasta  DateTime @map("fecha_hasta") @db.Date
-  diasHabiles Decimal  @map("dias_habiles") @db.Decimal(6, 2)
-  nota        String?  @db.Text
+  id            String   @id @default(uuid(7)) @db.Char(36)
+  empleadoId    String   @map("empleado_id") @db.Char(36)
+  fechaDesde    DateTime @map("fecha_desde") @db.Date
+  fechaHasta    DateTime @map("fecha_hasta") @db.Date
+  diasHabiles   Decimal  @map("dias_habiles") @db.Decimal(6, 2)
+  nota          String?  @db.Text
   /// Liquidación de tipo SALARIO_VACACIONAL generada por esta licencia (§7.11).
-  liquidacionId String? @unique @map("liquidacion_id") @db.Char(36)
+  liquidacionId String?  @unique @map("liquidacion_id") @db.Char(36)
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.DateTime(3)
   creadoPor     String?  @map("creado_por") @db.Char(36)

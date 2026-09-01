@@ -119,6 +119,15 @@ export async function crearEmpleadoDePrueba(opciones: OpcionesEmpleado) {
       banco: 'BROU',
       cuenta: 'ABC123',
       fechaIngreso,
+    },
+  })
+
+  // §6.4 — «cobra boletos» es una serie: el primer registro rige desde el mes de ingreso,
+  // como lo crea el alta real (§4.2.2).
+  await prisma.empleadoCobraBoletos.create({
+    data: {
+      empleadoId: empleado.id,
+      fechaVigencia: vigencia,
       cobraBoletos: opciones.cobraBoletos ?? true,
     },
   })
