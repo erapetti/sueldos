@@ -47,6 +47,8 @@ import {
   todosEnteros,
 } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
+import { generaBoletoAdicional } from '@/lib/calculo/boletos'
+import { totalDeHorasExtras } from '@/lib/calculo/liquidacion'
 
 type Extra = { conBps: boolean; recargoPct: number }
 
@@ -131,16 +133,20 @@ export function PlanillaHorasExtras(props: {
     const vhc = props.valorHoraCalculado ? new Decimal(props.valorHoraCalculado) : null
     const vhn = props.valorHoraNegro ? new Decimal(props.valorHoraNegro) : null
 
+    /*
+      §6.6 y §6.7 — la valorización sale del motor, que es el único que la sabe: agrupa por
+      recargo y redondea **por línea**. Cuando el pie tenía su propia cuenta, sin redondear,
+      anunciaba un importe parecido pero no el que después se liquidaba.
+    */
     const importeDe = (soloConBps: boolean, valorHora: Decimal | null) =>
       valorHora === null
         ? null
-        : renglones
-            .filter((r) => conBpsDe(r) === soloConBps)
-            .reduce(
-              (a, r) =>
-                a.plus(new Decimal(r.horas).times(valorHora).times(1 + extra(r).recargoPct / 100)),
-              new Decimal(0),
-            )
+        : totalDeHorasExtras(
+            renglones
+              .filter((r) => conBpsDe(r) === soloConBps)
+              .map((r) => ({ horas: new Decimal(r.horas), recargoPct: extra(r).recargoPct })),
+            valorHora,
+          )
 
     const conBpsImporte = importeDe(true, vhc)
     const sinBpsImporte = importeDe(false, vhn)
@@ -291,26 +297,26 @@ export function PlanillaHorasExtras(props: {
           totalesDeLaSesion(renglones)
 
         /*
-          §6.5 — días con horas extras en un día que **no era de trabajo**: o el régimen no le
-          da horas, o es feriado no laborable. Es el mismo criterio que `noEraDiaDeTrabajo` en
-          `lib/calculo/boletos.ts`, y tiene que serlo: mirando solo el régimen, el feriado que
-          cae en un día con horas quedaba afuera y el pie anunciaba **de menos** boletos que
-          los que la liquidación después paga.
-
-          El feriado **laborable** —Carnaval, Turismo— no entra: ese día se trabaja
-          normalmente, así que sus horas extras no agregan ningún viaje.
+          §6.5 — días con horas extras en un día que no era de trabajo. La pregunta se la hace
+          al motor: `DiaContexto` extiende `DiaDeBoletos` justamente para eso. Cuando el pie
+          tenía su propia copia de la regla, se desviaba y anunciaba de más o de menos
+          (IMPLEMENTATION_HINTS §1.14).
 
           Solo cuentan si la empleada cobra boletos ese mes (§6.4): sin eso el pie anunciaba
-          boletos que la liquidación después no emite, y con una empleada sin régimen los
-          anunciaba **todos los días**, porque para ella no hay ninguno con horas.
+          boletos que la liquidación después no emite.
         */
-        const noEraDiaDeTrabajo = new Set(
+        const faltadasEn = (fecha: string) =>
+          (props.dias.find((d) => d.fecha === fecha)?.marcas ?? [])
+            .filter((m) => m.signo === '−')
+            .reduce((a, m) => a + m.horas, 0)
+
+        const conBoletoAdicional = new Set(
           props.dias
-            .filter((d) => d.horasRegimen <= 0 || d.feriadoNoLaborable)
+            .filter((d) => generaBoletoAdicional(d, faltadasEn(d.fecha)))
             .map((d) => d.fecha),
         )
         const boletosExtra = props.cobraBoletos
-          ? new Set(renglones.filter((r) => noEraDiaDeTrabajo.has(r.fecha)).map((r) => r.fecha))
+          ? new Set(renglones.filter((r) => conBoletoAdicional.has(r.fecha)).map((r) => r.fecha))
               .size
           : 0
 

@@ -853,6 +853,68 @@ filtro mira el **salario vigente**, no el importe de la línea: el mes anterior 
 empleada con salario también da cero, pero ahí el cero es el dato —tiene salario y no lo cobró—
 y la línea se emite con sus días y su valor unitario.
 
+### 1.14 Las reglas del día de boletos se escriben una sola vez
+
+**El pie de las planillas no recalcula: pregunta.** Los tres predicados del §6.4 y del §6.5
+—`eraDiaDeTrabajo`, `laFaltaDescuentaElBoleto`, `generaBoletoAdicional`— viven en
+`lib/calculo/boletos.ts` y los usan el motor **y** las dos planillas. `DiaContexto` (en
+`components/dominio/PlanillaMensual.tsx`) extiende `DiaDeBoletos` justamente para eso.
+
+**Por qué.** Con la regla escrita dos veces, el mismo error volvió tres veces:
+
+| Dónde | Cómo terminó |
+|---|---|
+| Pie de horas extras: no miraba `cobra_boletos` | commit `9a6a5f4` |
+| Pie de horas extras: no miraba el feriado no laborable | commit `a68cbec` |
+| Pie de inasistencias: descontaba boletos de días que no pagaban ninguno | esta sección |
+
+Los tres son la misma clase de error: la pantalla tenía **su** copia de una regla del motor y
+se desviaba. El pie de inasistencias, por ejemplo, anunciaba «−2 boletos» por faltar a un
+feriado no laborable, un día que nunca había pagado boleto.
+
+**Los predicados van en `number`, no en `Decimal`**, porque los comparte el cliente, que recibe
+el día ya serializado. Es seguro: el CHECK `ck_regimenes_horas` obliga a que las horas sean
+múltiplos de 0,5, exactos en binario. El motor convierte con `.toNumber()` en el borde.
+
+**`DiaContexto` ganó dos hechos que antes no tenía**, `enLicencia` y `dentroDelVinculo`: sin
+ellos el pie no podía acertar esos casos ni queriendo. Los resuelve `contextoDePlanilla` con la
+misma expansión por día que usa `lib/liquidacion/datos.ts` para el motor.
+
+**El criterio, escrito una sola vez: se paga ida y vuelta por cada día que la empleada fue a
+trabajar.** Fue si cumplió su jornada, o si hizo horas extras — no importa por cuál de las dos
+cosas viajó, el viaje es el mismo. De ahí salen los dos casos que atiende `días_a_trabajar` y
+los cuatro que atiende `días_extra_con_boleto`: el día que el régimen deja en cero, el feriado
+no laborable, el día de licencia y **el día en que faltó la jornada completa**.
+
+**Divergencia con el §6.5**, por decisión del dueño del proyecto. El SPECS solo saca de la
+cuenta al feriado no laborable —«invalidan las horas del régimen vigente, por lo tanto son días
+con 0 horas»— más lo «ya contado en días_a_trabajar», así que dos días quedaban sin cobrar
+ningún boleto aunque la empleada hubiera ido:
+
+| Caso | Antes | Ahora |
+|---|---|---|
+| Licencia + horas extras | sin boleto | lo paga la hora extra |
+| Falta de jornada completa + horas extras | sin boleto | lo paga la hora extra |
+| Día fuera del vínculo + horas extras | pagaba boleto | sin boleto (§6.4) |
+
+En los dos primeros el boleto **no se pierde, cambia de dueño**: lo deja de pagar la jornada y
+lo pasa a pagar la hora extra, que es lo que decide en qué tabla cae (§6.5.1). El tercero es al
+revés y es el §6.4 aplicándose donde ya correspondía: si no era empleada, no fue a trabajar.
+El `SPECS.md` no se edita sin permiso del dueño (§2.7). Las tres asimetrías eran invisibles
+mientras la regla estaba en dos lados; al juntarla hubo que responderlas.
+
+**Por eso `laFaltaDescuentaElBoleto` también pregunta si el día tiene horas extras**: si las
+tiene, la falta no descuenta nada. Descontar acá y volver a sumar allá daría el mismo total,
+pero la planilla anunciaría un descuento que no existe.
+
+**El importe de las horas extras también se calcula en un solo lugar.** `importeDeHorasExtras`
+y `totalDeHorasExtras`, en `lib/calculo/liquidacion.ts`, son de donde salen tanto las líneas de
+la liquidación como el importe del pie. Importa porque el §6.7 redondea **por línea**: agrupar
+por recargo y redondear cada grupo no da lo mismo que sumar todo y redondear al final, y el pie
+—que no redondeaba— anunciaba un importe parecido al que después se liquidaba, pero no el
+mismo. El §7.1 lo sigue llamando «importe estimado» porque el mes no está cerrado, no porque la
+cuenta sea aproximada.
+
 ---
 
 ## 2. Reglas de arquitectura que conviene no romper

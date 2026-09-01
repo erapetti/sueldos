@@ -8,7 +8,7 @@ import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
-import { aISO, diasDelPeriodo, primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
+import { aISO, diasDelPeriodo, primerDiaDelMes, sumarDias, ultimoDiaDelMes } from '@/lib/format/dates'
 import type { DiaContexto, MarcaDia } from '@/components/dominio/PlanillaMensual'
 
 export type ContextoPlanilla = {
@@ -50,6 +50,8 @@ export async function contextoDePlanilla(
     aporteBps,
     cobraBoletos,
     feriados,
+    licencias,
+    empleado,
     liquidacion,
     extras,
     faltas,
@@ -75,6 +77,15 @@ export async function contextoDePlanilla(
       orderBy: { fechaVigencia: 'desc' },
     }),
     prisma.feriado.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
+    // §4.15.2 — una licencia puede empezar antes del mes y terminar después.
+    prisma.licencia.findMany({
+      where: { empleadoId, fechaDesde: { lte: hasta }, fechaHasta: { gte: desde } },
+    }),
+    // §6.4 — el vínculo recorta los días que pagan boleto.
+    prisma.empleado.findUniqueOrThrow({
+      where: { id: empleadoId },
+      select: { fechaIngreso: true, fechaEgreso: true },
+    }),
     prisma.liquidacion.findFirst({
       where: { empleadoId, periodo: desde, tipo: 'MENSUAL', estado: 'CONFIRMADA' },
       include: INCLUIR_PAGOS,
@@ -96,6 +107,17 @@ export async function contextoDePlanilla(
 
   const regimen = regimenFila ? aRegimenHoras(regimenFila) : null
   const porFecha = new Map(feriados.map((f) => [aISO(f.fecha), f]))
+
+  // Días comprendidos en algún período de licencia, recortados al mes (§4.15.2, §6.4). Es la
+  // misma expansión que hace `lib/liquidacion/datos.ts` para el motor.
+  const diasDeLicencia = new Set<string>()
+  for (const licencia of licencias) {
+    const inicio = licencia.fechaDesde < desde ? desde : licencia.fechaDesde
+    const fin = licencia.fechaHasta > hasta ? hasta : licencia.fechaHasta
+    for (let f = inicio; f.getTime() <= fin.getTime(); f = sumarDias(f, 1)) {
+      diasDeLicencia.add(aISO(f))
+    }
+  }
 
   const marcasPorFecha = new Map<string, MarcaDia[]>()
   function agregarMarca(fecha: Date, marca: MarcaDia) {
@@ -127,6 +149,10 @@ export async function contextoDePlanilla(
     return {
       fecha: clave,
       horasRegimen: regimen ? aDecimal(horasDelDia(regimen, f)).toNumber() : 0,
+      enLicencia: diasDeLicencia.has(clave),
+      dentroDelVinculo:
+        f.getTime() >= empleado.fechaIngreso.getTime() &&
+        (!empleado.fechaEgreso || f.getTime() <= empleado.fechaEgreso.getTime()),
       feriado: feriado?.descripcion ?? null,
       feriadoNoLaborable: feriado?.noLaborable ?? false,
       marcas: marcasPorFecha.get(clave) ?? [],

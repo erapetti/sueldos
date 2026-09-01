@@ -148,8 +148,47 @@ function verificarDatos(entrada: EntradaLiquidacion): void {
   if (faltantes.length > 0) throw new ErrorDatosFaltantes(faltantes)
 }
 
+/**
+ * §6.6 — el valor de una hora extra con su recargo: `valor_hora × (1 + recargo/100)`. Es el
+ * mismo para las dos clases; lo único que cambia entre ellas es **qué** valor hora entra, el
+ * calculado o el «en negro» (§4.3.1).
+ */
+export function valorHoraConRecargo(valorHora: Decimal, recargoPct: number): Decimal {
+  return valorHora.times(new Decimal(1).plus(new Decimal(recargoPct).dividedBy(100)))
+}
+
+/**
+ * §6.6 y §6.7 — el importe de una línea de horas extras, **ya redondeado a pesos enteros**,
+ * que es como la emite la liquidación.
+ *
+ * Lo usa también el pie de la planilla de horas extras: es el único lugar donde se valorizan
+ * horas extras, así que el importe que anuncia la pantalla es exactamente el que se va a
+ * liquidar y no una cuenta parecida (IMPLEMENTATION_HINTS §1.14).
+ */
+export function importeDeHorasExtras(
+  horas: Decimal,
+  valorHora: Decimal,
+  recargoPct: number,
+): Decimal {
+  return redondearPesos(horas.times(valorHoraConRecargo(valorHora, recargoPct)))
+}
+
+/**
+ * El total de un conjunto de horas extras al mismo valor hora, agrupando por recargo y
+ * redondeando **por línea**: sumar primero y redondear después daría otro número (§6.7).
+ */
+export function totalDeHorasExtras(
+  extras: readonly { horas: Decimal; recargoPct: number }[],
+  valorHora: Decimal,
+): Decimal {
+  return agruparPorRecargo(extras).reduce(
+    (acc, g) => acc.plus(importeDeHorasExtras(g.horas, valorHora, g.recargoPct)),
+    new Decimal(0),
+  )
+}
+
 /** Agrupa horas extras por porcentaje de recargo, para emitir una línea por recargo. */
-function agruparPorRecargo(
+export function agruparPorRecargo(
   extras: readonly { horas: Decimal; recargoPct: number }[],
 ): { recargoPct: number; horas: Decimal }[] {
   const porRecargo = new Map<number, Decimal>()
@@ -302,8 +341,8 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     const horas = grupo.recargoPct === 0 ? grupo.horas.minus(horasEnFeriados) : grupo.horas
     if (horas.lessThanOrEqualTo(0)) continue
 
-    const unitario = vhc.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
-    const importe = redondearPesos(horas.times(unitario))
+    const unitario = valorHoraConRecargo(vhc, grupo.recargoPct)
+    const importe = importeDeHorasExtras(horas, vhc, grupo.recargoPct)
     totalExtrasConBps = totalExtrasConBps.plus(importe)
     lineas.push({
       tabla: tablaBase,
@@ -472,14 +511,13 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
 
   for (const grupo of extrasSinBps) {
     const vhn = entrada.valorHoraNegro!
-    const unitario = vhn.times(new Decimal(1).plus(new Decimal(grupo.recargoPct).dividedBy(100)))
     lineas.push({
       tabla: 'INFORMAL',
       codigo: CODIGOS.HORAS_EXTRAS_SIN_BPS,
       descripcion: descripcionDeHorasExtras(grupo.recargoPct),
       cantidad: grupo.horas,
-      valorUnitario: unitario,
-      importe: redondearPesos(grupo.horas.times(unitario)),
+      valorUnitario: valorHoraConRecargo(vhn, grupo.recargoPct),
+      importe: importeDeHorasExtras(grupo.horas, vhn, grupo.recargoPct),
       signo: 1,
     })
   }
