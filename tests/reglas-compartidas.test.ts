@@ -12,11 +12,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   calcularBoletos,
-  eraDiaDeTrabajo,
   generaBoletoAdicional,
   laFaltaDescuentaElBoleto,
-  type DiaDeBoletos,
 } from '@/lib/calculo/boletos'
+import {
+  eraDiaDeTrabajo,
+  motivoSinJornada,
+  topeDeFaltaDelDia,
+  type DiaDeBoletos,
+} from '@/lib/calculo/jornada'
 import {
   importeDeHorasExtras,
   totalDeHorasExtras,
@@ -58,6 +62,43 @@ describe('§6.4 — el día era de trabajo', () => {
 
   it('no lo es el día fuera del vínculo', () => {
     expect(eraDiaDeTrabajo(dia({ dentroDelVinculo: false }))).toBe(false)
+  })
+})
+
+/*
+  §4.6 — el tope de horas de falta del día. Es el mismo predicado que usa `guardarFaltas`, y
+  el que la planilla de inasistencias usa para deshabilitar el día y para precargar el campo:
+  si se desvían, la pantalla ofrece cargar lo que el servidor rechaza.
+*/
+describe('§4.6 — el tope de falta del día', () => {
+  it('en un día común es el del régimen', () => {
+    expect(topeDeFaltaDelDia(dia())).toBe(8)
+  })
+
+  it('el feriado no laborable no tiene jornada a la que faltar', () => {
+    expect(topeDeFaltaDelDia(dia({ feriadoNoLaborable: true }))).toBe(0)
+    expect(motivoSinJornada(dia({ feriadoNoLaborable: true }))).toBe('FERIADO_NO_LABORABLE')
+  })
+
+  /*
+    Divergencia con el §4.6, por decisión del dueño del proyecto: el §6.4 ya deja pagos los
+    días de licencia, así que la falta los descontaría dos veces.
+  */
+  it('el día de licencia tampoco', () => {
+    expect(topeDeFaltaDelDia(dia({ enLicencia: true }))).toBe(0)
+    expect(motivoSinJornada(dia({ enLicencia: true }))).toBe('EN_LICENCIA')
+  })
+
+  it('ni el día fuera del vínculo, que gana a todo lo demás', () => {
+    expect(topeDeFaltaDelDia(dia({ dentroDelVinculo: false }))).toBe(0)
+    expect(motivoSinJornada(dia({ dentroDelVinculo: false, enLicencia: true }))).toBe(
+      'FUERA_DEL_VINCULO',
+    )
+  })
+
+  it('el día que el régimen deja en cero ya lo dejaba en cero', () => {
+    expect(topeDeFaltaDelDia(dia({ horasRegimen: 0 }))).toBe(0)
+    expect(motivoSinJornada(dia({ horasRegimen: 0 }))).toBe('SIN_REGIMEN')
   })
 })
 

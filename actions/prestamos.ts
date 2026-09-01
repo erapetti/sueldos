@@ -5,8 +5,13 @@
  */
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db/prisma'
-import { exigirEdicion } from '@/lib/auth/guards'
+import { exigirEdicion, vinculoDe } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
+import {
+  ETIQUETA_FUERA_DEL_VINCULO,
+  MENSAJE_FUERA_DEL_VINCULO,
+  fechaEnElVinculo,
+} from '@/lib/validacion/vinculo'
 import {
   ajusteCuentaCorriente,
   edicionConcepto,
@@ -16,7 +21,7 @@ import {
 } from '@/lib/validacion/esquemas'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { aporteBpsALaFecha, libroALaFecha } from '@/lib/consultas/aporteBps'
-import { hoy, parseFechaISO } from '@/lib/format/dates'
+import { aISO, hoy, parseFechaISO } from '@/lib/format/dates'
 
 /**
  * Cómo queda el concepto de un asiento al que se lo dejaron vacío. Es obligatorio en la base
@@ -52,6 +57,24 @@ export async function registrarPrestamo(entrada: unknown) {
 
     const auditoria = { creadoPor: usuario.id, modificadoPor: usuario.id }
     const fecha = parseFechaISO(datos.fecha)
+
+    /*
+      El préstamo se toma **durante el vínculo**: no se le presta a alguien que todavía no
+      entró ni a alguien que ya se fue.
+
+      Va **antes** de resolver el libro a propósito: la fecha es la que decide el libro (§4.9),
+      así que con una fecha de afuera el error que salía era «no tiene aporte registrado», que
+      manda a mirar la ficha en vez de a corregir la fecha.
+
+      Las **cuotas quedan libres**: un préstamo tomado antes del cese se sigue debiendo
+      después, así que el límite es la fecha del préstamo y no la de su plan de pagos.
+    */
+    const posicion = fechaEnElVinculo(aISO(fecha), vinculoDe(empleado))
+    if (posicion !== 'OK') {
+      throw new ErrorNegocio(MENSAJE_FUERA_DEL_VINCULO[posicion], {
+        fecha: ETIQUETA_FUERA_DEL_VINCULO[posicion],
+      })
+    }
 
     /*
       §4.9 — el préstamo va al libro que le corresponde a la empleada **a la fecha del

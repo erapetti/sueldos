@@ -9,7 +9,7 @@
 import { revalidatePath } from 'next/cache'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
-import { exigirEdicion } from '@/lib/auth/guards'
+import { exigirEdicion, vinculoDe } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
 import {
   edicionConcepto,
@@ -18,8 +18,16 @@ import {
   pagoAdicional,
   idUuid,
 } from '@/lib/validacion/esquemas'
+import {
+  ETIQUETA_FUERA_DEL_VINCULO,
+  MENSAJE_FUERA_DEL_VINCULO,
+  fechaEnElVinculo,
+  type Vinculo,
+} from '@/lib/validacion/vinculo'
 import { aColumnaCantidad, aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
+import { diasDeLicenciaEnRango } from '@/lib/calculo/licencias'
+import { TEXTO_SIN_JORNADA, motivoSinJornada, topeDeFaltaDelDia } from '@/lib/calculo/jornada'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
 import { normalizarDescuenta } from '@/constants/causales'
 import { aporteBpsALaFecha } from '@/lib/consultas/aporteBps'
@@ -69,13 +77,14 @@ async function avisoDePeriodoLiquidado(
  */
 function verificarFechaDeNovedad(
   fecha: Date,
-  fechaIngreso: Date,
+  vinculo: Vinculo,
   campo: string,
   limite: 'HOY' | 'FIN_DEL_MES_EN_CURSO',
 ) {
-  if (fecha.getTime() < fechaIngreso.getTime()) {
-    throw new ErrorNegocio('La fecha no puede ser anterior al ingreso de la empleada.', {
-      [campo]: 'Anterior al ingreso',
+  const posicion = fechaEnElVinculo(aISO(fecha), vinculo)
+  if (posicion !== 'OK') {
+    throw new ErrorNegocio(MENSAJE_FUERA_DEL_VINCULO[posicion], {
+      [campo]: ETIQUETA_FUERA_DEL_VINCULO[posicion],
     })
   }
 
@@ -108,7 +117,7 @@ export async function guardarHorasExtras(entrada: unknown) {
           `El renglón del ${renglon.fecha} no pertenece a ${formatearPeriodo(periodo)}.`,
         )
       }
-      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'FIN_DEL_MES_EN_CURSO')
+      verificarFechaDeNovedad(fecha, vinculoDe(empleado), 'fecha', 'FIN_DEL_MES_EN_CURSO')
     }
 
     /*
@@ -170,8 +179,9 @@ export async function guardarHorasExtras(entrada: unknown) {
  * §7.2 — guardado en lote de la planilla mensual de faltas.
  *
  * §4.6 — la suma de horas de falta de un día no puede superar las horas que le corresponden
- * según el régimen vigente. §4.6.1 — `descuenta` se fuerza a `true` salvo en ENFERMEDAD,
- * sin confiar en lo que mande el cliente.
+ * según el régimen vigente, y ese tope es cero en los días sin jornada: el feriado no
+ * laborable y el día de licencia (`topeDeFaltaDelDia`). §4.6.1 — `descuenta` se fuerza a
+ * `true` salvo en ENFERMEDAD, sin confiar en lo que mande el cliente.
  */
 export async function guardarFaltas(entrada: unknown) {
   return ejecutar('novedades.faltas', async (log) => {
@@ -194,10 +204,27 @@ export async function guardarFaltas(entrada: unknown) {
     }
     const regimen = aRegimenHoras(regimenFila)
 
-    // Faltas ya guardadas del período que no se están editando ni borrando en este lote.
-    const existentes = await prisma.falta.findMany({
-      where: { empleadoId: empleado.id, fecha: { gte: desde, lte: hasta } },
-    })
+    /*
+      §4.6 — el tope del día no sale del régimen crudo: sale de si ese día **había jornada**.
+      El feriado no laborable y el día de licencia dejan el tope en cero, así que hacen falta
+      los dos calendarios además del régimen (`topeDeFaltaDelDia`, `lib/calculo/jornada.ts`).
+    */
+    const [existentes, feriados, licencias] = await Promise.all([
+      // Faltas ya guardadas del período que no se están editando ni borrando en este lote.
+      prisma.falta.findMany({
+        where: { empleadoId: empleado.id, fecha: { gte: desde, lte: hasta } },
+      }),
+      prisma.feriado.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
+      // §4.15.2 — una licencia puede empezar antes del mes y terminar después.
+      prisma.licencia.findMany({
+        where: { empleadoId: empleado.id, fechaDesde: { lte: hasta }, fechaHasta: { gte: desde } },
+      }),
+    ])
+
+    const feriadosNoLaborables = new Set(
+      feriados.filter((f) => f.noLaborable).map((f) => aISO(f.fecha)),
+    )
+    const diasEnLicencia = new Set(diasDeLicenciaEnRango(licencias, desde, hasta).map(aISO))
     const editadas = new Set(datos.renglones.map((r) => r.id).filter(Boolean) as string[])
     const borradas = new Set(datos.borrar)
 
@@ -215,16 +242,34 @@ export async function guardarFaltas(entrada: unknown) {
           `El renglón del ${renglon.fecha} no pertenece a ${formatearPeriodo(periodo)}.`,
         )
       }
-      verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'FIN_DEL_MES_EN_CURSO')
+      verificarFechaDeNovedad(fecha, vinculoDe(empleado), 'fecha', 'FIN_DEL_MES_EN_CURSO')
 
       const clave = aISO(fecha)
       const acumulado = (acumuladoPorDia.get(clave) ?? new Decimal(0)).plus(renglon.horas)
-      const tope = horasDelDia(regimen, fecha)
+      const dia = {
+        horasRegimen: horasDelDia(regimen, fecha).toNumber(),
+        feriadoNoLaborable: feriadosNoLaborables.has(clave),
+        enLicencia: diasEnLicencia.has(clave),
+        // El vínculo ya se verificó arriba; el día llega entero para que el motivo sea el que
+        // corresponde y no «fuera del vínculo» para todos.
+        dentroDelVinculo: true,
+      }
 
+      // Un día sin jornada no admite falta de ninguna clase, y decir «corresponden 0 h» no
+      // explica nada: el motivo es lo que hace entendible el rechazo (§4.6, §6.5).
+      const sinJornada = motivoSinJornada(dia)
+      if (sinJornada) {
+        throw new ErrorNegocio(
+          `El ${renglon.fecha} ${TEXTO_SIN_JORNADA[sinJornada]}: no hay jornada a la que faltar.`,
+          { fecha: 'Sin jornada ese día' },
+        )
+      }
+
+      const tope = topeDeFaltaDelDia(dia)
       if (acumulado.greaterThan(tope)) {
         throw new ErrorNegocio(
-          `El ${renglon.fecha} corresponden ${tope.toString()} h según el régimen y las faltas suman ${acumulado.toString()} h.`,
-          { fecha: `Corresponden ${tope.toString()} horas ese día` },
+          `El ${renglon.fecha} corresponden ${tope} h según el régimen y las faltas suman ${acumulado.toString()} h.`,
+          { fecha: `Corresponden ${tope} horas ese día` },
         )
       }
       acumuladoPorDia.set(clave, acumulado)
@@ -276,8 +321,19 @@ export async function guardarPagoAdicional(entrada: unknown) {
     log({ usuarioId: usuario.id, entidad: 'pagos_adicionales', entidadId: empleado.id })
 
     const fecha = parseFechaISO(datos.fecha)
-    // El pago adicional sigue con el tope del §6.11: no es una novedad que se anticipe.
-    verificarFechaDeNovedad(fecha, empleado.fechaIngreso, 'fecha', 'HOY')
+    /*
+      El pago adicional sigue con el tope del §6.11: no es una novedad que se anticipe.
+
+      Y **el egreso no lo limita**, por decisión del dueño del proyecto: una liquidación final,
+      un premio o una diferencia se pagan después del cese. Por eso el vínculo va sin fecha de
+      egreso y le queda solo el piso del ingreso.
+    */
+    verificarFechaDeNovedad(
+      fecha,
+      { fechaIngreso: aISO(empleado.fechaIngreso), fechaEgreso: null },
+      'fecha',
+      'HOY',
+    )
 
     const comun = {
       fecha,

@@ -67,6 +67,30 @@ export function diasDeLicencia(fechaDesde: Date, fechaHasta: Date): Date[] {
   return Array.from({ length: total }, (_, i) => sumarDias(fechaDesde, i))
 }
 
+/**
+ * §4.15.2 — los días de varios períodos de licencia, **recortados a una ventana**: una
+ * licencia puede empezar antes del mes y terminar después, y lo que se pregunta siempre es
+ * por los días de adentro.
+ *
+ * Lo necesitan el motor (`lib/liquidacion/datos.ts`), el calendario de las planillas
+ * (`lib/consultas/planilla.ts`) y la validación del tope de faltas (`actions/novedades.ts`),
+ * así que la expansión se escribe una sola vez.
+ */
+export function diasDeLicenciaEnRango(
+  periodos: readonly { fechaDesde: Date; fechaHasta: Date }[],
+  desde: Date,
+  hasta: Date,
+): Date[] {
+  const dias: Date[] = []
+  for (const periodo of periodos) {
+    const inicio = periodo.fechaDesde < desde ? desde : periodo.fechaDesde
+    const fin = periodo.fechaHasta > hasta ? hasta : periodo.fechaHasta
+    if (fin < inicio) continue
+    dias.push(...diasDeLicencia(inicio, fin))
+  }
+  return dias
+}
+
 /** Dos períodos se superponen si comparten al menos un día (§4.15.2). */
 export function seSuperponen(
   aDesde: Date,

@@ -37,7 +37,7 @@ export function DialogoLicencia(props: DialogoNovedadProps) {
   return props.abierto ? <Cuerpo {...props} /> : null
 }
 
-function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
+function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<{ licenciaId: string }>()
 
@@ -94,6 +94,11 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
       amplio
     >
       <div className="space-y-4">
+        {/*
+          §4.15.2 — las dos puntas van adentro del vínculo: no se goza licencia antes de entrar
+          ni después del cese. Con el egreso cargado el calendario no ofrece esos días, y si se
+          fuerzan el servidor los rechaza.
+        */}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="licencia-desde">Desde</Label>
@@ -101,7 +106,8 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
               id="licencia-desde"
               valor={desde}
               onChange={setDesde}
-              minimo={fechaIngreso}
+              minimo={vinculo.fechaIngreso}
+              maximo={vinculo.fechaEgreso}
               disabled={enviando}
               aria-label="Primer día de la licencia"
             />
@@ -116,7 +122,8 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
               id="licencia-hasta"
               valor={hasta}
               onChange={setHasta}
-              minimo={desde ?? fechaIngreso}
+              minimo={desde ?? vinculo.fechaIngreso}
+              maximo={vinculo.fechaEgreso}
               disabled={enviando}
               aria-label="Último día de la licencia"
             />

@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
 import { usuarioActual, type UsuarioActual } from './currentUser'
 import { aISO } from '@/lib/format/dates'
+import type { Vinculo } from '@/lib/validacion/vinculo'
 import type { ListadoDePersonal } from '@/constants/listados'
 import type { EmpleadaDelMarco } from '@/components/dominio/MarcoDeMovimientos'
 
@@ -74,6 +75,23 @@ export type EmpleadoConAcceso = {
 }
 
 /**
+ * El vínculo de la empleada en fechas ISO, que es la forma en la que se compara
+ * (`lib/validacion/vinculo.ts`). Es el borde: de acá para adentro no hay más `Date`.
+ *
+ * Lo usan las acciones que limitan una novedad al vínculo y `empleadaDelMarco`, que se lo pasa
+ * a los diálogos de alta para que no ofrezcan fechas de afuera.
+ */
+export function vinculoDe(empleado: {
+  fechaIngreso: Date
+  fechaEgreso: Date | null
+}): Vinculo {
+  return {
+    fechaIngreso: aISO(empleado.fechaIngreso),
+    fechaEgreso: empleado.fechaEgreso ? aISO(empleado.fechaEgreso) : null,
+  }
+}
+
+/**
  * Lo que las pantallas de la rama «Movimientos» le pasan a su marco (`MarcoDeMovimientos`).
  * Sale del mismo `accesoAEmpleado` que ya resolvió el permiso, así que las seis páginas no lo
  * rearman una por una.
@@ -83,7 +101,7 @@ export function empleadaDelMarco({ empleado, nivel }: EmpleadoConAcceso): Emplea
     id: empleado.id,
     alias: empleado.alias,
     nombreCompleto: empleado.nombreCompleto,
-    fechaIngreso: aISO(empleado.fechaIngreso),
+    vinculo: vinculoDe(empleado),
     listadoDeOrigen: listadoDeOrigen(nivel),
     soloLectura: !puedeEditar(nivel),
     dadoDeBaja: !empleado.activo,

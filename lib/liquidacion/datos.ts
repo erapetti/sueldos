@@ -12,10 +12,11 @@ import { aDecimal, aDecimalOpcional, aRegimenHoras } from '@/lib/db/mapeo'
 import { redondearPesos } from '@/lib/format/money'
 import { resolverConceptosBps } from '@/lib/calculo/bps'
 import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
+import { diasDeLicenciaEnRango } from '@/lib/calculo/licencias'
 import type { EntradaLiquidacion, ResultadoLiquidacion } from '@/lib/calculo/tipos'
 import type { EstadoDePago } from '@/lib/calculo/cuentaCorriente'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from './pago'
-import { primerDiaDelMes, sumarDias, ultimoDiaDelMes } from '@/lib/format/dates'
+import { primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
 
 export type ContextoLiquidacion = {
   entrada: EntradaLiquidacion
@@ -141,14 +142,7 @@ export async function armarContextoLiquidacion(
   ])
 
   // Días comprendidos en algún período de licencia, recortados al mes (§4.15.2, §6.4).
-  const diasLicencia: Date[] = []
-  for (const licencia of licencias) {
-    const inicio = licencia.fechaDesde < desde ? desde : licencia.fechaDesde
-    const fin = licencia.fechaHasta > hasta ? hasta : licencia.fechaHasta
-    for (let f = inicio; f.getTime() <= fin.getTime(); f = sumarDias(f, 1)) {
-      diasLicencia.push(f)
-    }
-  }
+  const diasLicencia = diasDeLicenciaEnRango(licencias, desde, hasta)
 
   const liquidacionesPrevias = previas.map((l) => ({
     id: l.id,
