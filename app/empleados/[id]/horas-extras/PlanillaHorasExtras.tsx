@@ -48,6 +48,7 @@ import {
 } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
 import { generaBoletoAdicional } from '@/lib/calculo/boletos'
+import { totalDeHorasExtras } from '@/lib/calculo/liquidacion'
 
 type Extra = { conBps: boolean; recargoPct: number }
 
@@ -132,16 +133,20 @@ export function PlanillaHorasExtras(props: {
     const vhc = props.valorHoraCalculado ? new Decimal(props.valorHoraCalculado) : null
     const vhn = props.valorHoraNegro ? new Decimal(props.valorHoraNegro) : null
 
+    /*
+      §6.6 y §6.7 — la valorización sale del motor, que es el único que la sabe: agrupa por
+      recargo y redondea **por línea**. Cuando el pie tenía su propia cuenta, sin redondear,
+      anunciaba un importe parecido pero no el que después se liquidaba.
+    */
     const importeDe = (soloConBps: boolean, valorHora: Decimal | null) =>
       valorHora === null
         ? null
-        : renglones
-            .filter((r) => conBpsDe(r) === soloConBps)
-            .reduce(
-              (a, r) =>
-                a.plus(new Decimal(r.horas).times(valorHora).times(1 + extra(r).recargoPct / 100)),
-              new Decimal(0),
-            )
+        : totalDeHorasExtras(
+            renglones
+              .filter((r) => conBpsDe(r) === soloConBps)
+              .map((r) => ({ horas: new Decimal(r.horas), recargoPct: extra(r).recargoPct })),
+            valorHora,
+          )
 
     const conBpsImporte = importeDe(true, vhc)
     const sinBpsImporte = importeDe(false, vhn)
@@ -300,8 +305,15 @@ export function PlanillaHorasExtras(props: {
           Solo cuentan si la empleada cobra boletos ese mes (§6.4): sin eso el pie anunciaba
           boletos que la liquidación después no emite.
         */
+        const faltadasEn = (fecha: string) =>
+          (props.dias.find((d) => d.fecha === fecha)?.marcas ?? [])
+            .filter((m) => m.signo === '−')
+            .reduce((a, m) => a + m.horas, 0)
+
         const conBoletoAdicional = new Set(
-          props.dias.filter(generaBoletoAdicional).map((d) => d.fecha),
+          props.dias
+            .filter((d) => generaBoletoAdicional(d, faltadasEn(d.fecha)))
+            .map((d) => d.fecha),
         )
         const boletosExtra = props.cobraBoletos
           ? new Set(renglones.filter((r) => conBoletoAdicional.has(r.fecha)).map((r) => r.fecha))

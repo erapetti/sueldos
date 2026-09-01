@@ -241,10 +241,16 @@ export function PlanillaFaltas(props: {
           pagaba uno. La pregunta se la hace al motor: faltar a un feriado no laborable o a un
           día de licencia no descuenta nada, porque ahí no había boleto que sacar, y el pie lo
           anunciaba igual (IMPLEMENTATION_HINTS §1.14).
+
+          Las horas extras del día vienen de las marcas guardadas: esta planilla no las edita,
+          así que ahí está todo lo que hay. Si el día tiene, la falta no descuenta el boleto —
+          fue igual, y lo paga la hora extra (§6.5).
         */
         const diasCompletos = [...acumulado.entries()].filter(([fecha, horas]) => {
           const dia = porFecha.get(fecha)
-          return dia !== undefined && laFaltaDescuentaElBoleto(dia, horas)
+          if (dia === undefined) return false
+          const hayHorasExtras = dia.marcas.some((m) => m.signo === '+')
+          return laFaltaDescuentaElBoleto(dia, horas, hayHorasExtras)
         }).length
 
         return (

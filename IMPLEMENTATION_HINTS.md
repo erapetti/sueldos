@@ -880,23 +880,40 @@ múltiplos de 0,5, exactos en binario. El motor convierte con `.toNumber()` en e
 ellos el pie no podía acertar esos casos ni queriendo. Los resuelve `contextoDePlanilla` con la
 misma expansión por día que usa `lib/liquidacion/datos.ts` para el motor.
 
-**Divergencia con el §6.5: el día de licencia con horas extras paga boleto.** El SPECS saca de
-la cuenta solo al feriado no laborable —«invalidan las horas del régimen vigente, por lo tanto
-son días con 0 horas»— y no dice nada de la licencia, así que hasta acá un día de licencia con
-horas extras cargadas no pagaba ningún boleto. Por decisión del dueño del proyecto ahora sí:
-si fue a hacer horas extras, viajó, que es el criterio del propio §6.5. El `SPECS.md` no se
-edita sin su permiso (§2.7). La asimetría era invisible mientras la regla estaba en dos lados;
-al juntarla hubo que responderla.
+**El criterio, escrito una sola vez: se paga ida y vuelta por cada día que la empleada fue a
+trabajar.** Fue si cumplió su jornada, o si hizo horas extras — no importa por cuál de las dos
+cosas viajó, el viaje es el mismo. De ahí salen los dos casos que atiende `días_a_trabajar` y
+los cuatro que atiende `días_extra_con_boleto`: el día que el régimen deja en cero, el feriado
+no laborable, el día de licencia y **el día en que faltó la jornada completa**.
 
-**Lo que no cambió: la falta de jornada completa.** Un día con horas del régimen, falta
-completa y horas extras sigue sin generar boleto adicional. La falta saca el día de
-`días_a_trabajar` pero no lo convierte en día no laborable, y por eso no es un hecho de
-`DiaDeBoletos` sino una pregunta aparte.
+**Divergencia con el §6.5**, por decisión del dueño del proyecto. El SPECS solo saca de la
+cuenta al feriado no laborable —«invalidan las horas del régimen vigente, por lo tanto son días
+con 0 horas»— más lo «ya contado en días_a_trabajar», así que dos días quedaban sin cobrar
+ningún boleto aunque la empleada hubiera ido:
 
-**Lo que queda duplicado a propósito:** el **importe** del pie. `totalesDeLaSesion` valoriza
-las horas extras por su cuenta y no redondea por línea como el motor (`redondearPesos`), así
-que puede diferir en pesos. El §7.1 lo llama «importe estimado», así que hoy es correcto que
-sea una aproximación; si alguna vez se quiere exacto, es el mismo movimiento que este.
+| Caso | Antes | Ahora |
+|---|---|---|
+| Licencia + horas extras | sin boleto | lo paga la hora extra |
+| Falta de jornada completa + horas extras | sin boleto | lo paga la hora extra |
+| Día fuera del vínculo + horas extras | pagaba boleto | sin boleto (§6.4) |
+
+En los dos primeros el boleto **no se pierde, cambia de dueño**: lo deja de pagar la jornada y
+lo pasa a pagar la hora extra, que es lo que decide en qué tabla cae (§6.5.1). El tercero es al
+revés y es el §6.4 aplicándose donde ya correspondía: si no era empleada, no fue a trabajar.
+El `SPECS.md` no se edita sin permiso del dueño (§2.7). Las tres asimetrías eran invisibles
+mientras la regla estaba en dos lados; al juntarla hubo que responderlas.
+
+**Por eso `laFaltaDescuentaElBoleto` también pregunta si el día tiene horas extras**: si las
+tiene, la falta no descuenta nada. Descontar acá y volver a sumar allá daría el mismo total,
+pero la planilla anunciaría un descuento que no existe.
+
+**El importe de las horas extras también se calcula en un solo lugar.** `importeDeHorasExtras`
+y `totalDeHorasExtras`, en `lib/calculo/liquidacion.ts`, son de donde salen tanto las líneas de
+la liquidación como el importe del pie. Importa porque el §6.7 redondea **por línea**: agrupar
+por recargo y redondear cada grupo no da lo mismo que sumar todo y redondear al final, y el pie
+—que no redondeaba— anunciaba un importe parecido al que después se liquidaba, pero no el
+mismo. El §7.1 lo sigue llamando «importe estimado» porque el mes no está cerrado, no porque la
+cuenta sea aproximada.
 
 ---
 
