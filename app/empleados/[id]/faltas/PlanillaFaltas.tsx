@@ -44,6 +44,7 @@ import {
 import { formatearHoras } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
 import { laFaltaDescuentaElBoleto } from '@/lib/calculo/boletos'
+import { TEXTO_SIN_JORNADA, motivoSinJornada, topeDeFaltaDelDia } from '@/lib/calculo/jornada'
 
 type Extra = { causal: CausalFaltaValor; descuenta: boolean }
 
@@ -129,6 +130,19 @@ export function PlanillaFaltas(props: {
       )}
       signo="−"
       aportaBps={props.aportaBps}
+      /*
+        §4.6 — no se falta a un día sin jornada. El feriado no laborable y el día sin horas de
+        régimen ya venían en cero por el §6.5; el **día de licencia** también, por decisión del
+        dueño del proyecto: son días que el §6.4 ya deja pagos, así que la falta los descontaría
+        dos veces (divergencia con el §4.6, ver IMPLEMENTATION_HINTS §1.14).
+
+        Es el mismo predicado que usa `guardarFaltas`, así que la celda y el servidor no se
+        pueden desviar.
+      */
+      motivoSinCarga={(contexto) => {
+        const sinJornada = motivoSinJornada(contexto)
+        return sinJornada ? TEXTO_SIN_JORNADA[sinJornada] : null
+      }}
       // §4.6.1 — la excepción es la falta que NO se descuenta del sueldo.
       esPlena={(renglon) => extra(renglon).descuenta}
       renderPopover={({ fecha, contexto, renglones, agregar, quitar, cerrar }) => (
@@ -151,8 +165,13 @@ export function PlanillaFaltas(props: {
             <CampoDia valor={renglon.fecha} onChange={(iso) => actualizar({ fecha: iso })} />
           </CampoLista>
           <CampoLista etiqueta="Horas">
+            {/*
+              El tope del día, no las horas crudas del régimen: en un feriado no laborable o en
+              un día de licencia son cero, y mostrar «8 h» invitaba a cargar una falta que el
+              servidor iba a rechazar.
+            */}
             <span className={cn('flex min-h-9 items-center text-sm tabular', COL_ANGOSTA)}>
-              {contexto ? `${contexto.horasRegimen} h` : '—'}
+              {contexto ? `${topeDeFaltaDelDia(contexto)} h` : '—'}
             </span>
           </CampoLista>
           <CampoLista etiqueta="Horas falta">
@@ -164,7 +183,7 @@ export function PlanillaFaltas(props: {
               aceptar={(n) => n > 0}
               step={0.5}
               min={0}
-              max={contexto?.horasRegimen || undefined}
+              max={contexto ? topeDeFaltaDelDia(contexto) || undefined : undefined}
               className={cn('w-full', COL_HORAS)}
               aria-label="Horas"
             />
@@ -300,14 +319,22 @@ function PopoverFalta({
   quitar: (clave: string) => void
   cerrar: () => void
 }) {
-  // §7.2 — el tope del día viene precargado.
-  const [horas, setHoras] = useState(
-    contexto.horasRegimen > 0 ? String(contexto.horasRegimen) : '',
-  )
+  /*
+    §7.2 — el tope del día viene precargado. Es `topeDeFaltaDelDia` y no las horas crudas del
+    régimen: el feriado no laborable y el día de licencia no tienen jornada a la que faltar, y
+    el popover llegaba a decir «Corresponden 8 horas ese día» en un 25 de agosto.
+
+    El calendario ya no deja abrir esos días —`motivoSinCarga` los bloquea—, pero el popover
+    también se abre desde la lista rápida, así que la cuenta se hace acá con el mismo criterio
+    que el servidor.
+  */
+  const tope = topeDeFaltaDelDia(contexto)
+  const [horas, setHoras] = useState(tope > 0 ? String(tope) : '')
   const [nota, setNota] = useState('')
 
   const yaCargadas = renglones.reduce((a, r) => a + r.horas, 0)
-  const disponible = Math.max(0, contexto.horasRegimen - yaCargadas)
+  const disponible = Math.max(0, tope - yaCargadas)
+  const sinJornada = motivoSinJornada(contexto)
 
   // Mientras no haya horas válidas el «Agregar» queda deshabilitado, en vez de habilitado
   // y sin efecto. Pasa con los días que no se trabajan, que arrancan con el campo vacío.
@@ -331,7 +358,9 @@ function PopoverFalta({
       <div>
         <p className="font-medium">{formatearFecha(parseFechaISO(fecha))}</p>
         <p className="text-xs text-muted-foreground">
-          Corresponden {contexto.horasRegimen} horas ese día
+          {sinJornada
+            ? `No admite inasistencias: ${TEXTO_SIN_JORNADA[sinJornada]}.`
+            : `Corresponden ${tope} horas ese día`}
           {yaCargadas > 0 ? ` · ya cargadas ${yaCargadas} h` : ''}
           {contexto.feriado ? ` · ${contexto.feriado}` : ''}
         </p>
@@ -379,8 +408,8 @@ function PopoverFalta({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setHoras(String(disponible || contexto.horasRegimen))}
-            disabled={contexto.horasRegimen <= 0}
+            onClick={() => setHoras(String(disponible || tope))}
+            disabled={tope <= 0}
           >
             Día completo
           </Button>
@@ -438,7 +467,7 @@ function PopoverFalta({
         <Button variant="outline" size="sm" onClick={cerrar}>
           Cerrar
         </Button>
-        <Button size="sm" onClick={confirmar} disabled={horasValidas === null}>
+        <Button size="sm" onClick={confirmar} disabled={horasValidas === null || tope <= 0}>
           Agregar
         </Button>
       </div>

@@ -10,13 +10,21 @@ import { CampoMonto, CampoTexto } from './CampoMonto'
 import { useAccion } from '@/hooks/useAccion'
 import { guardarPagoAdicional } from '@/actions/novedades'
 import { aISO, hoy } from '@/lib/format/dates'
+import type { Vinculo } from '@/lib/validacion/vinculo'
 
+/**
+ * Lo que comparten los cuatro diálogos de alta de la rama «Movimientos».
+ *
+ * El `vinculo` viaja entero —ingreso **y** egreso— porque cada uno recorta distinto: la
+ * licencia y el préstamo no salen del vínculo, y el pago adicional y el pago bancario sí se
+ * registran después del cese (§7.3, §7.5).
+ */
 export type DialogoNovedadProps = {
   abierto: boolean
   onCerrar: () => void
   empleadoId: string
   alias: string
-  fechaIngreso: string
+  vinculo: Vinculo
 }
 
 /**
@@ -28,7 +36,7 @@ export function DialogoPagoAdicional(props: DialogoNovedadProps) {
   return props.abierto ? <Cuerpo {...props} /> : null
 }
 
-function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
+function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<undefined>()
 
@@ -60,11 +68,12 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
       <div className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="pago-fecha">Fecha</Label>
+          {/* §7.3 — el egreso no topea nada: la liquidación final se paga después del cese. */}
           <SelectorFecha
             id="pago-fecha"
             valor={fecha}
             onChange={setFecha}
-            minimo={fechaIngreso}
+            minimo={vinculo.fechaIngreso}
             maximo={aISO(hoy())}
             disabled={enviando}
             aria-label="Fecha del pago adicional"

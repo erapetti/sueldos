@@ -13,8 +13,13 @@ import { revalidatePath } from 'next/cache'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { auditar } from '@/lib/auditoria'
-import { exigirEdicion } from '@/lib/auth/guards'
+import { exigirEdicion, vinculoDe } from '@/lib/auth/guards'
 import { ErrorNegocio, ejecutar, exito, validar } from '@/lib/acciones/resultado'
+import {
+  ETIQUETA_FUERA_DEL_VINCULO,
+  MENSAJE_FUERA_DEL_VINCULO,
+  fechaEnElVinculo,
+} from '@/lib/validacion/vinculo'
 import { idUuid, registrarLicencia as esquemaLicencia } from '@/lib/validacion/esquemas'
 import {
   calcularDiasHabiles,
@@ -27,6 +32,7 @@ import { aporteBpsALaFecha } from '@/lib/consultas/aporteBps'
 import { CODIGOS } from '@/lib/calculo/tipos'
 import { formatearDiasHabiles } from '@/lib/format/money'
 import {
+  aISO,
   formatearFecha,
   formatearPeriodo,
   hoy,
@@ -88,10 +94,23 @@ export async function registrarLicencia(entrada: unknown) {
     const fechaDesde = parseFechaISO(datos.fechaDesde)
     const fechaHasta = parseFechaISO(datos.fechaHasta)
 
-    if (fechaDesde.getTime() < empleado.fechaIngreso.getTime()) {
-      throw new ErrorNegocio('La licencia no puede empezar antes del ingreso del empleado.', {
-        fechaDesde: 'Anterior al ingreso',
-      })
+    /*
+      §4.15.2 — la licencia va entera adentro del vínculo, **las dos puntas**: no se goza antes
+      de entrar ni después del cese. Antes solo se miraba `fechaDesde`, así que una licencia
+      que arrancaba el último día alcanzaba para meter semanas posteriores al egreso, y esos
+      días cuentan para el saldo y para los boletos.
+    */
+    const vinculo = vinculoDe(empleado)
+    for (const [campo, fecha] of [
+      ['fechaDesde', fechaDesde],
+      ['fechaHasta', fechaHasta],
+    ] as const) {
+      const posicion = fechaEnElVinculo(aISO(fecha), vinculo)
+      if (posicion !== 'OK') {
+        throw new ErrorNegocio(MENSAJE_FUERA_DEL_VINCULO[posicion], {
+          [campo]: ETIQUETA_FUERA_DEL_VINCULO[posicion],
+        })
+      }
     }
 
     // §4.15.2 — no se admiten períodos superpuestos para el mismo empleado.

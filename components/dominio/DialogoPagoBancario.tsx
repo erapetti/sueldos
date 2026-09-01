@@ -70,7 +70,7 @@ export function DialogoPagoBancario(props: DialogoNovedadProps) {
   return props.abierto ? <Cuerpo {...props} /> : null
 }
 
-function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
+function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<{ id: string }>()
 
@@ -225,11 +225,12 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
 
         <div className="space-y-1.5">
           <Label htmlFor="pago-banc-fecha">Fecha</Label>
+          {/* §7.5 — el egreso no topea nada: al que se fue se le sigue pagando por banco. */}
           <SelectorFecha
             id="pago-banc-fecha"
             valor={fecha}
             onChange={setFecha}
-            minimo={fechaIngreso}
+            minimo={vinculo.fechaIngreso}
             maximo={aISO(hoy())}
             disabled={enviando}
             aria-label="Fecha del pago"

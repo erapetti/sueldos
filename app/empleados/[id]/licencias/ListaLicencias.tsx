@@ -114,7 +114,7 @@ export function ListaLicencias({
         onCerrar={() => setAlta(false)}
         empleadoId={empleada.id}
         alias={empleada.alias}
-        fechaIngreso={empleada.fechaIngreso}
+        vinculo={empleada.vinculo}
       />
     </MarcoDeMovimientos>
   )

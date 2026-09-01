@@ -19,6 +19,7 @@ import type { DialogoNovedadProps } from './DialogoPagoAdicional'
 import { useAccion } from '@/hooks/useAccion'
 import { registrarPrestamo } from '@/actions/prestamos'
 import { repartirEnCuotas } from '@/lib/calculo/cuentaCorriente'
+import { topeConElEgreso } from '@/lib/validacion/vinculo'
 import {
   aISO,
   aPeriodoISO,
@@ -60,7 +61,7 @@ export function DialogoPrestamo(props: DialogoNovedadProps) {
   return props.abierto ? <Cuerpo {...props} /> : null
 }
 
-function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadProps) {
+function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<{ id: string }>()
 
@@ -157,12 +158,17 @@ function Cuerpo({ onCerrar, empleadoId, alias, fechaIngreso }: DialogoNovedadPro
       <div className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="prestamo-fecha">Fecha</Label>
+          {/*
+            §7.4 — el préstamo se toma durante el vínculo, así que el selector no ofrece días
+            de afuera. Las **cuotas** no se topean: un préstamo tomado antes del cese se sigue
+            debiendo después.
+          */}
           <SelectorFecha
             id="prestamo-fecha"
             valor={fecha}
             onChange={setFecha}
-            minimo={fechaIngreso}
-            maximo={aISO(hoy())}
+            minimo={vinculo.fechaIngreso}
+            maximo={topeConElEgreso(aISO(hoy()), vinculo)}
             disabled={enviando}
             aria-label="Fecha del préstamo"
           />

@@ -5,6 +5,7 @@
  */
 import Decimal from 'decimal.js'
 import { aISO, diasDelPeriodo, diaSemana, primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
+import { eraDiaDeTrabajo, type DiaDeBoletos } from './jornada'
 import type {
   DetalleBoletos,
   EmpleadoCalculo,
@@ -32,36 +33,6 @@ export function horasDelDia(regimen: RegimenHoras, f: Date): Decimal {
 /** Suma de las horas semanales del régimen; §4.4 la valida contra `horasSemanales`. */
 export function horasSemanalesDelRegimen(regimen: RegimenHoras): Decimal {
   return DIAS.reduce((acc, d) => acc.plus(regimen[d]), new Decimal(0))
-}
-
-/**
- * Los hechos de un día que deciden su boleto. Es lo único que hace falta para responder las
- * tres preguntas del §6.4 y del §6.5, y por eso lo comparten el motor y el pie de las
- * planillas: **la regla se escribe una sola vez**. Tenerla en dos lados es lo que hizo que el
- * mismo error se repitiera tres veces (ver IMPLEMENTATION_HINTS §1.14).
- *
- * Las horas van en `number` y no en `Decimal` a propósito: el cliente recibe el día ya
- * serializado. Es seguro porque el CHECK `ck_regimenes_horas` las obliga a ser múltiplos de
- * 0,5, que son exactos en binario; el motor convierte con `.toNumber()` en el borde, como ya
- * hacía `lib/consultas/planilla.ts`.
- */
-export type DiaDeBoletos = {
-  horasRegimen: number
-  feriadoNoLaborable: boolean
-  /** §4.15.2 — el día cae dentro de algún período de licencia gozada. */
-  enLicencia: boolean
-  /** §6.4 — no se cuentan días anteriores al ingreso ni posteriores al egreso. */
-  dentroDelVinculo: boolean
-}
-
-/**
- * §6.4 — el día era de trabajo según el régimen y el calendario, **antes de mirar las
- * novedades**: la empleada tenía jornada y ni el feriado ni la licencia se la sacaron. El §6.5
- * lo dice del otro lado —el feriado no laborable «invalida las horas del régimen vigente, por
- * lo tanto son días con 0 horas»—, que es la misma frase.
- */
-export function eraDiaDeTrabajo(dia: DiaDeBoletos): boolean {
-  return dia.dentroDelVinculo && dia.horasRegimen > 0 && !dia.feriadoNoLaborable && !dia.enLicencia
 }
 
 /**

@@ -7,10 +7,11 @@
  * Las pantallas de la rama —el listado y el detalle de cada movimiento— empiezan igual, y los
  * datos de la empleada que necesitan esas dos piezas viajaban repetidos prop por prop en cada
  * una. Acá viajan en un solo objeto, que la página arma con `empleadaDelMarco`
- * (`lib/auth/guards.ts`) desde el mismo `accesoAEmpleado` que ya resolvió el permiso. La
- * `fechaIngreso` no la usa el marco: la usan los diálogos de alta de cada pantalla, para no
- * ofrecer fechas anteriores al ingreso.
+ * (`lib/auth/guards.ts`) desde el mismo `accesoAEmpleado` que ya resolvió el permiso. El
+ * `vinculo` no lo usa el marco: lo usan los diálogos de alta de cada pantalla, para no ofrecer
+ * fechas de afuera del vínculo.
  */
+import type { Vinculo } from '@/lib/validacion/vinculo'
 import type { ListadoDePersonal } from '@/constants/listados'
 import { EncabezadoEmpleada } from './EncabezadoEmpleada'
 import { MovimientosEmpleado } from './MovimientosEmpleado'
@@ -20,7 +21,8 @@ export type EmpleadaDelMarco = {
   id: string
   alias: string
   nombreCompleto: string
-  fechaIngreso: string
+  /** §7.4, §7.11 — el ingreso y el egreso, que topean las fechas de los diálogos de alta. */
+  vinculo: Vinculo
   /** De qué listado se vino, para el breadcrumb del encabezado. */
   listadoDeOrigen: ListadoDePersonal
   soloLectura: boolean

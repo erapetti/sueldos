@@ -6,9 +6,10 @@ import 'server-only'
 import { prisma } from '@/lib/db/prisma'
 import { aDecimal, aRegimenHoras } from '@/lib/db/mapeo'
 import { horasDelDia } from '@/lib/calculo/boletos'
+import { diasDeLicenciaEnRango } from '@/lib/calculo/licencias'
 import { valorHoraCalculado } from '@/lib/calculo/liquidacion'
 import { INCLUIR_PAGOS, pagoDeLiquidacion } from '@/lib/liquidacion/pago'
-import { aISO, diasDelPeriodo, primerDiaDelMes, sumarDias, ultimoDiaDelMes } from '@/lib/format/dates'
+import { aISO, diasDelPeriodo, primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
 import type { DiaContexto, MarcaDia } from '@/components/dominio/PlanillaMensual'
 
 export type ContextoPlanilla = {
@@ -110,14 +111,7 @@ export async function contextoDePlanilla(
 
   // Días comprendidos en algún período de licencia, recortados al mes (§4.15.2, §6.4). Es la
   // misma expansión que hace `lib/liquidacion/datos.ts` para el motor.
-  const diasDeLicencia = new Set<string>()
-  for (const licencia of licencias) {
-    const inicio = licencia.fechaDesde < desde ? desde : licencia.fechaDesde
-    const fin = licencia.fechaHasta > hasta ? hasta : licencia.fechaHasta
-    for (let f = inicio; f.getTime() <= fin.getTime(); f = sumarDias(f, 1)) {
-      diasDeLicencia.add(aISO(f))
-    }
-  }
+  const diasDeLicencia = new Set(diasDeLicenciaEnRango(licencias, desde, hasta).map(aISO))
 
   const marcasPorFecha = new Map<string, MarcaDia[]>()
   function agregarMarca(fecha: Date, marca: MarcaDia) {

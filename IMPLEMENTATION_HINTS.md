@@ -853,12 +853,18 @@ filtro mira el **salario vigente**, no el importe de la línea: el mes anterior 
 empleada con salario también da cero, pero ahí el cero es el dato —tiene salario y no lo cobró—
 y la línea se emite con sus días y su valor unitario.
 
-### 1.14 Las reglas del día de boletos se escriben una sola vez
+### 1.14 Las reglas del día se escriben una sola vez
 
-**El pie de las planillas no recalcula: pregunta.** Los tres predicados del §6.4 y del §6.5
-—`eraDiaDeTrabajo`, `laFaltaDescuentaElBoleto`, `generaBoletoAdicional`— viven en
-`lib/calculo/boletos.ts` y los usan el motor **y** las dos planillas. `DiaContexto` (en
-`components/dominio/PlanillaMensual.tsx`) extiende `DiaDeBoletos` justamente para eso.
+**El pie de las planillas no recalcula: pregunta.** Los predicados del §6.4 y del §6.5
+—`eraDiaDeTrabajo`, `laFaltaDescuentaElBoleto`, `generaBoletoAdicional`— los usan el motor **y**
+las dos planillas. `DiaContexto` (en `components/dominio/PlanillaMensual.tsx`) extiende
+`DiaDeBoletos` justamente para eso.
+
+**Dónde viven.** `DiaDeBoletos`, `eraDiaDeTrabajo`, `motivoSinJornada` y `topeDeFaltaDelDia`
+están en `lib/calculo/jornada.ts`; `laFaltaDescuentaElBoleto`, `generaBoletoAdicional` y
+`calcularBoletos`, en `lib/calculo/boletos.ts`, que importa los primeros. Nacieron todos en
+`boletos.ts` y se separaron cuando el tope de las faltas pasó a preguntar lo mismo: «¿ese día
+había jornada?» dejó de ser una pregunta sobre boletos.
 
 **Por qué.** Con la regla escrita dos veces, el mismo error volvió tres veces:
 
@@ -867,6 +873,7 @@ y la línea se emite con sus días y su valor unitario.
 | Pie de horas extras: no miraba `cobra_boletos` | commit `9a6a5f4` |
 | Pie de horas extras: no miraba el feriado no laborable | commit `a68cbec` |
 | Pie de inasistencias: descontaba boletos de días que no pagaban ninguno | esta sección |
+| Popover de inasistencias: ofrecía faltar a un feriado no laborable | esta sección |
 
 Los tres son la misma clase de error: la pantalla tenía **su** copia de una regla del motor y
 se desviaba. El pie de inasistencias, por ejemplo, anunciaba «−2 boletos» por faltar a un
@@ -907,13 +914,77 @@ mientras la regla estaba en dos lados; al juntarla hubo que responderlas.
 tiene, la falta no descuenta nada. Descontar acá y volver a sumar allá daría el mismo total,
 pero la planilla anunciaría un descuento que no existe.
 
-**El importe de las horas extras también se calcula en un solo lugar.** `importeDeHorasExtras`
-y `totalDeHorasExtras`, en `lib/calculo/liquidacion.ts`, son de donde salen tanto las líneas de
-la liquidación como el importe del pie. Importa porque el §6.7 redondea **por línea**: agrupar
+#### El tope de la falta es el mismo predicado
+
+**§4.6 — no se falta a un día sin jornada.** `topeDeFaltaDelDia(dia)` es
+`eraDiaDeTrabajo(dia) ? dia.horasRegimen : 0`, y lo usan `guardarFaltas` (`actions/novedades.ts`)
+para validar el lote y la planilla de inasistencias para deshabilitar el día, precargar el campo
+y decidir el «Día completo». Antes el tope era `horasDelDia(regimen, fecha)` —las horas crudas
+del régimen—, así que el feriado no laborable y el día de licencia admitían falta, el popover
+decía «Corresponden 8 horas ese día» en un 25 de agosto, y esa falta **descontaba sueldo** en el
+paso 2 de días que ya estaban pagos por otro lado. Era doble descuento.
+
+**El feriado no laborable no es divergencia; la licencia sí.** El §4.6 dice «las horas que le
+corresponden a ese día según el régimen vigente», y el §6.5 ya define que los feriados no
+laborables «invalidan las horas del régimen vigente, por lo tanto son días con 0 horas»:
+bloquear ahí es leer el SPECS consistentemente. Que el **día de licencia** también baje el tope
+a cero es una **divergencia con el §4.6**, por decisión del dueño del proyecto del 01/09/2026:
+el §6.4 ya deja esos días pagos, así que la falta los descontaría dos veces. El `SPECS.md` no se
+edita sin su permiso (§2.7).
+
+**`motivoSinJornada` devuelve el motivo y no un booleano** porque los dos lados que preguntan
+necesitan explicarlo: el servidor lo traduce a un `ErrorNegocio` y la celda lo pone en su
+`title` y en su etiqueta accesible. La frase sale de `TEXTO_SIN_JORNADA`, una sola vez para los
+dos.
+
+#### El importe de las horas extras, también
+
+**Se calcula en un solo lugar.** `importeDeHorasExtras` y `totalDeHorasExtras`, en
+`lib/calculo/liquidacion.ts`, son de donde salen tanto las líneas de la liquidación como el
+importe del pie. Importa porque el §6.7 redondea **por línea**: agrupar
 por recargo y redondear cada grupo no da lo mismo que sumar todo y redondear al final, y el pie
 —que no redondeaba— anunciaba un importe parecido al que después se liquidaba, pero no el
 mismo. El §7.1 lo sigue llamando «importe estimado» porque el mes no está cerrado, no porque la
 cuenta sea aproximada.
+
+### 1.14.1 El vínculo topea el registro de novedades
+
+**`fechaEnElVinculo` (`lib/validacion/vinculo.ts`) es el criterio único**, y va en fechas ISO
+(`AAAA-MM-DD`) y no en `Date`: es lo que cruza al cliente, lo que tienen los formularios, y
+compara como texto sin malabares de zona horaria. El servidor convierte en el borde con
+`vinculoDe` (`lib/auth/guards.ts`), que es también lo que `empleadaDelMarco` le pasa a los
+diálogos de alta para que no ofrezcan fechas de afuera.
+
+**Qué topea cada extremo**, por decisión del dueño del proyecto del 01/09/2026:
+
+| Novedad | Antes del ingreso | Después del egreso |
+|---|---|---|
+| Horas extras, faltas (§7.1, §7.2) | bloquea | bloquea |
+| Licencia (§7.11) — **las dos puntas** | bloquea | bloquea |
+| Préstamo (§7.4) | bloquea | bloquea |
+| Pago adicional (§7.3) | bloquea | **se registra igual** |
+| Pago bancario (§7.5) | — | **se registra igual** |
+
+Los dos últimos son a propósito: la liquidación final, un premio o una transferencia se pagan
+después del cese. Las **cuotas del plan de pagos también quedan libres** —un préstamo tomado
+antes del cese se sigue debiendo después—, así que el límite es la fecha del préstamo y no la de
+sus cuotas.
+
+**En el préstamo la validación va antes de resolver el libro.** La fecha es la que decide el
+libro (§4.9, `libroALaFecha`), así que con una fecha de afuera el error que salía era «no tiene
+aporte registrado», que manda a mirar la ficha en vez de a corregir la fecha.
+
+**La celda bloqueada usa `aria-disabled` y no `disabled`.** Un botón deshabilitado no toma foco,
+y las flechas del §7.1 recorren la grilla con el foco: una semana de licencia en el medio del
+mes dejaría al teclado sin paso. El día sigue mostrando lo que tenga cargado —de antes de la
+baja, o de antes de que se registrara la licencia—, que es lo que hay que ver para ir a
+borrarlo.
+
+**Lo que esto NO hace: el motor no filtra por vínculo.** El cambio es de *registro*. Los pasos
+2, 3 y 9 de la liquidación siguen agrupando faltas y horas extras sin mirar el vínculo; lo único
+que ya lo respeta es `calcularBoletos`. No importa porque no hay datos cargados fuera del
+vínculo y el seed tampoco los crea. Si algún día aparecen, filtrar el motor es otra tarea, y
+cambia números de meses viejos al recalcular.
 
 ### 1.15 El selector de mes es uno solo, y se acuerda de dónde estabas
 

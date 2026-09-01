@@ -32,7 +32,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { formatearCantidad } from '@/lib/format/money'
-import type { DiaDeBoletos } from '@/lib/calculo/boletos'
+import type { DiaDeBoletos } from '@/lib/calculo/jornada'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
@@ -351,6 +351,7 @@ function etiquetaDeCelda(
   contexto: DiaContexto | undefined,
   celda: CeldaDia,
   marcas: MarcaDia[],
+  bloqueo: string | null,
 ): string {
   const cargas: string[] = []
   if (celda.faltas > 0) cargas.push(`${formatearCantidad(celda.faltas)} h de falta`)
@@ -364,6 +365,9 @@ function etiquetaDeCelda(
     contexto?.feriado,
     celda.regimen > 0 ? `${formatearCantidad(celda.regimen)} h de régimen` : null,
     cargas.length > 0 ? cargas.join(', ') : 'sin cargas',
+    // El motivo va último: el día deshabilitado igual dice lo que tiene cargado, y lo que
+    // hace falta explicar es por qué no se puede abrir.
+    bloqueo,
   ]
     .filter(Boolean)
     .join(' — ')
@@ -422,6 +426,16 @@ export type PlanillaMensualProps = {
    * a trabajar para que entre en el cálculo de boletos. Las inasistencias no.
    */
   admiteCero?: boolean
+  /**
+   * Por qué el día **no** admite carga, o `null` si la admite. Es lo que cada planilla agrega
+   * a lo que ya bloquea el calendario por su cuenta: el día fuera del vínculo, que vale para
+   * las dos. La celda se deshabilita y el motivo va al `title` y a la etiqueta accesible, así
+   * que la frase se lee después de la fecha.
+   *
+   * §7.1 no lo usa: la hora extra se carga en cualquier día del vínculo —también en el
+   * feriado y en el de licencia, que es justamente lo que paga el boleto del §6.5—.
+   */
+  motivoSinCarga?: (contexto: DiaContexto) => string | null
   /** Confirmación antes de guardar, o `null` si el lote no la necesita. */
   confirmacionAlGuardar?: (renglones: Renglon[]) => string | null
   /** Si el renglón lleva el tratamiento normal de su tipo (con BPS / se descuenta). */
@@ -499,6 +513,25 @@ type ApiNavegacion = {
   currentEntry?: { index: number }
   addEventListener: (tipo: 'navigate', manejador: (e: EventoNavegacion) => void) => void
   removeEventListener: (tipo: 'navigate', manejador: (e: EventoNavegacion) => void) => void
+}
+
+/**
+ * Por qué el día no admite carga, o `null` si la admite.
+ *
+ * El **vínculo lo bloquea el calendario**, no cada planilla: ninguna novedad se carga antes
+ * del ingreso ni después del egreso, así que la regla vale para las dos y va escrita una sola
+ * vez. Lo propio de cada una llega en `motivoSinCarga`.
+ *
+ * El día sin contexto —no debería pasar, el mes viene entero— no se bloquea: el servidor
+ * valida igual, y dejar la celda muerta sin explicación sería peor.
+ */
+function motivoDeBloqueo(
+  contexto: DiaContexto | undefined,
+  motivoSinCarga: PlanillaMensualProps['motivoSinCarga'],
+): string | null {
+  if (!contexto) return null
+  if (!contexto.dentroDelVinculo) return 'la empleada no estaba en la empresa ese día'
+  return motivoSinCarga?.(contexto) ?? null
 }
 
 function firma(renglon: Renglon): string {
@@ -686,6 +719,17 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
   )
 
   /**
+   * Por qué el día no admite carga, o `null` si la admite.
+   *
+   * El **vínculo lo bloquea el calendario**, no cada planilla: ninguna novedad se carga antes
+   * del ingreso ni después del egreso, así que la regla vale para las dos y va escrita una
+   * sola vez. Lo propio de cada una llega en `motivoSinCarga`.
+   *
+   * El día sin contexto —no debería pasar, el mes viene entero— no se bloquea: el servidor
+   * valida igual, y dejar la celda muerta sin explicación sería peor.
+   */
+
+  /**
    * Día en el que va a caer el próximo «Agregar renglón», o null si no queda
    * ninguno y el botón tiene que quedar deshabilitado.
    *
@@ -699,7 +743,11 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
    * guardado.
    */
   const fechaNuevoRenglon = useMemo(() => {
-    const fechas = props.dias.map((d) => d.fecha)
+    // Los días que no admiten carga quedan afuera: el renglón que naciera ahí sería uno que
+    // el servidor va a rechazar al guardar todo el lote.
+    const fechas = props.dias
+      .filter((d) => motivoDeBloqueo(d, props.motivoSinCarga) === null)
+      .map((d) => d.fecha)
     if (fechas.length === 0) return null
 
     const ocupados = new Set(renglones.map((r) => r.fecha))
@@ -714,7 +762,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
 
     // Se llegó a fin de mes: se completan los huecos de atrás.
     return primerLibre
-  }, [props.dias, renglones])
+  }, [props.dias, props.motivoSinCarga, renglones])
 
   /**
    * No se agrega otro renglón mientras haya uno sin horas cargadas. Donde el cero es un valor
@@ -1006,6 +1054,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                 })),
               ]
               const celda = contarCelda(marcas, horasDeRegimenVisibles(contexto), props.aportaBps)
+              const bloqueo = motivoDeBloqueo(contexto, props.motivoSinCarga)
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
               // El fondo marca los días en los que no se trabaja: domingos y feriados
@@ -1041,23 +1090,48 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                     <button
                       type="button"
                       data-fecha={fecha}
-                      onClick={() => !props.soloLectura && setDiaAbierto(fecha)}
+                      onClick={() => !props.soloLectura && bloqueo === null && setDiaAbierto(fecha)}
                       onKeyDown={(e) => alTeclado(e, fecha)}
                       onFocus={() => setFoco(fecha)}
                       tabIndex={foco === fecha || (!foco && fechaDia.getUTCDate() === 1) ? 0 : -1}
                       disabled={props.soloLectura}
-                      title={contexto?.feriado ?? undefined}
-                      aria-label={etiquetaDeCelda(fechaDia.getUTCDate(), contexto, celda, marcas)}
+                      /*
+                        El día que no admite carga no se abre, y se marca con `aria-disabled` y
+                        no con `disabled`: un botón deshabilitado no toma foco, y las flechas
+                        del §7.1 recorren la grilla justamente con el foco —una semana de
+                        licencia en el medio del mes dejaría al teclado sin paso—. Sigue
+                        mostrando lo que tenga cargado, de antes de la baja o de antes de que
+                        se registrara la licencia, que es lo que hay que ver para ir a
+                        borrarlo.
+                      */
+                      aria-disabled={bloqueo !== null || undefined}
+                      title={
+                        bloqueo
+                          ? `No admite carga: ${bloqueo}.`
+                          : (contexto?.feriado ?? undefined)
+                      }
+                      aria-label={etiquetaDeCelda(
+                        fechaDia.getUTCDate(),
+                        contexto,
+                        celda,
+                        marcas,
+                        bloqueo ? `no admite carga, ${bloqueo}` : null,
+                      )}
                       className={cn(
                         'flex min-h-16 flex-col text-left text-xs transition-colors sm:min-h-20 lg:min-h-24',
                         'focus-visible:outline-none focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                         noTrabaja && !fondoNoHabil && 'bg-muted/50',
                         fondoNoHabil && 'bg-destructive/10',
+                        // El día que no admite carga se apaga como los que no se trabajan: es
+                        // la única señal que tenía el día de licencia, que hasta ahora se veía
+                        // igual que cualquier martes.
+                        bloqueo !== null && !fondoNoHabil && 'bg-muted/50',
+                        bloqueo !== null && 'cursor-not-allowed',
                         cierraDerecha && 'border-r-2 border-foreground/20',
                         cierraAbajo && 'border-b-2 border-foreground/20',
                         esFeriado && 'ring-1 ring-inset ring-destructive/60',
                         esHoy && 'relative z-10 ring-2 ring-inset ring-primary',
-                        !props.soloLectura && 'hover:bg-accent',
+                        !props.soloLectura && bloqueo === null && 'hover:bg-accent',
                         // El día abierto se resalta como con marcador: el popover puede quedar
                         // lejos de la celda —se acomoda al borde de la pantalla— y sin esto no
                         // hay nada que diga a qué día se le está cargando. El color es
