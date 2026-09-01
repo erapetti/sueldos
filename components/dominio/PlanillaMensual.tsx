@@ -272,6 +272,23 @@ function contarCelda(marcas: MarcaDia[], regimen: number, aportaBps: boolean | n
   return celda
 }
 
+/**
+ * §6.4 — las horas de régimen que la celda **tiene** que mostrar.
+ *
+ * En un feriado **no laborable** el régimen no se trabaja: `calcularBoletos` saltea el día y
+ * la liquidación no lo cuenta ni lo descuenta. Mostrar ahí las horas en letra grande decía
+ * que ese día se trabaja, que es justo lo que no pasa. No se ocultan por CSS: no llegan a la
+ * celda, así que tampoco están en la etiqueta accesible, que sale del mismo número.
+ *
+ * El feriado **laborable** —Carnaval, Turismo— no entra acá: se trabaja normalmente y sus
+ * horas son las del régimen, como cualquier otro día. Lo que lo distingue en la celda es el
+ * borde, que el calendario ya le pone a los dos tipos.
+ */
+function horasDeRegimenVisibles(contexto: DiaContexto | undefined): number {
+  if (!contexto || contexto.feriadoNoLaborable) return 0
+  return contexto.horasRegimen
+}
+
 /** Si hay algún renglón de horas extras, aunque sea de cero horas (§6.5). */
 function hayExtras(marcas: MarcaDia[], plena: boolean): boolean {
   return marcas.some((m) => m.signo === '+' && m.plena === plena && m.horas >= 0)
@@ -969,7 +986,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                   guardada: Boolean(r.id),
                 })),
               ]
-              const celda = contarCelda(marcas, contexto?.horasRegimen ?? 0, props.aportaBps)
+              const celda = contarCelda(marcas, horasDeRegimenVisibles(contexto), props.aportaBps)
               const noTrabaja = (contexto?.horasRegimen ?? 0) <= 0
               const esHoy = fecha === hoyISO
               // El fondo marca los días en los que no se trabaja: domingos y feriados
