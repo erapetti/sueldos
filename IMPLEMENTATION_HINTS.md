@@ -853,6 +853,51 @@ filtro mira el **salario vigente**, no el importe de la línea: el mes anterior 
 empleada con salario también da cero, pero ahí el cero es el dato —tiene salario y no lo cobró—
 y la línea se emite con sus días y su valor unitario.
 
+### 1.14 Las reglas del día de boletos se escriben una sola vez
+
+**El pie de las planillas no recalcula: pregunta.** Los tres predicados del §6.4 y del §6.5
+—`eraDiaDeTrabajo`, `laFaltaDescuentaElBoleto`, `generaBoletoAdicional`— viven en
+`lib/calculo/boletos.ts` y los usan el motor **y** las dos planillas. `DiaContexto` (en
+`components/dominio/PlanillaMensual.tsx`) extiende `DiaDeBoletos` justamente para eso.
+
+**Por qué.** Con la regla escrita dos veces, el mismo error volvió tres veces:
+
+| Dónde | Cómo terminó |
+|---|---|
+| Pie de horas extras: no miraba `cobra_boletos` | commit `9a6a5f4` |
+| Pie de horas extras: no miraba el feriado no laborable | commit `a68cbec` |
+| Pie de inasistencias: descontaba boletos de días que no pagaban ninguno | esta sección |
+
+Los tres son la misma clase de error: la pantalla tenía **su** copia de una regla del motor y
+se desviaba. El pie de inasistencias, por ejemplo, anunciaba «−2 boletos» por faltar a un
+feriado no laborable, un día que nunca había pagado boleto.
+
+**Los predicados van en `number`, no en `Decimal`**, porque los comparte el cliente, que recibe
+el día ya serializado. Es seguro: el CHECK `ck_regimenes_horas` obliga a que las horas sean
+múltiplos de 0,5, exactos en binario. El motor convierte con `.toNumber()` en el borde.
+
+**`DiaContexto` ganó dos hechos que antes no tenía**, `enLicencia` y `dentroDelVinculo`: sin
+ellos el pie no podía acertar esos casos ni queriendo. Los resuelve `contextoDePlanilla` con la
+misma expansión por día que usa `lib/liquidacion/datos.ts` para el motor.
+
+**Divergencia con el §6.5: el día de licencia con horas extras paga boleto.** El SPECS saca de
+la cuenta solo al feriado no laborable —«invalidan las horas del régimen vigente, por lo tanto
+son días con 0 horas»— y no dice nada de la licencia, así que hasta acá un día de licencia con
+horas extras cargadas no pagaba ningún boleto. Por decisión del dueño del proyecto ahora sí:
+si fue a hacer horas extras, viajó, que es el criterio del propio §6.5. El `SPECS.md` no se
+edita sin su permiso (§2.7). La asimetría era invisible mientras la regla estaba en dos lados;
+al juntarla hubo que responderla.
+
+**Lo que no cambió: la falta de jornada completa.** Un día con horas del régimen, falta
+completa y horas extras sigue sin generar boleto adicional. La falta saca el día de
+`días_a_trabajar` pero no lo convierte en día no laborable, y por eso no es un hecho de
+`DiaDeBoletos` sino una pregunta aparte.
+
+**Lo que queda duplicado a propósito:** el **importe** del pie. `totalesDeLaSesion` valoriza
+las horas extras por su cuenta y no redondea por línea como el motor (`redondearPesos`), así
+que puede diferir en pesos. El §7.1 lo llama «importe estimado», así que hoy es correcto que
+sea una aproximación; si alguna vez se quiere exacto, es el mismo movimiento que este.
+
 ---
 
 ## 2. Reglas de arquitectura que conviene no romper

@@ -32,6 +32,7 @@ import {
   sumarMeses,
 } from '@/lib/format/dates'
 import { formatearCantidad } from '@/lib/format/money'
+import type { DiaDeBoletos } from '@/lib/calculo/boletos'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
@@ -218,12 +219,18 @@ export type MarcaDia = {
   guardada: boolean
 }
 
-export type DiaContexto = {
+/**
+ * Lo que la planilla sabe de un día.
+ *
+ * **Extiende `DiaDeBoletos`**, que es la forma que pide `lib/calculo/boletos.ts`: así el pie
+ * pregunta las reglas del §6.4 y del §6.5 al motor en vez de reimplementarlas, que es lo que
+ * hacía que el mismo error volviera (IMPLEMENTATION_HINTS §1.14). De ahí salen `horasRegimen`,
+ * `feriadoNoLaborable`, `enLicencia` y `dentroDelVinculo`.
+ */
+export type DiaContexto = DiaDeBoletos & {
   fecha: string
-  /** Horas que le corresponden al día según el régimen vigente. */
-  horasRegimen: number
+  /** La descripción del feriado, para el tooltip. `null` si no lo es. */
   feriado: string | null
-  feriadoNoLaborable: boolean
   /**
    * Novedades **guardadas** del día, de los dos tipos. La planilla descarta las de su propio
    * signo y las reemplaza por sus renglones en vivo, que incluyen lo que todavía no se guardó.
@@ -1108,6 +1115,8 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                         horasRegimen: 0,
                         feriado: null,
                         feriadoNoLaborable: false,
+                        enLicencia: false,
+                        dentroDelVinculo: true,
                         marcas: [],
                       },
                       renglones: delDia,

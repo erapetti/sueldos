@@ -43,6 +43,7 @@ import {
 } from '@/constants/causales'
 import { formatearHoras } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
+import { laFaltaDescuentaElBoleto } from '@/lib/calculo/boletos'
 
 type Extra = { causal: CausalFaltaValor; descuenta: boolean }
 
@@ -230,15 +231,21 @@ export function PlanillaFaltas(props: {
           .filter((r) => extra(r).descuenta)
           .reduce((a, r) => a.plus(r.horas), new Decimal(0))
 
-        const porFecha = new Map(props.dias.map((d) => [d.fecha, d.horasRegimen]))
+        const porFecha = new Map(props.dias.map((d) => [d.fecha, d]))
         const acumulado = new Map<string, number>()
         for (const r of renglones) {
           acumulado.set(r.fecha, (acumulado.get(r.fecha) ?? 0) + r.horas)
         }
-        // §6.4 — solo la falta de jornada completa descuenta el boleto.
-        const diasCompletos = [...acumulado.entries()].filter(
-          ([fecha, horas]) => (porFecha.get(fecha) ?? 0) > 0 && horas >= (porFecha.get(fecha) ?? 0),
-        ).length
+        /*
+          §6.4 — solo la falta de jornada completa descuenta el boleto, y solo si ese día
+          pagaba uno. La pregunta se la hace al motor: faltar a un feriado no laborable o a un
+          día de licencia no descuenta nada, porque ahí no había boleto que sacar, y el pie lo
+          anunciaba igual (IMPLEMENTATION_HINTS §1.14).
+        */
+        const diasCompletos = [...acumulado.entries()].filter(([fecha, horas]) => {
+          const dia = porFecha.get(fecha)
+          return dia !== undefined && laFaltaDescuentaElBoleto(dia, horas)
+        }).length
 
         return (
           <span className="flex flex-wrap gap-x-4 gap-y-1">

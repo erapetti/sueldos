@@ -47,6 +47,7 @@ import {
   todosEnteros,
 } from '@/lib/format/money'
 import { formatearFecha, parseFechaISO } from '@/lib/format/dates'
+import { generaBoletoAdicional } from '@/lib/calculo/boletos'
 
 type Extra = { conBps: boolean; recargoPct: number }
 
@@ -291,26 +292,19 @@ export function PlanillaHorasExtras(props: {
           totalesDeLaSesion(renglones)
 
         /*
-          §6.5 — días con horas extras en un día que **no era de trabajo**: o el régimen no le
-          da horas, o es feriado no laborable. Es el mismo criterio que `noEraDiaDeTrabajo` en
-          `lib/calculo/boletos.ts`, y tiene que serlo: mirando solo el régimen, el feriado que
-          cae en un día con horas quedaba afuera y el pie anunciaba **de menos** boletos que
-          los que la liquidación después paga.
-
-          El feriado **laborable** —Carnaval, Turismo— no entra: ese día se trabaja
-          normalmente, así que sus horas extras no agregan ningún viaje.
+          §6.5 — días con horas extras en un día que no era de trabajo. La pregunta se la hace
+          al motor: `DiaContexto` extiende `DiaDeBoletos` justamente para eso. Cuando el pie
+          tenía su propia copia de la regla, se desviaba y anunciaba de más o de menos
+          (IMPLEMENTATION_HINTS §1.14).
 
           Solo cuentan si la empleada cobra boletos ese mes (§6.4): sin eso el pie anunciaba
-          boletos que la liquidación después no emite, y con una empleada sin régimen los
-          anunciaba **todos los días**, porque para ella no hay ninguno con horas.
+          boletos que la liquidación después no emite.
         */
-        const noEraDiaDeTrabajo = new Set(
-          props.dias
-            .filter((d) => d.horasRegimen <= 0 || d.feriadoNoLaborable)
-            .map((d) => d.fecha),
+        const conBoletoAdicional = new Set(
+          props.dias.filter(generaBoletoAdicional).map((d) => d.fecha),
         )
         const boletosExtra = props.cobraBoletos
-          ? new Set(renglones.filter((r) => noEraDiaDeTrabajo.has(r.fecha)).map((r) => r.fecha))
+          ? new Set(renglones.filter((r) => conBoletoAdicional.has(r.fecha)).map((r) => r.fecha))
               .size
           : 0
 
