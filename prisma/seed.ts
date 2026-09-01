@@ -43,6 +43,7 @@ async function feriadosFijos(anio: number) {
     [1, 1, 'Año Nuevo', true],
     [5, 1, 'Día de los Trabajadores', true],
     [7, 18, 'Jura de la Constitución', true],
+    [8, 19, 'Día de la Trabajadora Doméstica', true],
     [8, 25, 'Declaratoria de la Independencia', true],
     [12, 25, 'Día de la Familia', true],
     [1, 6, 'Día de los Niños', false],
