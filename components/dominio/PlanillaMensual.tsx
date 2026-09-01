@@ -376,6 +376,13 @@ export type PlanillaMensualProps = {
   /** De qué listado se vino, para el breadcrumb del encabezado. */
   listadoDeOrigen: ListadoDePersonal
   periodo: string
+  /**
+   * Hasta dónde llegan las flechas: del mes de ingreso al de egreso, sin pasar del mes en
+   * curso. Lo resuelve la página con `rangoDePeriodos`, que es el mismo rango que recorre el
+   * selector de la liquidación.
+   */
+  puedeRetroceder: boolean
+  puedeAvanzar: boolean
   /** Ruta base de la planilla, para navegar entre meses. */
   ruta: string
   titulo: string
@@ -799,8 +806,6 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
    */
   const rellenoFinal = (7 - ((relleno + diasDelMes.length) % 7)) % 7
 
-  const noPuedeAvanzar = periodo.getTime() >= parsePeriodo(aPeriodoISO(hoy())).getTime()
-
   return (
     <div className="space-y-4 pb-48 sm:pb-32">
       {/* Encabezado */}
@@ -816,11 +821,18 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           nombreCompleto={props.nombreCompleto}
           activa={props.claveMenu}
           listadoDeOrigen={props.listadoDeOrigen}
+          periodo={props.periodo}
         />
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => irAMes(-1)} aria-label="Mes anterior">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => irAMes(-1)}
+              disabled={!props.puedeRetroceder}
+              aria-label="Mes anterior"
+            >
               <ChevronLeft className="size-4" />
             </Button>
             <span className="min-w-40 text-center font-medium">
@@ -830,7 +842,7 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
               variant="outline"
               size="icon"
               onClick={() => irAMes(1)}
-              disabled={noPuedeAvanzar}
+              disabled={!props.puedeAvanzar}
               aria-label="Mes siguiente"
             >
               <ChevronRight className="size-4" />

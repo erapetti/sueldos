@@ -42,6 +42,7 @@ export function PantallaAguinaldo(props: {
           nombreCompleto={props.nombreCompleto}
           activa="liquidaciones"
           listadoDeOrigen={props.listadoDeOrigen}
+          periodo={props.periodo}
         />
 
         <NavegadorDePeriodo

@@ -9,13 +9,14 @@ import {
   puedeVer,
 } from '@/lib/auth/guards'
 import { contextoDePlanilla } from '@/lib/consultas/planilla'
+import { periodoDePantalla } from '@/lib/consultas/periodoDePantalla'
+import { mesEnRango } from '@/lib/calculo/periodos'
 import { aDecimal } from '@/lib/db/mapeo'
 import {
   aISO,
   aPeriodoISO,
-  hoy,
-  parsePeriodo,
   primerDiaDelMes,
+  sumarMeses,
   ultimoDiaDelMes,
 } from '@/lib/format/dates'
 import { PlanillaFaltas } from './PlanillaFaltas'
@@ -36,7 +37,9 @@ export default async function PaginaFaltas({
   const acceso = await accesoAEmpleado(id, usuario)
   if (!acceso || !puedeVer(acceso.nivel)) notFound()
 
-  const periodo = periodoTexto ? parsePeriodo(periodoTexto) : primerDiaDelMes(hoy())
+  // El mes lo resuelve el pedido de la URL, la memoria de la navegación o el atraso de
+  // liquidaciones, en ese orden; las flechas se topean en el rango de la empleada.
+  const { periodo, rango } = await periodoDePantalla(acceso.empleado, periodoTexto)
   const contexto = await contextoDePlanilla(id, periodo)
 
   const registros = await prisma.falta.findMany({
@@ -71,6 +74,8 @@ export default async function PaginaFaltas({
         nombreCompleto={acceso.empleado.nombreCompleto}
         listadoDeOrigen={listadoDeOrigen(acceso.nivel)}
         periodo={aPeriodoISO(periodo)}
+        puedeRetroceder={mesEnRango(sumarMeses(periodo, -1), rango)}
+        puedeAvanzar={mesEnRango(sumarMeses(periodo, 1), rango)}
         dias={contexto.dias}
         guardados={guardados}
         estadoLiquidacion={contexto.estadoLiquidacion}

@@ -12,6 +12,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { EncabezadoPagina } from '@/components/layout/EncabezadoPagina'
+import { MemoriaDePeriodo } from '@/components/dominio/MemoriaDePeriodo'
 import { LISTADOS_DE_PERSONAL, type ListadoDePersonal } from '@/constants/listados'
 import { cn } from '@/lib/utils'
 
@@ -22,13 +23,22 @@ export type ItemMenu = {
   href: string
 }
 
-export function itemsDeMenu(empleadoId: string): ItemMenu[] {
+/**
+ * Los ítems del menú. Las tres pantallas con selector de mes se llevan el mes puesto: pasar de
+ * inasistencias a horas extras no cambia de mes, y el botón «atrás» del navegador vuelve al
+ * que se estaba mirando y no al que diga la cookie en ese momento.
+ *
+ * Sin `periodo` —la ficha, que no tiene selector— los enlaces van pelados y cada pantalla
+ * resuelve el mes por su cuenta.
+ */
+export function itemsDeMenu(empleadoId: string, periodo?: string): ItemMenu[] {
   const base = `/empleados/${empleadoId}`
+  const mes = periodo ? `?periodo=${periodo}` : ''
   return [
     { clave: 'datos', etiqueta: 'Datos', href: `${base}?seccion=datos` },
-    { clave: 'horas-extras', etiqueta: 'Horas extras', href: `${base}/horas-extras` },
-    { clave: 'faltas', etiqueta: 'Inasistencias', href: `${base}/faltas` },
-    { clave: 'liquidaciones', etiqueta: 'Liquidaciones', href: `${base}/liquidacion` },
+    { clave: 'horas-extras', etiqueta: 'Horas extras', href: `${base}/horas-extras${mes}` },
+    { clave: 'faltas', etiqueta: 'Inasistencias', href: `${base}/faltas${mes}` },
+    { clave: 'liquidaciones', etiqueta: 'Liquidaciones', href: `${base}/liquidacion${mes}` },
     { clave: 'cuenta', etiqueta: 'Cuenta corriente', href: `${base}?seccion=cuenta` },
     { clave: 'movimientos', etiqueta: 'Movimientos', href: `${base}?seccion=movimientos` },
   ]
@@ -57,6 +67,7 @@ export function EncabezadoEmpleada({
   nombreCompleto,
   activa,
   listadoDeOrigen,
+  periodo,
   estados,
   aviso,
 }: {
@@ -65,6 +76,11 @@ export function EncabezadoEmpleada({
   nombreCompleto: string
   /** Clave del ítem del menú donde estás. */
   activa: string
+  /**
+   * `AAAA-MM` de la pantalla, en las tres que tienen selector de mes. Viaja a los enlaces del
+   * menú y se recuerda para la próxima pantalla.
+   */
+  periodo?: string
   /**
    * De qué listado se vino, que es a dónde vuelve el breadcrumb. Lo deduce del permiso
    * `listadoDeOrigen` (`lib/auth/guards.ts`) y viaja prop por prop porque no está en la URL.
@@ -75,7 +91,7 @@ export function EncabezadoEmpleada({
   /** Aviso de §8.7, cuando un administrador mira una empleada ajena. */
   aviso?: React.ReactNode
 }) {
-  const items = itemsDeMenu(empleadoId)
+  const items = itemsDeMenu(empleadoId, periodo)
   const listado = LISTADOS_DE_PERSONAL[listadoDeOrigen]
   const activaNormalizada = (SECCIONES_DE_DATOS as readonly string[]).includes(activa)
     ? 'datos'
@@ -89,6 +105,8 @@ export function EncabezadoEmpleada({
       único lugar donde se decide, y 24px es cómodo para tocar sin acertarle al ítem de al lado.
     */
     <div className="mb-6 space-y-5">
+      {periodo ? <MemoriaDePeriodo periodo={periodo} /> : null}
+
       {aviso}
 
       <div className="flex flex-wrap items-start justify-between gap-3">

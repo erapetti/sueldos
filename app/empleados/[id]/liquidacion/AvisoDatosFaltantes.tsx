@@ -34,6 +34,7 @@ export function AvisoDatosFaltantes({
         nombreCompleto={nombreCompleto}
         activa="liquidaciones"
         listadoDeOrigen={listadoDeOrigen}
+        periodo={periodo}
       />
 
       <p className="text-sm text-muted-foreground">

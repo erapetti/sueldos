@@ -14,9 +14,11 @@ import {
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
-import { aISO, aPeriodoISO, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
+import { aISO, aPeriodoISO } from '@/lib/format/dates'
+import { periodoDePantalla } from '@/lib/consultas/periodoDePantalla'
 import {
   anteriorPeriodo,
+  mesEnRango,
   periodoValido,
   siguientePeriodo,
   tipoDesdeUrl,
@@ -46,10 +48,10 @@ export default async function PaginaLiquidacion({
   const liquidacionesDeLaEmpleada = await listarLiquidaciones(id)
   const totalesPorPeriodo = Object.fromEntries(totalPorPeriodo(liquidacionesDeLaEmpleada))
 
-  // §6.10 — la pantalla abre por defecto en el mes en curso y no ofrece meses futuros.
-  const mesActual = primerDiaDelMes(hoy())
-  const pedido = periodoTexto ? parsePeriodo(periodoTexto) : mesActual
-  const periodo = pedido.getTime() > mesActual.getTime() ? mesActual : pedido
+  // El mes lo resuelve el pedido de la URL, la memoria de la navegación o el atraso de
+  // liquidaciones, en ese orden, y siempre dentro del rango de la empleada (§6.10 — no hay
+  // meses futuros).
+  const { periodo, rango } = await periodoDePantalla(acceso.empleado, periodoTexto)
 
   // §7.7 — el aguinaldo es un período más de la secuencia, no una pantalla aparte. Una URL
   // armada a mano con un aguinaldo fuera de junio o diciembre cae al mensual de ese mes.
@@ -59,22 +61,20 @@ export default async function PaginaLiquidacion({
     : { periodo, tipo: 'MENSUAL' }
 
   /**
-   * §7.6 — la flecha de atrás se habilita solo si hay alguna liquidación en un período
-   * anterior. Sin liquidaciones no hay historia para recorrer, así que las dos flechas quedan
-   * deshabilitadas y la pantalla se queda en el período en curso.
+   * Las dos flechas miran el mismo rango que las planillas: del mes de ingreso al de egreso,
+   * sin pasar del mes en curso (§6.10 — no hay períodos futuros).
+   *
+   * La de atrás pedía antes que existiera una liquidación anterior, y eso dejaba encerrada
+   * justamente a la empleada con el mes atrasado: sin liquidaciones previas no había forma de
+   * llegar al mes que faltaba liquidar. Ahora se puede recorrer toda la historia de la
+   * empleada, esté liquidada o no.
+   *
+   * Las dos miran el **período siguiente de la secuencia** y no el mes: desde el mensual de
+   * junio se avanza a su aguinaldo —el mes es el mismo— y desde el aguinaldo de diciembre no,
+   * porque el que sigue es enero del año que viene.
    */
-  const anterior = anteriorPeriodo(actual)
-  const puedeRetroceder = liquidacionesDeLaEmpleada.some(
-    (l) => l.estado !== 'ANULADA' && l.periodoISO <= aISO(anterior.periodo),
-  )
-
-  /**
-   * §6.10 — no se ofrecen períodos futuros. La regla es una sola para las dos pantallas y
-   * mira el **período siguiente de la secuencia**: desde el mensual de junio se avanza a su
-   * aguinaldo —el mes es el mismo— y desde el aguinaldo de diciembre no, porque el que sigue
-   * es enero del año que viene.
-   */
-  const puedeAvanzar = siguientePeriodo(actual).periodo.getTime() <= mesActual.getTime()
+  const puedeRetroceder = mesEnRango(anteriorPeriodo(actual).periodo, rango)
+  const puedeAvanzar = mesEnRango(siguientePeriodo(actual).periodo, rango)
 
   // El aguinaldo tiene otro formato y su fórmula está pendiente (§13.3): por ahora la pantalla
   // informa eso, con el mismo encabezado y el mismo navegador que el resto.

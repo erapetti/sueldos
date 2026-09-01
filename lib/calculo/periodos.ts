@@ -11,7 +11,16 @@
  * licencia, en la fecha que corresponda, y no tiene un lugar fijo en el calendario.
  */
 import { esMesDeAguinaldo } from './aguinaldo'
-import { aPeriodoISO, formatearPeriodoCapitalizado, sumarMeses } from '@/lib/format/dates'
+import {
+  aPeriodoISO,
+  formatearPeriodoCapitalizado,
+  hoy,
+  maxFecha,
+  minFecha,
+  parsePeriodo,
+  primerDiaDelMes,
+  sumarMeses,
+} from '@/lib/format/dates'
 
 /** Los dos tipos que se recorren con las flechas. */
 export type TipoPeriodo = 'MENSUAL' | 'AGUINALDO'
@@ -71,4 +80,62 @@ export function etiquetaPeriodo({ periodo, tipo }: PeriodoLiquidable): string {
  */
 export function periodoValido({ periodo, tipo }: PeriodoLiquidable): boolean {
   return tipo === 'MENSUAL' || esMesDeAguinaldo(periodo)
+}
+
+/**
+ * El tramo de meses que el selector puede recorrer, en las tres pantallas de la empleada:
+ * horas extras, inasistencias y liquidación.
+ *
+ * Antes cada pantalla tenía su propia idea. Las planillas retrocedían sin tope —hasta meses
+ * anteriores al ingreso, donde no hay régimen ni salario— y la liquidación solo retrocedía si
+ * ya existía una liquidación anterior, así que un mes atrasado quedaba inalcanzable
+ * justamente cuando había que liquidarlo. Ahora es un rango solo: desde el mes de ingreso
+ * hasta el mes de egreso, sin pasar del mes en curso (§6.10 — no hay períodos futuros).
+ */
+export type RangoDePeriodos = { desde: Date; hasta: Date }
+
+export function rangoDePeriodos(
+  empleado: { fechaIngreso: Date; fechaEgreso: Date | null },
+  referencia: Date = hoy(),
+): RangoDePeriodos {
+  const desde = primerDiaDelMes(empleado.fechaIngreso)
+  const mesActual = primerDiaDelMes(referencia)
+  const hasta = empleado.fechaEgreso
+    ? minFecha(primerDiaDelMes(empleado.fechaEgreso), mesActual)
+    : mesActual
+  // Una empleada que ingresó y egresó dentro del mismo mes deja el rango en ese único mes;
+  // el `max` también cubre la ficha con el egreso cargado antes del ingreso.
+  return { desde, hasta: maxFecha(hasta, desde) }
+}
+
+export function mesEnRango(periodo: Date, { desde, hasta }: RangoDePeriodos): boolean {
+  return periodo.getTime() >= desde.getTime() && periodo.getTime() <= hasta.getTime()
+}
+
+/** El mes pedido, traído al rango: lo que se abre cuando la URL o la memoria caen afuera. */
+export function acotarPeriodo(periodo: Date, rango: RangoDePeriodos): Date {
+  return minFecha(maxFecha(periodo, rango.desde), rango.hasta)
+}
+
+/**
+ * Cómo se recuerda el mes elegido de una pantalla a la otra, y de una empleada a la siguiente.
+ *
+ * Es una cookie y no `sessionStorage` porque el que decide qué mes abrir es el servidor: las
+ * tres pantallas son componentes de servidor y leen la cookie del request. Guardarlo en el
+ * cliente obligaría a dibujar un mes y redirigir al otro, con el parpadeo de por medio.
+ * Sin `expires`: dura lo que dure la ventana del navegador.
+ */
+export const COOKIE_PERIODO = 'periodo'
+
+/**
+ * `AAAA-MM` que llega de afuera —la URL o la cookie— y puede ser cualquier cosa. Devuelve
+ * `null` en vez de tirar: un valor roto se ignora y la pantalla abre en el mes por defecto.
+ */
+export function parsePeriodoSeguro(texto: string | null | undefined): Date | null {
+  if (!texto) return null
+  try {
+    return parsePeriodo(texto)
+  } catch {
+    return null
+  }
 }

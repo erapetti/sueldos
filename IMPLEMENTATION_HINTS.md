@@ -525,11 +525,11 @@ alcanzaba desde la acción que ya no existe, y el segundo solo servía para habi
 —si la base es el promedio del semestre, qué conceptos la integran, si lleva descuentos de
 BPS— con el mismo encabezado y el mismo navegador que la liquidación mensual.
 
-**La flecha de atrás pide historia.** Se habilita solo si existe una liquidación no anulada en
-un período anterior, por pedido del usuario. Tiene una consecuencia que conviene tener
-presente: si un mes quedó sin liquidar y no hay ninguna liquidación anterior, a ese mes no se
-llega con las flechas —hay que escribir el `?periodo=` a mano—. La vista «Lista» tampoco lo
-muestra, porque solo lista las confirmadas.
+**Las flechas recorren la vida laboral de la empleada, no su historia de liquidaciones.**
+Durante un tiempo la de atrás se habilitó solo si existía una liquidación no anulada en un
+período anterior, y eso dejaba encerrado justamente al mes atrasado: sin liquidaciones previas
+no había forma de llegar con las flechas al mes que faltaba liquidar. El rango ahora es el
+mismo de las planillas (§1.15).
 
 ### 1.10 Los movimientos de a uno tienen listado y detalle, y no hay tabla de préstamos
 
@@ -914,6 +914,48 @@ por recargo y redondear cada grupo no da lo mismo que sumar todo y redondear al 
 —que no redondeaba— anunciaba un importe parecido al que después se liquidaba, pero no el
 mismo. El §7.1 lo sigue llamando «importe estimado» porque el mes no está cerrado, no porque la
 cuenta sea aproximada.
+
+### 1.15 El selector de mes es uno solo, y se acuerda de dónde estabas
+
+Las tres pantallas de la empleada con selector de mes —horas extras, inasistencias y
+liquidación— tenían cada una su idea de por dónde se podía andar y en qué mes abrir. Por pedido
+del dueño del proyecto pasan a compartir las dos cosas.
+
+**El rango es la vida laboral de la empleada.** Del mes de su ingreso al de su egreso, sin
+pasar del mes en curso (§6.10 — no hay períodos futuros). Lo resuelve `rangoDePeriodos` en
+`lib/calculo/periodos.ts`, y las tres pantallas apagan sus flechas con `mesEnRango`. Antes las
+planillas retrocedían **sin tope**, hasta meses en que la empleada no existía y no hay régimen
+ni salario que aplicar; la liquidación, al revés, pedía historia y no llegaba al mes atrasado.
+
+Un `?periodo=` fuera del rango no rompe nada ni da 404: `acotarPeriodo` lo trae al borde más
+cercano. Hace falta, porque el mes viaja de una empleada a otra y el de una puede no existir
+para la siguiente.
+
+**El mes se recuerda entre pantallas y entre empleadas.** Pasar de inasistencias a horas
+extras, o saltar a otra empleada desde el listado, mantiene el mes que se venía mirando; se
+pierde al cerrar la ventana del navegador. Se guarda en una cookie de sesión (`COOKIE_PERIODO`)
+y **no** en `sessionStorage`, porque el que decide qué mes dibujar es el servidor: las tres
+pantallas son componentes de servidor y leen la cookie del request. Con el estado en el
+cliente habría que dibujar un mes y redirigir al otro, con el parpadeo de por medio.
+
+| Pieza | Qué hace |
+|---|---|
+| `lib/consultas/periodoDePantalla.ts` | Resuelve el mes: URL → cookie → atraso, y lo acota al rango |
+| `components/dominio/MemoriaDePeriodo.tsx` | Escribe la cookie desde el cliente; un componente de servidor no puede mandar `Set-Cookie` |
+| `components/dominio/EncabezadoEmpleada.tsx` | Recibe `periodo`, lo pone en los enlaces del menú y monta la memoria |
+
+Los enlaces del menú llevan el mes puesto aunque la cookie alcanzaría: así el botón «atrás» del
+navegador vuelve al mes que se estaba mirando y no al que diga la cookie en ese momento.
+
+**Divergencia con el §6.10**, por decisión del dueño del proyecto: el SPECS dice que la
+pantalla abre en el mes en curso, y ahora abre en el **mes anterior** cuando ese mes quedó sin
+liquidar y la empleada ya había ingresado. Lo habitual es entrar a cargar las novedades del mes
+que falta liquidar, y empezar en un mes ya cerrado obliga a retroceder a mano cada vez. El
+criterio solo se aplica cuando no hay nada en la URL ni en la cookie —la primera pantalla de la
+sesión—; después manda lo que se venía mirando. «Sin liquidar» es no tener una liquidación
+`MENSUAL` `CONFIRMADA` de ese mes: las filas de `Liquidacion` se crean únicamente al confirmar,
+así que un mes pendiente no tiene fila y no hay un estado intermedio que mirar.
+El `SPECS.md` no se edita sin permiso del dueño (§2.7).
 
 ---
 

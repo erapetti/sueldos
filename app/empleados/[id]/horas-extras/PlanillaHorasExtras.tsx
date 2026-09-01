@@ -62,6 +62,8 @@ export function PlanillaHorasExtras(props: {
   nombreCompleto: string
   listadoDeOrigen: ListadoDePersonal
   periodo: string
+  puedeRetroceder: boolean
+  puedeAvanzar: boolean
   dias: DiaContexto[]
   guardados: Renglon[]
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
@@ -169,6 +171,8 @@ export function PlanillaHorasExtras(props: {
       nombreCompleto={props.nombreCompleto}
       listadoDeOrigen={props.listadoDeOrigen}
       periodo={props.periodo}
+      puedeRetroceder={props.puedeRetroceder}
+      puedeAvanzar={props.puedeAvanzar}
       ruta={`/empleados/${props.empleadoId}/horas-extras`}
       claveMenu="horas-extras"
       titulo="Horas extras"

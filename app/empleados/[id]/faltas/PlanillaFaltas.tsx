@@ -57,6 +57,8 @@ export function PlanillaFaltas(props: {
   nombreCompleto: string
   listadoDeOrigen: ListadoDePersonal
   periodo: string
+  puedeRetroceder: boolean
+  puedeAvanzar: boolean
   dias: DiaContexto[]
   guardados: Renglon[]
   estadoLiquidacion: 'SIN_LIQUIDAR' | 'LIQUIDADA' | 'LIQUIDADA_Y_PAGADA'
@@ -108,6 +110,8 @@ export function PlanillaFaltas(props: {
       nombreCompleto={props.nombreCompleto}
       listadoDeOrigen={props.listadoDeOrigen}
       periodo={props.periodo}
+      puedeRetroceder={props.puedeRetroceder}
+      puedeAvanzar={props.puedeAvanzar}
       ruta={`/empleados/${props.empleadoId}/faltas`}
       claveMenu="faltas"
       titulo="Inasistencias"
