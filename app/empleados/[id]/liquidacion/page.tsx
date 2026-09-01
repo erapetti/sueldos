@@ -20,6 +20,7 @@ import {
   anteriorPeriodo,
   mesEnRango,
   periodoValido,
+  sePuedeConfirmar,
   siguientePeriodo,
   tipoDesdeUrl,
   type PeriodoLiquidable,
@@ -93,6 +94,13 @@ export default async function PaginaLiquidacion({
       />
     )
   }
+
+  /**
+   * §7.6 — la liquidación del mes recién se puede confirmar desde el día 23 (§4.2.3). Se
+   * resuelve acá y no en la pantalla porque depende de qué día es hoy: calculado en el
+   * cliente, el primer dibujado no coincidiría con el del servidor.
+   */
+  const puedeConfirmar = sePuedeConfirmar(periodo)
 
   const comunes = {
     empleadoId: id,
@@ -180,6 +188,7 @@ export default async function PaginaLiquidacion({
       cedula={acceso.empleado.cedula}
       fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       previas={previas}
+      puedeConfirmar={puedeConfirmar}
       lineasPersistidas={
         ultimaConfirmada
           ? ultimaConfirmada.lineas.map((l) => ({

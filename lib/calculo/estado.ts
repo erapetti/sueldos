@@ -22,7 +22,14 @@ export type EntradaEstado = {
   hayLiquidacionImpaga: boolean
 }
 
-/** El umbral del §4.2.3 a partir del cual se espera tener liquidado el mes en curso. */
+/**
+ * El umbral del §4.2.3 a partir del cual se espera tener liquidado el mes en curso.
+ *
+ * Es también el día desde el que se habilita el botón de confirmar la liquidación del mes
+ * (`sePuedeConfirmar`, en `lib/calculo/periodos.ts`). Un solo número para las dos cosas: el
+ * día en que la empleada empieza a figurar «Falta liquidación» es el día en que se puede
+ * liquidar.
+ */
 export const DIA_UMBRAL_LIQUIDACION = 23
 
 /**

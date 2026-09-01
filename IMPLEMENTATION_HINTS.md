@@ -957,6 +957,53 @@ sesión—; después manda lo que se venía mirando. «Sin liquidar» es no tene
 así que un mes pendiente no tiene fila y no hay un estado intermedio que mirar.
 El `SPECS.md` no se edita sin permiso del dueño (§2.7).
 
+### 1.16 Confirmar la liquidación del mes recién se habilita el día 23
+
+El botón **Confirmar liquidación** de la pantalla de liquidación (§7.6) estaba siempre
+habilitado. Por pedido del dueño del proyecto arranca apagado y se habilita el **día 23 del mes
+del período**: la liquidación de setiembre 2026 se confirma el 23/09/2026 o cualquier día
+posterior, sin tope. Un mes atrasado, entonces, se confirma siempre: su día 23 ya pasó.
+
+El umbral es el **mismo** número del §4.2.3 —`DIA_UMBRAL_LIQUIDACION`, en
+`lib/calculo/estado.ts`—, no uno nuevo. El pedido original decía 25 y se corrigió a 23
+justamente para eso: con dos números distintos quedaba una ventana de dos días en la que la
+empleada figuraba «Falta liquidación» y la aplicación no dejaba liquidarla.
+
+| Pieza | Qué hace |
+|---|---|
+| `lib/calculo/periodos.ts` | `sePuedeConfirmar(periodo, referencia)` y `primerDiaConfirmable(periodo)` |
+| `app/empleados/[id]/liquidacion/page.tsx` | Resuelve `puedeConfirmar` en el servidor y lo pasa como prop |
+| `app/empleados/[id]/liquidacion/PantallaLiquidacion.tsx` | Botón apagado, envuelto en el tooltip que dice qué día se habilita |
+
+**La regla se resuelve en el servidor.** La pantalla es un componente de cliente y el dato
+depende de qué día es hoy: calculado en el cliente, el primer dibujado no coincidiría con el del
+servidor. La página ya es `force-dynamic`, así que se recalcula en cada request; una pantalla
+abierta durante la medianoche del 22 al 23 se habilita al recargar.
+
+**El tooltip va sobre un `span`, no sobre el botón.** Un botón `disabled` no dispara eventos de
+puntero, así que un tooltip colgado de él nunca abre. El `disabled:pointer-events-none` que ya
+trae `Button` deja pasar el hover al envoltorio, que es el que abre el tooltip; el `tabIndex`
+del `span` lo pone además al alcance del teclado. Es el primer uso real de
+`components/ui/tooltip.tsx` en la aplicación: el `TooltipProvider` estaba montado en
+`app/layout.tsx` desde el principio, sin nadie que lo usara.
+
+**En un teléfono el tooltip no aparece** —no hay con qué pasar por encima— y el botón queda
+apagado sin explicación. Es una decisión del dueño del proyecto, no un olvido: se descartó
+agregar un renglón de texto visible al lado del botón.
+
+**Divergencia con el §4.2.3 y el §7.6**, por decisión del dueño del proyecto. El §4.2.3 dice
+textualmente que el día 23 «no restringe la operación: se puede liquidar cualquier mes cualquier
+día (§6.10)», y el §7.6 lista el botón Confirmar sin ninguna condición de fecha. Los casos de
+prueba 35 y 36 del §12 siguen valiendo tal cual: hablan del estado del empleado, que no cambió.
+El `SPECS.md` no se edita sin permiso del dueño (§2.7).
+
+**Lo que queda deliberadamente afuera:** la validación en el servidor.
+`confirmarLiquidacionMensual` (`actions/liquidaciones.ts`) **no** verifica el día, así que un
+pedido armado a mano confirma igual. El dueño del proyecto eligió que la regla viva solo en el
+botón. Si alguna vez se quiere de verdad, el lugar es el mismo `if` donde ya se rechaza el
+período futuro (§6.10), reusando `sePuedeConfirmar`; hay que tener en cuenta que ese action es
+también el que genera la complementaria, que hoy no tiene restricción de fecha ninguna.
+
 ---
 
 ## 2. Reglas de arquitectura que conviene no romper

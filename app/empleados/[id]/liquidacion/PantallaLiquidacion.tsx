@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
@@ -19,9 +20,12 @@ import {
 import {
   formatearFecha,
   formatearPeriodoCapitalizado,
+  mes,
+  nombreMes,
   parseFechaISO,
   parsePeriodo,
 } from '@/lib/format/dates'
+import { primerDiaConfirmable } from '@/lib/calculo/periodos'
 import { CODIGOS } from '@/lib/calculo/tipos'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
@@ -142,6 +146,8 @@ export function PantallaLiquidacion(props: {
   /** ISO `AAAA-MM-DD`. */
   fechaIngreso: string
   previas: Previa[]
+  /** §7.6 — el mes en curso recién se puede confirmar desde el día 23 (§4.2.3). */
+  puedeConfirmar: boolean
   lineasPersistidas: LineaVista[] | null
 }) {
   const router = useRouter()
@@ -575,10 +581,34 @@ export function PantallaLiquidacion(props: {
                   Generar complementaria
                 </Button>
               </>
-            ) : (
+            ) : props.puedeConfirmar ? (
               <Button onClick={() => confirmar(false)} disabled={enviando}>
                 {enviando ? 'Confirmando…' : 'Confirmar liquidación'}
               </Button>
+            ) : (
+              /*
+                §7.6 — el mes en curso no se confirma antes del día 23 (§4.2.3), así que el
+                botón está apagado y el tooltip es lo único que dice por qué y desde cuándo.
+
+                Va sobre un `span` y no sobre el botón porque un botón `disabled` no dispara
+                eventos de puntero: el `disabled:pointer-events-none` que ya trae `Button` los
+                deja pasar al envoltorio, que es el que abre el tooltip. El `tabIndex` lo pone
+                además al alcance del teclado, que no tiene hover.
+
+                En un teléfono el tooltip no aparece —no hay con qué pasar por encima— y ahí el
+                botón queda apagado sin explicación. Es una decisión tomada, no un olvido.
+              */
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button disabled>Confirmar liquidación</Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  La liquidación de {nombreMes(mes(periodo))} se habilita el{' '}
+                  {formatearFecha(primerDiaConfirmable(periodo))}.
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         ) : null}

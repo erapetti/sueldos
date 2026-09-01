@@ -11,11 +11,15 @@
  * licencia, en la fecha que corresponda, y no tiene un lugar fijo en el calendario.
  */
 import { esMesDeAguinaldo } from './aguinaldo'
+import { DIA_UMBRAL_LIQUIDACION } from './estado'
 import {
+  anio,
   aPeriodoISO,
+  fecha,
   formatearPeriodoCapitalizado,
   hoy,
   maxFecha,
+  mes,
   minFecha,
   parsePeriodo,
   primerDiaDelMes,
@@ -80,6 +84,32 @@ export function etiquetaPeriodo({ periodo, tipo }: PeriodoLiquidable): string {
  */
 export function periodoValido({ periodo, tipo }: PeriodoLiquidable): boolean {
   return tipo === 'MENSUAL' || esMesDeAguinaldo(periodo)
+}
+
+/**
+ * §7.6 — el día a partir del cual se puede confirmar la liquidación de un período: el
+ * **día 23 de su propio mes**. El de setiembre 2026 se confirma el 23/09/2026 o después, sin
+ * tope.
+ *
+ * Es el mismo umbral del §4.2.3 —`DIA_UMBRAL_LIQUIDACION`— y no otro a propósito: el día en
+ * que la empleada empieza a figurar «Falta liquidación» es el día en que se puede liquidar.
+ * Con dos números distintos quedaba una ventana en la que la aplicación reclamaba algo que
+ * ella misma no dejaba hacer.
+ */
+export function primerDiaConfirmable(periodo: Date): Date {
+  return fecha(anio(periodo), mes(periodo), DIA_UMBRAL_LIQUIDACION)
+}
+
+/**
+ * §7.6 — si el período ya está en fecha de confirmarse. Los meses pasados siempre lo están:
+ * el umbral es del mes del período, así que el único que puede quedar por debajo es el mes en
+ * curso, y solo hasta su día 22.
+ *
+ * **Divergencia con el §4.2.3**, que dice que el umbral «no restringe la operación». Ver
+ * `IMPLEMENTATION_HINTS.md`.
+ */
+export function sePuedeConfirmar(periodo: Date, referencia: Date = hoy()): boolean {
+  return referencia.getTime() >= primerDiaConfirmable(periodo).getTime()
 }
 
 /**

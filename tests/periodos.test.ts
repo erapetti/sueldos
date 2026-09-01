@@ -11,7 +11,9 @@ import {
   mesEnRango,
   parsePeriodoSeguro,
   periodoValido,
+  primerDiaConfirmable,
   rangoDePeriodos,
+  sePuedeConfirmar,
   siguientePeriodo,
   tipoDesdeUrl,
   type PeriodoLiquidable,
@@ -154,6 +156,35 @@ describe('el rango de meses que recorre el selector', () => {
     const r = rango(fecha(2025, 3, 17), fecha(2026, 6, 30))
     expect(mesEnRango(siguientePeriodo(mensual(2026, 6)).periodo, r)).toBe(true)
     expect(mesEnRango(siguientePeriodo(aguinaldo(2026, 6)).periodo, r)).toBe(false)
+  })
+})
+
+describe('§7.6 desde qué día se puede confirmar la liquidación', () => {
+  const setiembre = periodoDe(2026, 9)
+
+  it('el día 22 del mes todavía no, el 23 sí', () => {
+    expect(sePuedeConfirmar(setiembre, fecha(2026, 9, 22))).toBe(false)
+    expect(sePuedeConfirmar(setiembre, fecha(2026, 9, 23))).toBe(true)
+  })
+
+  it('desde el 23 no hay tope: el último día del mes también', () => {
+    expect(sePuedeConfirmar(setiembre, fecha(2026, 9, 30))).toBe(true)
+  })
+
+  it('un mes atrasado se confirma cualquier día del mes siguiente', () => {
+    expect(sePuedeConfirmar(setiembre, fecha(2026, 10, 1))).toBe(true)
+    expect(sePuedeConfirmar(setiembre, fecha(2027, 3, 8))).toBe(true)
+  })
+
+  it('el umbral es del mes del período, no del mes en curso', () => {
+    // El 23 de agosto no habilita setiembre, aunque sea un día 23.
+    expect(sePuedeConfirmar(setiembre, fecha(2026, 8, 23))).toBe(false)
+    expect(primerDiaConfirmable(setiembre)).toEqual(fecha(2026, 9, 23))
+  })
+
+  it('febrero también tiene su día 23', () => {
+    expect(sePuedeConfirmar(periodoDe(2026, 2), fecha(2026, 2, 22))).toBe(false)
+    expect(sePuedeConfirmar(periodoDe(2026, 2), fecha(2026, 2, 23))).toBe(true)
   })
 })
 
