@@ -1173,6 +1173,8 @@ que decide.
 | Un `<input type="number">` acepta valores fuera de `min`/`max` | Esos atributos solo limitan las flechas del spinner y la validación nativa, no lo que se tipea | Las planillas mensuales clampean en el `onChange`. El tope real de horas de falta contra el régimen lo valida el servidor (§4.6), que es donde tiene que estar |
 | Al imprimir sale una última hoja en blanco | El contenedor usaba `space-y-*` y sus últimos hijos son `no-print`: el último bloque visible se queda con el margen inferior, que empuja el documento unos píxeles más allá del borde de la hoja | Separar con `gap` en un contenedor flex, que no reserva nada alrededor de un `display: none`. Vale para cualquier pantalla imprimible que termine en elementos ocultos |
 | Al verificar el CSS de impresión, las utilidades `print:*` de Tailwind parecen no existir | Un recorrido de `document.styleSheets` que solo mira las reglas de primer nivel no las encuentra: viven dentro de `@layer utilities`, y ahí el `@media print` es una regla anidada | Hay que recorrer `CSSGroupingRule.cssRules` en recursión. Las de `globals.css` sí están arriba, así que el recorrido plano encuentra `.no-print` y hace parecer que Tailwind no emitió nada |
+| «Salir» borra la sesión pero el navegador queda en bucle sobre `/oauth2/sign_out` | nginx manda `X-Auth-Request-Redirect: $request_uri` para todo `/oauth2/`, y para sign_out eso vale `/oauth2/sign_out`. De las tres estrategias de redirect de oauth2-proxy, la del encabezado es la única que **no** descarta las rutas del propio proxy, y es la de mayor prioridad | Un `location = /oauth2/sign_out` que vacíe ese encabezado; caen las otras dos estrategias, que sí se protegen. README §5.2 |
+| Un usuario dado de alta en **Usuarios** no puede entrar: Google lo autentica y aterriza en un 403 «Invalid session: unauthorized» | El despliegue arranca oauth2-proxy con `--authenticated-emails-file` y sin `--email-domain`, así que ese archivo es una segunda lista de acceso, **antes** de la app. La validación pasa en el callback de OAuth, antes de que haya sesión, así que la request nunca llega a Next y no se ve `/sin-acceso` | El email va en los dos lugares. Es una divergencia del §3.3 sin resolver: README §5.6 |
 | Un archivo de tests rompe el build de producción | `tsconfig.json` incluía `**/*.ts`, así que `next build` typechequeaba `tests/` | Resuelto: ver abajo |
 
 ### Los tests están fuera del typecheck de producción
@@ -1247,9 +1249,20 @@ los `CHECK` de la migración `20260818000100_restricciones`.
 **Antes de dar esto por bueno: correr `prisma migrate deploy` y la suite completa contra un
 MySQL 8 real.**
 
-Tampoco se probó contra un **oauth2-proxy real**. La configuración de nginx del README está
-razonada pero no ejecutada; el punto más frágil es que los `$upstream_http_x_auth_request_*`
-dependen de que `--set-xauthrequest=true` esté puesto.
+**El oauth2-proxy ya no es hipotético, pero los arreglos del README §5 sí.** Hay un despliegue
+real corriendo, y de ahí salió el síntoma que está en la tabla de arriba: `/oauth2/sign_out` en
+bucle. La causa está leída en el código de oauth2-proxy, no adivinada.
+
+Lo que **no** está verificado es la configuración de nginx del §5.1 corriendo. Se editó a partir
+de la que está en producción, pero acá no hay nginx ni para pasarle un `nginx -t`. Los tres
+cambios a confirmar en el servidor, en este orden:
+
+1. `nginx -t` pasa.
+2. «Salir» corta en una sola vuelta, sin bucle.
+3. Un POST con la sesión vencida da 401 y la app muestra el aviso de sesión, no el genérico.
+   Es lo que prueba que `/sesion/estado` quedó bien: es de lo que depende que el aviso
+   distinga sesión de red. `curl -s -o /dev/null -w '%{http_code}\n' https://tu-dominio/oauth2/auth`
+   tiene que seguir dando **404**, que es lo que confirma que el `internal` sigue puesto.
 
 ---
 

@@ -124,7 +124,9 @@ WorkingDirectory=/opt/sueldos
 # El bind a 127.0.0.1 es un requisito de seguridad, no una preferencia:
 #  - §3.2: la app no debe ser alcanzable sin pasar por oauth2-proxy;
 #  - §7.12: es lo que garantiza que /api/cron/ solo se pueda invocar desde el propio servidor.
-ExecStart=/usr/bin/node node_modules/.bin/next start --hostname 127.0.0.1 --port 3000
+#
+# El puerto tiene que ser el mismo que el de los `proxy_pass` del nginx de §5.1.
+ExecStart=/usr/bin/node node_modules/.bin/next start --hostname 127.0.0.1 --port 3002
 
 Environment=NODE_ENV=production
 Environment=TZ=America/Montevideo
@@ -179,73 +181,296 @@ es la marca de un `npm install` corrido por error fuera del proyecto, que ademá
 
 La aplicación **no implementa login** (§3.1): corre detrás de oauth2-proxy contra Google.
 
+oauth2-proxy se puede usar de dos maneras, y acá se usa la segunda:
+
+- **como proxy** —`--upstream=…`—, donde el tráfico lo pasa él y nginx solo lo tiene adelante;
+- **como proveedor de autenticación**, donde nginx es el portón, le pregunta por cada request
+  con la directiva `auth_request`, y proxea él mismo a la app.
+
+La diferencia no es cosmética: en el segundo modo **las decisiones sobre qué pasa cuando no hay
+sesión las toma nginx**, no oauth2-proxy. Buena parte de esta sección es sobre eso.
+
+La configuración de oauth2-proxy entra por **dos lugares distintos**, y conviene no
+confundirlos: el YAML de `--alpha-config` —acá, `oauth2-proxy.yaml`— y los flags de siempre. El
+YAML **no** es un archivo de configuración completo: solo tiene seis claves posibles
+—`upstreamConfig`, `injectRequestHeaders`, `injectResponseHeaders`, `server`, `metricsServer` y
+`providers`—, y todo lo que no cae en alguna de esas seis sigue viniendo por flag.
+
+La línea que arranca el servicio es corta, y es exactamente lo que está configurado hoy:
+
 ```
---provider=google
---pass-user-headers=true
---set-xauthrequest=true
---prefer-email-to-user=false      # para que X-Forwarded-User traiga el sub, no el email
---email-domain=*                  # el control de acceso lo hace la app, no el proxy
---skip-provider-button=true
---cookie-secure=true
---cookie-refresh=1h
---cookie-expire=8h
---upstream=http://127.0.0.1:3000
+ExecStart=/usr/local/bin/oauth2-proxy \
+  --alpha-config=/usr/local/etc/oauth2-proxy/oauth2-proxy.yaml \
+  --cookie-secret='un-secreto-largo-y-aleatorio' \
+  --authenticated-emails-file=/usr/local/etc/oauth2-proxy/users
 ```
 
-Además hay que inyectar el header secreto compartido. Con nginx delante del proxy:
+Del resto de lo que hace falta, una parte está en el YAML:
 
-```nginx
-proxy_set_header X-Proxy-Auth "un-secreto-largo-y-aleatorio";
+| Qué | Cómo se ve en el YAML |
+|---|---|
+| Proveedor Google | `providers[0].provider: google`, con `clientID` y `clientSecret` |
+| Dirección de escucha | `server.bindAddress: 127.0.0.1:4180` |
+| `--set-xauthrequest` | la lista `injectResponseHeaders`, con los claims `user`, `email` y `preferred_username`. El flag legacy no existe en el YAML: **es** esa lista |
+
+Y la otra parte **no está escrita en ningún lado**: son opciones de las que la aplicación
+depende y que hoy rigen porque coinciden con el default de oauth2-proxy. Escritas explícitas
+serían estas, todas con el valor que ya tienen:
+
+```
+--cookie-secure=true          # default. La cookie de sesión solo viaja por HTTPS
+--cookie-expire=168h          # default. Es la semana que dura la sesión (§5.5)
+--cookie-refresh=0            # default. Sin refresco, que es lo que queremos (§5.5)
+--skip-provider-button=false  # default. Es lo que hace que «Salir» termine afuera (§5.2)
 ```
 
-Si el header falta o no coincide con `PROXY_SHARED_SECRET`, la app responde **403** sin
-procesar nada. El prefijo `/api/cron/` queda excluido de esa validación porque tiene su
-propio control (§7.12).
+Que estén tomadas por omisión es cómodo pero frágil: son correctas hoy porque el default
+coincide con lo que necesitamos, no porque alguien las haya decidido. Si algún día cambia un
+default, cambia el comportamiento sin que nadie toque nada. Están escritas acá para que, si eso
+pasa, se sepa dónde mirar. Ponerlas explícitas en el `ExecStart` no cambia nada hoy y las
+vuelve inmunes a eso.
 
-La opción «Salir» del menú apunta a `/oauth2/sign_out`, que borra la cookie del proxy sin
-tocar la sesión de Google del navegador (§3.5).
+Hay una más que **no** está puesta y que conviene tener a mano:
 
-#### 5.1. Iconos y manifest sin autenticación
+```
+--email-domain=*              # el control de acceso lo haría solo la app (§3.3)
+```
 
-Cinco rutas tienen que poder verse **sin sesión**, y necesitan su propio `location` en nginx
-que saltee oauth2-proxy:
+Es la alternativa a `--authenticated-emails-file`: con `*` entra cualquier email autenticado por
+Google y quien filtra es la tabla `usuarios`, así que **el alta de una persona vuelve a ser un
+solo paso**. Hoy son dos, y por qué está en §5.6.
 
-```nginx
-# Arriba del `location /` que va a oauth2-proxy. Al ser un location con regex le gana
-# igual, pero conviene que se lea primero.
-location ~ ^/(favicon\.ico|icon1\.png|icon2\.png|apple-icon\.png|manifest\.webmanifest)$ {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host $host;
+`--reverse-proxy` **no está puesto**, y la documentación de oauth2-proxy lo pide para
+`auth_request`. En la práctica no rompe nada acá, y conviene entender por qué: el redirect
+después del login lo resuelve el encabezado `X-Auth-Request-Redirect`, que oauth2-proxy lee
+siempre, sin condicionarlo a que confíe en el proxy. Lo que sí queda inerte es el
+`proxy_set_header X-Forwarded-Uri` del `location = /oauth2/auth`, porque esa lectura sí está
+condicionada:
 
-    # Estas rutas están excluidas del matcher de `proxy.ts`, así que acá NO hace falta
-    # repetir X-Proxy-Auth: el secreto queda escrito en un solo lugar de la configuración.
-
-    # Este location no pasa por oauth2-proxy, así que ningún encabezado de identidad
-    # puede entrar por acá desde afuera.
-    proxy_set_header X-Forwarded-User "";
-    proxy_set_header X-Forwarded-Email "";
-    proxy_set_header X-Forwarded-Preferred-Username "";
-
-    access_log off;
+```go
+func GetRequestURI(req *http.Request) string {
+	uri := req.Header.Get(XForwardedURI)
+	if !CanTrustForwardedHeaders(req) || uri == "" {
+		uri = req.URL.RequestURI()
+	}
+	return uri
 }
 ```
 
-El que **obliga** a esto es el manifest: el navegador lo pide con `credentials: omit`, así que
-detrás del login llega sin cookie, oauth2-proxy contesta el redirect y Chrome descarta la
-instalación sin decir por qué. Los iconos, además, se piden en contextos donde todavía no hay
-sesión, como la propia pantalla de login.
+O sea que ese encabezado es configuración muerta mientras `--reverse-proxy` no esté. Lo que se
+gana poniéndolo es tener la IP real del cliente en los logs, en vez de `127.0.0.1`. Si se pone,
+va junto con `--trusted-proxy-ip`: sin eso oauth2-proxy confía en los `X-Forwarded-*` de
+cualquier origen, que acá está contenido porque escucha solo en loopback, pero no hay razón para
+dejarlo abierto.
+
+No hay `--upstream`: en este modo oauth2-proxy no proxea nada.
+
+#### 5.1. La configuración de nginx
+
+Está en `nginx-sueldos.conf`, fuera del repositorio porque lleva el secreto compartido. Lo que
+sigue es el bloque de TLS con el secreto reemplazado por un placeholder:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name sueldos.rapetti.name;
+
+    # La planilla mensual (§7.1) postea un mes entero de renglones en una sola operación.
+    client_max_body_size 2m;
+
+    # El endpoint del cron no se expone nunca hacia afuera (§7.12). Se responde 404 y no
+    # 403, para no confirmar que existe.
+    location ^~ /api/cron/ {
+        return 404;
+    }
+
+    # La salida necesita su propio location. Ver §5.2.
+    location = /oauth2/sign_out {
+        proxy_pass       http://127.0.0.1:4180;
+        proxy_set_header Host      $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme  $scheme;
+        proxy_set_header X-Auth-Request-Redirect "";
+    }
+
+    # Login y callback: no protegidos.
+    location /oauth2/ {
+        proxy_pass       http://127.0.0.1:4180;
+        proxy_set_header Host      $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme  $scheme;
+        proxy_set_header X-Auth-Request-Redirect $request_uri;
+    }
+
+    # El oráculo de sesión, solo para la subrequest. `internal` no es opcional: ver §5.3.
+    location = /oauth2/auth {
+        internal;
+        proxy_pass       http://127.0.0.1:4180;
+        proxy_set_header Host             $host;
+        proxy_set_header X-Real-IP        $remote_addr;
+        proxy_set_header X-Forwarded-Uri  $request_uri;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length   "";
+    }
+
+    # Iconos y manifest, sin sesión. Ver §5.4.
+    location ~ ^/(favicon\.ico|icon1\.png|icon2\.png|apple-icon\.png|manifest\.webmanifest)$ {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-User "";
+        proxy_set_header X-Forwarded-Email "";
+        proxy_set_header X-Forwarded-Preferred-Username "";
+        access_log off;
+    }
+
+    # La sonda que consulta el cliente: 204 o 401, sin cuerpo ni encabezados. Ver §5.3.
+    location = /sesion/estado {
+        auth_request /oauth2/auth;
+        return 204;
+    }
+
+    # Qué hacer sin sesión, según el método. Ver §5.3.
+    location @sin_sesion {
+        if ($request_method = POST) {
+            return 401;
+        }
+
+        proxy_pass       http://127.0.0.1:4180/oauth2/sign_in;
+        proxy_set_header Host      $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme  $scheme;
+        proxy_set_header X-Auth-Request-Redirect $request_uri;
+    }
+
+    location / {
+        auth_request /oauth2/auth;
+        error_page 401 = @sin_sesion;
+
+        auth_request_set $email $upstream_http_x_auth_request_email;
+        auth_request_set $user  $upstream_http_x_auth_request_user;
+        auth_request_set $name  $upstream_http_x_auth_request_preferred_username;
+
+        # Fijarlos acá pisa cualquier X-Forwarded-* que mande el cliente (§3.2).
+        proxy_set_header X-Forwarded-Email               $email;
+        proxy_set_header X-Forwarded-User                $user;
+        proxy_set_header X-Forwarded-Preferred-Username  $name;
+
+        # §3.2 — tiene que coincidir con el PROXY_SHARED_SECRET de la unidad de systemd.
+        proxy_set_header X-Proxy-Auth "un-secreto-largo-y-aleatorio";
+
+        # Todo lo demás que oauth2-proxy podría inyectar se neutraliza.
+        proxy_set_header X-Auth-Request-Email              "";
+        proxy_set_header X-Auth-Request-User               "";
+        proxy_set_header X-Auth-Request-Preferred-Username "";
+        proxy_set_header X-Auth-Request-Groups             "";
+        proxy_set_header X-Auth-Request-Access-Token       "";
+        proxy_set_header X-Forwarded-Groups                "";
+        proxy_set_header X-Forwarded-Access-Token          "";
+        proxy_set_header Authorization                     "";
+
+        # Las Server Actions de liquidación hacen varias escrituras en una transacción.
+        proxy_read_timeout 120s;
+
+        proxy_pass http://127.0.0.1:3002;
+    }
+}
+```
+
+Los tres `auth_request_set` son el corazón del asunto: la subrequest devuelve la identidad en
+encabezados `X-Auth-Request-*`, y hay que copiarla a los `X-Forwarded-*` que lee
+`lib/auth/currentUser.ts` (§3.2). Si `--set-xauthrequest` no está puesto, esas variables vienen
+vacías y **la app no rompe: te manda a la pantalla de acceso no autorizado**, que es un síntoma
+que no señala hacia el proxy.
+
+Si el header `X-Proxy-Auth` falta o no coincide con `PROXY_SHARED_SECRET`, la app responde
+**403** sin procesar nada. El prefijo `/api/cron/` queda excluido de esa validación porque tiene
+su propio control (§7.12).
+
+#### 5.2. La salida entra en bucle si nginx manda `X-Auth-Request-Redirect`
+
+Síntoma: «Salir» borra la sesión —eso funciona— y después el navegador queda dando vueltas
+sobre `/oauth2/sign_out` para siempre.
+
+La causa es una asimetría en oauth2-proxy. Para decidir a dónde mandarte después del logout usa
+tres estrategias, por orden de prioridad: el parámetro `rd`, el encabezado
+`X-Auth-Request-Redirect`, y la URI de la request. Las dos últimas se protegen de los bucles:
+
+```go
+if a.hasProxyPrefix(redirect) {
+    return "/"
+}
+```
+
+La del encabezado **no** —solo valida que el destino sea un dominio permitido— y es la que tiene
+más prioridad. Así que un `proxy_set_header X-Auth-Request-Redirect $request_uri` en el
+`location /oauth2/`, que es lo correcto para el login, le dice a `sign_out` que después de
+cerrar sesión vaya a `/oauth2/sign_out`. Que cierra sesión y vuelve a ir a `/oauth2/sign_out`.
+
+El arreglo es el `location = /oauth2/sign_out` de §5.1, que vacía ese encabezado. Vaciarlo y no
+fijarlo a mano es a propósito: caen las otras dos estrategias, que sí traen la protección
+adentro.
+
+Con el bucle resuelto, la salida aterriza en `/`, que exige sesión, así que se muestra la
+pantalla de login de oauth2-proxy —la del botón «Sign in with Google»— y ahí termina. El usuario
+quedó afuera, que es lo que se esperaba.
+
+**Que termine ahí depende de que `--skip-provider-button` esté en falso**, y por eso no está en
+la lista de flags de arriba. Con ese flag prendido, `/oauth2/sign_in` no dibuja nada: manda
+derecho a Google, que con la sesión del navegador viva (§3.5) devuelve al usuario adentro sin
+preguntarle nada. O sea que prenderlo ahorra un clic por ingreso y a cambio **deja «Salir» sin
+efecto visible**. La diferencia está en una sola bifurcación de oauth2-proxy:
+
+```go
+if p.SkipProviderButton {
+    p.OAuthStart(rw, req)              // derecho a Google
+} else {
+    p.SignInPage(rw, req, statusCode)  // la pantalla con el botón
+}
+```
+
+#### 5.3. Un POST sin sesión se contesta 401, no se redirige
+
+Todas las mutaciones de la app son Server Actions, que **postean a la URL de la página**. Si a
+un POST sin sesión se le contesta un 302, el navegador lo degrada a GET y le tira el cuerpo —lo
+dice el spec de Fetch para 301 y 302—, sigue el redirect hasta `accounts.google.com` y ahí el
+`fetch` interno de Next muere por CORS. El cuerpo nunca llega a Google, pero el envío se pierde.
+
+La documentación de oauth2-proxy recomienda separar rutas de navegador de rutas de API y no
+redirigir a estas últimas. Acá esa separación **no se puede hacer por path**, porque las Server
+Actions comparten la URL de la página: hay que hacerla por método, que es lo que hace el
+`location @sin_sesion`.
+
+El `if` adentro de un `location` es uno de los dos usos que la documentación de nginx considera
+seguros, porque lo único que hay adentro es un `return`.
+
+Para lo que no es POST se conserva lo de siempre: la pantalla de login servida en el lugar, sin
+redirect. El `if` con un `return` adentro es uno de los dos usos que la documentación de nginx
+considera seguros; el `proxy_pass` queda afuera del `if`, que es lo que evita el problema
+conocido.
+
+Del lado de la app, `hooks/useAccion.ts` atrapa el rechazo y consulta **`/sesion/estado`** para
+saber si fue la sesión o la red.
+
+Esa sonda existe en vez de consultar `/oauth2/auth` directamente, y no es una vuelta de más.
+`/oauth2/auth` tiene que quedar `internal`, porque su respuesta 202 pasa por el `headersChain`
+de oauth2-proxy y sale con los `X-Auth-Request-*` puestos —los mismos que nginx copia con
+`auth_request_set`—, y ahí adentro va el **access token de Google**. Un `fetch` mismo-origen
+puede leer todos los encabezados de la respuesta, así que exponer esa ruta al navegador le
+regalaría el token a cualquier XSS. `/sesion/estado` da exactamente la misma información —hay
+sesión o no la hay— y nada más: no tiene ningún `auth_request_set`, así que contesta 204 o 401
+sin cuerpo y sin encabezados de identidad.
+
+#### 5.4. Iconos y manifest sin autenticación
+
+Cinco rutas tienen que poder verse **sin sesión**, y por eso tienen su propio `location` que
+saltea `auth_request`. El que **obliga** es el manifest: el navegador lo pide con
+`credentials: omit`, así que detrás del login llega sin cookie, nginx contesta el redirect y
+Chrome descarta la instalación sin decir por qué. Los iconos, además, se piden en contextos
+donde todavía no hay sesión, como la propia pantalla de login.
 
 Vaciar los tres encabezados de identidad no es decorativo: la app confía en ellos para saber
-quién sos (§3.2), y esa confianza se sostiene porque nadie llega sin pasar por oauth2-proxy.
-Este `location` es una excepción a esa regla, así que tiene que cerrar la puerta que abre.
-
-La alternativa, si se prefiere no agregar un `location`, es dejar todo entrando por un solo
-camino y saltear la autenticación en el propio proxy —el flag es `--skip-auth-route` en las
-versiones nuevas y `--skip-auth-regex` en las viejas—:
-
-```
---skip-auth-route='GET=^/(favicon\.ico|icon[12]\.png|apple-icon\.png|manifest\.webmanifest)$'
-```
+quién sos (§3.2), y esa confianza se sostiene porque nadie llega sin pasar por el portón. Este
+`location` es una excepción a esa regla, así que tiene que cerrar la puerta que abre.
 
 Para verificarlo después del deploy, sin cookie:
 
@@ -254,6 +479,95 @@ curl -s -o /dev/null -w '%{http_code}\n' https://tu-dominio/manifest.webmanifest
 ```
 
 Tiene que dar `200`, y la raíz tiene que seguir redirigiendo al login.
+
+#### 5.5. Cuánto dura la sesión, y por qué no va `--cookie-refresh`
+
+Hay tres relojes y conviene no confundirlos:
+
+| Reloj | De dónde sale | Cuánto |
+|---|---|---|
+| Access token de Google | `expires_in` del canje | ~1 h |
+| Refresh token | solo la **primera** autorización, ahora que el consentimiento no se fuerza | — |
+| Cookie `_oauth2_proxy` | `--cookie-expire` | 168 h por defecto |
+
+El que manda es el tercero, y los otros dos no intervienen. En `stored_session.go`, la
+validación del vencimiento del token solo se alcanza a través de la decisión de refrescar:
+
+```go
+if !needsRefresh(s.refreshPeriod, session) {
+    // Refresh is disabled or the session is not old enough, do nothing
+    return nil
+}
+...
+return s.validateSession(req.Context(), session)
+
+func needsRefresh(refreshPeriod time.Duration, session *sessionsapi.SessionState) bool {
+    return refreshPeriod > time.Duration(0) && session.Age() > refreshPeriod
+}
+```
+
+Sin `--cookie-refresh`, `needsRefresh` es siempre falso y **el vencimiento del access token no
+se mira nunca**. A la app le da igual: `lib/auth/currentUser.ts` lee tres encabezados que salen
+de la sesión, no de una llamada a Google, y el access token no se usa en ninguna parte del
+código.
+
+Poner `--cookie-refresh` en este modo, además, casi no sirve: la subrequest de `auth_request`
+descarta la respuesta de oauth2-proxy, así que el `Set-Cookie` con la sesión renovada **no llega
+al navegador** salvo que se lo copie a mano con `auth_request_set $auth_cookie
+$upstream_http_set_cookie`. Y eso copia un solo `Set-Cookie`: si la sesión pasa los 4 KB,
+oauth2-proxy la parte en `_oauth2_proxy_0` y `_1`, y hay que copiar las dos. Sin refresh token
+—que es lo normal desde el segundo ingreso— no hay nada que renovar de todos modos.
+
+La consecuencia práctica es que **cada usuario vuelve a autenticarse una vez por semana**, y ese
+momento puede caer arriba de un POST. La red de contención es el §5.3 más el `catch` de
+`useAccion`: el aviso sale, y lo cargado sigue en pantalla.
+
+#### 5.6. El alta de un usuario son **dos** altas
+
+El §3.3 dice que el control de acceso lo hace la app: el administrador da de alta el email desde
+**Usuarios**, y el vínculo con la cuenta de Google se completa en el primer ingreso. En este
+despliegue eso **no alcanza**, porque hay una segunda lista antes, en oauth2-proxy.
+
+`--authenticated-emails-file=/usr/local/etc/oauth2-proxy/users` y la ausencia de
+`--email-domain` se combinan así:
+
+```go
+valid = isEmailValidWithDomains(email, domains)  // domains está vacío: siempre false
+if !valid {
+    valid = validUsers.IsValid(email)            // el archivo decide todo
+}
+if allowAll { valid = true }                     // allowAll es false: no hay "*"
+```
+
+Con `domains` vacío, la primera línea nunca da verdadero y `allowAll` nunca se activa, así que
+**el archivo es la única puerta del proxy**. Quien no esté ahí no llega a la app.
+
+Y no llega de una forma que no se parece a lo que el §3.3 describe. La validación ocurre en el
+callback de OAuth, antes de que exista sesión:
+
+```go
+if p.Validator(session.Email) && authorized {
+    ...
+} else {
+    p.ErrorPage(rw, req, http.StatusForbidden, "Invalid session: unauthorized")
+}
+```
+
+Es decir: la persona hace clic en el botón, elige su cuenta de Google, acepta, y aterriza en una
+página **403 de oauth2-proxy** que dice «Invalid session: unauthorized». Nunca ve la pantalla de
+acceso no autorizado de la app (`app/sin-acceso/page.tsx`), que es la que explica qué pasó y a
+quién reclamarle, porque la request no llega hasta Next.
+
+**Consecuencia operativa: dar de alta a alguien son dos pasos.** El email va en la pantalla de
+Usuarios *y* en `/usr/local/etc/oauth2-proxy/users`. El archivo se relee solo cuando cambia
+—oauth2-proxy lo vigila—, así que no hace falta reiniciar el servicio, pero sí acordarse. Si
+falta el segundo paso, el síntoma es el 403 de arriba, que no menciona ni a la app ni a la lista.
+
+**Esto es una divergencia del §3.3 y no está resuelta acá.** Las dos salidas razonables son
+sacar el archivo y poner `--email-domain=*`, que deja el control donde el SPECS lo pone y ahorra
+el paso doble; o conservarlo como defensa en profundidad y asumir el paso doble, documentándolo
+en el instructivo de alta. Es una decisión del dueño del proyecto, porque toca lo que el §3.3
+fija.
 
 ### 6. Alta del primer usuario
 
