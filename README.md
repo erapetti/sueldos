@@ -212,6 +212,7 @@ Del resto de lo que hace falta, una parte está en el YAML:
 | Proveedor Google | `providers[0].provider: google`, con `clientID` y `clientSecret` |
 | Dirección de escucha | `server.bindAddress: 127.0.0.1:4180` |
 | `--set-xauthrequest` | la lista `injectResponseHeaders`, con los claims `user`, `email` y `preferred_username`. El flag legacy no existe en el YAML: **es** esa lista |
+| Que Google no pida consentimiento | por **ausencia**: sin bloque `loginURLParameters` no se manda ningún parámetro (más abajo en esta sección) |
 
 Y la otra parte **no está escrita en ningún lado**: son opciones de las que la aplicación
 depende y que hoy rigen porque coinciden con el default de oauth2-proxy. Escritas explícitas
@@ -264,6 +265,24 @@ cualquier origen, que acá está contenido porque escucha solo en loopback, pero
 dejarlo abierto.
 
 No hay `--upstream`: en este modo oauth2-proxy no proxea nada.
+
+`--approval-prompt=auto` **no es opcional**. Si no se pone —ni ese ni `--prompt`—, oauth2-proxy
+manda `approval_prompt=force` por compatibilidad con sus versiones viejas, y con `force` Google
+vuelve a mostrar la pantalla de consentimiento en **cada** ingreso, no solo el primero. Cada vez
+que se acepta, Google lo registra como una autorización nueva y le manda al usuario un mail con
+asunto «You shared some Google Account data with …». Con `auto` no pide nada a partir del
+segundo ingreso.
+
+El valor `auto` es del parámetro viejo de Google, deprecado hoy en favor de `prompt`. Da igual:
+si Google lo respeta no pide consentimiento, y si lo ignora tampoco, porque `auto` no fuerza
+nada. El equivalente moderno es `--prompt=select_account`, que evita el consentimiento pero
+**muestra el selector de cuenta en cada ingreso**, así que no resuelve lo mismo. `--prompt=none`
+no sirve: falla con error cuando Google necesita interacción.
+
+Con la configuración alpha —el YAML de `--alpha-config`— el parámetro no tiene valor por
+defecto, así que el equivalente es borrar el bloque `loginURLParameters` del proveedor en vez de
+poner `auto`. Ojo con `--convert-config-to-alpha`: el YAML que genera trae el bloque escrito con
+`force`, porque la conversión aplica el default legacy.
 
 #### 5.1. La configuración de nginx
 
