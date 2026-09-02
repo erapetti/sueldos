@@ -28,10 +28,12 @@ const DURACION_FALLA = 20_000
  * framework: se pierde todo lo cargado y el usuario nunca se entera de que fue la sesión.
  *
  * Para saber cuál de las dos fallas fue, se le pregunta al borde en vez de adivinar por la
- * forma del error. `/sesion/estado` lo sirve nginx: 204 con sesión, 401 sin ella, y nunca un
- * redirect. No se consulta `/oauth2/auth` directamente —que es lo que esa ruta consulta por
- * dentro— porque su respuesta lleva los encabezados `X-Auth-Request-*`, con el access token
- * de Google adentro, y un `fetch` mismo-origen puede leerlos.
+ * forma del error. `/sesion/estado` lo sirve nginx detrás de un `auth_request`, y **contesta
+ * 401 cuando no hay sesión**, sin redirigir nunca. Lo único que se mira es ese 401; con sesión
+ * devuelve un cuerpo mínimo que no interesa. No se consulta `/oauth2/auth` directamente —que
+ * es lo que esa ruta consulta por dentro— porque su respuesta lleva los encabezados
+ * `X-Auth-Request-*`, con el access token de Google adentro, y un `fetch` mismo-origen puede
+ * leerlos.
  *
  * Se exige el **401 explícito**: en desarrollo no hay proxy delante y esa ruta da 404, que
  * no es una sesión vencida sino que no hay proxy.

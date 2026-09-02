@@ -342,10 +342,10 @@ server {
         access_log off;
     }
 
-    # La sonda que consulta el cliente: 204 o 401, sin cuerpo ni encabezados. Ver §5.3.
+    # La sonda que consulta el cliente: 401 sin sesión. Ver §5.3.
     location = /sesion/estado {
         auth_request /oauth2/auth;
-        return 204;
+        empty_gif;
     }
 
     # Qué hacer sin sesión, según el método. Ver §5.3.
@@ -353,12 +353,7 @@ server {
         if ($request_method = POST) {
             return 401;
         }
-
-        proxy_pass       http://127.0.0.1:4180/oauth2/sign_in;
-        proxy_set_header Host      $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Scheme  $scheme;
-        proxy_set_header X-Auth-Request-Redirect $request_uri;
+        rewrite ^ /oauth2/sign_in last;
     }
 
     location / {
@@ -464,11 +459,27 @@ seguros, porque lo único que hay adentro es un `return`.
 
 Para lo que no es POST se conserva lo de siempre: la pantalla de login servida en el lugar, sin
 redirect. El `if` con un `return` adentro es uno de los dos usos que la documentación de nginx
-considera seguros; el `proxy_pass` queda afuera del `if`, que es lo que evita el problema
-conocido.
+considera seguros.
+
+**Dos trampas de nginx que este par de `location` esquiva, y que no se parecen entre sí.**
+
+La primera se ve al arrancar. Dentro de una location con nombre, `proxy_pass` **no admite parte
+de URI**: `proxy_pass http://127.0.0.1:4180/oauth2/sign_in` no compila, y nginx lo dice sin
+ambigüedad —«cannot have URI part in location given by regular expression, or inside named
+location…»—. El destino se fija con `rewrite ^ /oauth2/sign_in last`, que vuelve a buscar
+location y cae en el `location /oauth2/`, que ya tiene el `proxy_pass` y el
+`X-Auth-Request-Redirect`. Es exactamente lo que hacía el `error_page 401 = /oauth2/sign_in`
+original, y `$request_uri` no cambia con el rewrite.
+
+La segunda **no se ve nunca**, y es la peligrosa. En la sonda hay `empty_gif` y no `return 204`
+porque `return` es del módulo rewrite y corre en la **fase de rewrite**, que va antes de la
+**fase de access**, que es donde corre `auth_request`. Con un `return`, la sonda contestaría
+siempre lo mismo sin haber consultado la sesión: nginx arranca, la ruta responde, y el aviso de
+«se venció la sesión» no sale jamás porque el 401 nunca llega. `empty_gif` es un handler de la
+fase de content, así que espera el veredicto del `auth_request`.
 
 Del lado de la app, `hooks/useAccion.ts` atrapa el rechazo y consulta **`/sesion/estado`** para
-saber si fue la sesión o la red.
+saber si fue la sesión o la red. Lo único que mira es el 401.
 
 Esa sonda existe en vez de consultar `/oauth2/auth` directamente, y no es una vuelta de más.
 `/oauth2/auth` tiene que quedar `internal`, porque su respuesta 202 pasa por el `headersChain`
@@ -476,8 +487,8 @@ de oauth2-proxy y sale con los `X-Auth-Request-*` puestos —los mismos que ngin
 `auth_request_set`—, y ahí adentro va el **access token de Google**. Un `fetch` mismo-origen
 puede leer todos los encabezados de la respuesta, así que exponer esa ruta al navegador le
 regalaría el token a cualquier XSS. `/sesion/estado` da exactamente la misma información —hay
-sesión o no la hay— y nada más: no tiene ningún `auth_request_set`, así que contesta 204 o 401
-sin cuerpo y sin encabezados de identidad.
+sesión o no la hay— y nada más: no tiene ningún `auth_request_set`, así que sale sin ningún
+encabezado de identidad.
 
 #### 5.4. Iconos y manifest sin autenticación
 
