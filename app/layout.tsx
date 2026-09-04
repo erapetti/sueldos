@@ -11,6 +11,7 @@ import { Instrument_Sans, Instrument_Serif } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import { MenuLateral, MenuMobile } from '@/components/layout/Menu'
+import { AvatarUsuario } from '@/components/layout/AvatarUsuario'
 import { usuarioActual } from '@/lib/auth/currentUser'
 import './globals.css'
 
@@ -30,19 +31,6 @@ const serif = Instrument_Serif({
 export const metadata: Metadata = {
   title: 'Liquidación de sueldos',
   description: 'Cálculo del sueldo mensual del personal doméstico',
-}
-
-/** Iniciales para el avatar de la barra superior (dos palabras como máximo). */
-function iniciales(nombre: string | null, email: string) {
-  const partes = (nombre ?? '').trim().split(/\s+/).filter(Boolean)
-  if (partes.length > 0) {
-    return partes
-      .slice(0, 2)
-      .map((p) => p[0])
-      .join('')
-      .toUpperCase()
-  }
-  return email.slice(0, 2).toUpperCase()
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -70,12 +58,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <span className="hidden truncate text-sm text-muted-foreground md:inline">
                   {usuario.nombre ?? usuario.email}
                 </span>
-                <span
-                  title={usuario.email}
-                  className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold tracking-wide text-primary-ink"
-                >
-                  {iniciales(usuario.nombre, usuario.email)}
-                </span>
+                <AvatarUsuario
+                  nombre={usuario.nombre}
+                  email={usuario.email}
+                  foto={usuario.avatar}
+                />
               </div>
             ) : null}
           </header>

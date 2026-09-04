@@ -31,7 +31,8 @@ async function bootstrap() {
   }
 
   const admin = await prisma.usuario.create({
-    data: { email, esAdmin: true, activo: true, nombre: 'Administrador inicial' },
+    // Sin `nombre`: lo trae el claim `name` de Google en el primer ingreso (README §5.7).
+    data: { email, esAdmin: true, activo: true },
   })
   console.log(`Administrador inicial creado: ${admin.email}`)
   return admin
@@ -165,7 +166,8 @@ async function duenoDemo() {
     const existente = await prisma.usuario.findUnique({ where: { email } })
     if (existente) return existente
     const creado = await prisma.usuario.create({
-      data: { email, esAdmin: true, activo: true, nombre: 'Administrador inicial' },
+      // Sin `nombre`: lo trae el claim `name` de Google en el primer ingreso (README §5.7).
+      data: { email, esAdmin: true, activo: true },
     })
     console.log(`Administrador ${creado.email} creado para ser dueño de los datos de ejemplo.`)
     return creado

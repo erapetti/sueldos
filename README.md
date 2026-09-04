@@ -211,7 +211,7 @@ Del resto de lo que hace falta, una parte está en el YAML:
 |---|---|
 | Proveedor Google | `providers[0].provider: google`, con `clientID` y `clientSecret` |
 | Dirección de escucha | `server.bindAddress: 127.0.0.1:4180` |
-| `--set-xauthrequest` | la lista `injectResponseHeaders`, con los claims `user`, `email` y `preferred_username`. El flag legacy no existe en el YAML: **es** esa lista |
+| `--set-xauthrequest` | la lista `injectResponseHeaders`, con los claims `user`, `email` y `preferred_username`. El flag legacy no existe en el YAML: **es** esa lista. Ahí van también `name` y `picture`, declarados en `additionalClaims` (§5.7) |
 | Que Google no pida consentimiento | por **ausencia**: sin bloque `loginURLParameters` no se manda ningún parámetro (más abajo en esta sección) |
 
 Y la otra parte **no está escrita en ningún lado**: son opciones de las que la aplicación
@@ -339,6 +339,8 @@ server {
         proxy_set_header X-Forwarded-User "";
         proxy_set_header X-Forwarded-Email "";
         proxy_set_header X-Forwarded-Preferred-Username "";
+        proxy_set_header X-Forwarded-Name "";
+        proxy_set_header X-Forwarded-Picture "";
         access_log off;
     }
 
@@ -360,14 +362,15 @@ server {
         auth_request /oauth2/auth;
         error_page 401 = @sin_sesion;
 
+        # El email es la clave (§5.8); el nombre y la foto salen de claims pedidos (§5.7).
         auth_request_set $email $upstream_http_x_auth_request_email;
-        auth_request_set $user  $upstream_http_x_auth_request_user;
-        auth_request_set $name  $upstream_http_x_auth_request_preferred_username;
+        auth_request_set $name  $upstream_http_x_auth_request_name;
+        auth_request_set $foto  $upstream_http_x_auth_request_picture;
 
         # Fijarlos acá pisa cualquier X-Forwarded-* que mande el cliente (§3.2).
-        proxy_set_header X-Forwarded-Email               $email;
-        proxy_set_header X-Forwarded-User                $user;
-        proxy_set_header X-Forwarded-Preferred-Username  $name;
+        proxy_set_header X-Forwarded-Email    $email;
+        proxy_set_header X-Forwarded-Name     $name;
+        proxy_set_header X-Forwarded-Picture  $foto;
 
         # §3.2 — tiene que coincidir con el PROXY_SHARED_SECRET de la unidad de systemd.
         proxy_set_header X-Proxy-Auth "un-secreto-largo-y-aleatorio";
@@ -378,7 +381,11 @@ server {
         proxy_set_header X-Auth-Request-Preferred-Username "";
         proxy_set_header X-Auth-Request-Groups             "";
         proxy_set_header X-Auth-Request-Access-Token       "";
+        proxy_set_header X-Auth-Request-Name               "";
+        proxy_set_header X-Auth-Request-Picture            "";
         proxy_set_header X-Forwarded-Groups                "";
+        proxy_set_header X-Forwarded-Preferred-Username    "";
+        proxy_set_header X-Forwarded-User                  "";
         proxy_set_header X-Forwarded-Access-Token          "";
         proxy_set_header Authorization                     "";
 
@@ -598,6 +605,124 @@ sacar el archivo y poner `--email-domain=*`, que deja el control donde el SPECS 
 el paso doble; o conservarlo como defensa en profundidad y asumir el paso doble, documentándolo
 en el instructivo de alta. Es una decisión del dueño del proyecto, porque toca lo que el §3.3
 fija.
+
+#### 5.7. Google no manda el nombre del usuario, y por eso el proveedor es `oidc`
+
+El §3.1 del SPECS da por sentado que `X-Forwarded-Preferred-Username` trae el nombre a
+mostrar. Contra Google **eso no pasa nunca**: ese header llega siempre vacío, el nombre queda
+en el que la fila ya tenía, y el síntoma es una barra superior que muestra un nombre viejo o
+—si la fila la creó el bootstrap— un nombre inventado, con sus iniciales.
+
+El motivo es que `preferred_username` es un claim de OIDC que emiten Entra, Keycloak o ADFS, y
+**Google no lo emite**. Su ID token trae `name`, `given_name`, `family_name`, `email` y
+`picture`. oauth2-proxy llena `SessionState.PreferredUsername` exclusivamente desde
+`preferred_username`, así que queda vacío y no hay nada que reenviar.
+
+Lo que sí se puede es pedirle a oauth2-proxy que extraiga los claims que hacen falta, con
+`additionalClaims`:
+
+```yaml
+providers:
+  - provider: oidc
+    scope: openid email profile
+    oidcConfig:
+      issuerURL: https://accounts.google.com
+    additionalClaims:
+      - name
+      - picture
+```
+
+Los claims declarados ahí se guardan en la sesión y quedan disponibles para la inyección de
+encabezados como cualquier otro:
+
+```yaml
+injectResponseHeaders:
+    - name: X-Auth-Request-Name
+      values:
+        - claimSource:
+            claim: name
+```
+
+Hay **dos condiciones** para que esto funcione, y ninguna es evidente:
+
+**1. oauth2-proxy 7.15.0 o posterior.** `additionalClaims` no existe antes
+([#2685](https://github.com/oauth2-proxy/oauth2-proxy/pull/2685)). En versiones anteriores, un
+`claim: name` no falla al arrancar: `SessionState.GetClaim()` resuelve un `switch` cerrado
+—`access_token`, `id_token`, `created_at`, `expires_on`, `refresh_token`, `email`, `user`,
+`groups`, `preferred_username`— y devuelve `[]string{}` en el `default`. O sea que inyecta un
+header vacío, en silencio. Desde 7.15.0 ese `default` pasa a ser `s.getAdditionalClaim(claim)`.
+
+**2. El proveedor tiene que ser `oidc`, no `google`.** Los claims adicionales los extrae
+`ProviderData.extractAdditionalClaims()`, y la llama `buildSessionFromClaims()`. El proveedor
+`google` **no pasa por ahí**: parsea el ID token por su cuenta en `Redeem()`, se queda con
+`sub`, `email` y `email_verified`, y descarta el resto. Con `provider: google` el
+`additionalClaims` se acepta y no hace nada.
+
+Contra Google, el proveedor `oidc` funciona igual apuntando a `https://accounts.google.com`.
+Se pierde solamente lo específico de `googleConfig` —los grupos vía Admin SDK y la cuenta de
+servicio—, que acá no se usa. El `scope` sí hay que escribirlo: el default del proveedor `oidc`
+no es el mismo que el de `google`, y sin `profile` los claims `name` y `picture` no vienen.
+
+El ID token entero **no** se le pasa a la app. Se evaluó: es el único claim inyectable que
+lleva `name` y `picture` sin `additionalClaims`, pero implica un JWT en el borde y que la app
+decodifique. Con `additionalClaims` la app recibe dos strings y no sabe que existe un token,
+que es donde tiene que estar la frontera.
+
+Del lado de la app lo lee `lib/auth/currentUser.ts`, que sigue siendo el único que toca headers
+de identidad. El `picture` termina en el `src` de una imagen que se renderiza en todas las
+páginas, así que se acota a `https` sobre un host de `googleusercontent.com`; cualquier otra
+cosa se descarta. La URL **no se guarda en la base**: llega en cada request, así que siempre
+está fresca y no queda una URL de Google vencida en `usuarios`. La contra es que el navegador le
+pega a Google en cada carga; si eso molesta, la alternativa es una ruta propia que baje la
+imagen del lado del servidor y la cachee.
+
+El bootstrap, por su parte, ya **no** escribe `nombre: 'Administrador inicial'`. Inventar un
+nombre ahí lo dejaba fijo para siempre, porque el refresco del §4.1 (`identidad.nombre?.trim()
+|| usuario.nombre`) no pisa con un valor vacío. Sin nombre, la primera visita lo completa con el
+de Google.
+
+#### 5.8. La identidad se ancla en el email, no en el `sub` de Google
+
+El §3.3 del SPECS pide que el match contra `usuarios` sea por `google_sub`, con el email
+sirviendo solo para pre-crear al usuario. **Acá el match es por email**, y la columna
+`google_sub` ya no existe.
+
+La recomendación de anclar en el `sub` es correcta en general, y protege de dos cosas:
+
+- **Que a una persona le cambien el email.** El `sub` no cambia nunca; la dirección sí. Con el
+  match por `sub`, un renombre se resuelve solo y el email se actualiza en el próximo ingreso.
+- **Que el email se reasigne a otra persona.** En Workspace, un administrador puede borrar una
+  cuenta y crear otra con la misma dirección. Con el match por email, la persona nueva
+  heredaría los empleados, los permisos y el flag de administrador de la anterior.
+
+Ninguna de las dos puede pasar en este despliegue, porque las cuentas son `@gmail.com`: una
+dirección de Gmail no se renombra, y Google no recicla las que se dan de baja. Y el email llega
+verificado, porque `insecureAllowUnverifiedEmail: false` —el default, que hay que dejar
+así— hace que oauth2-proxy rechace un `email_verified: false`.
+
+**Si algún día entra una cuenta de Workspace, esto hay que reconsiderarlo**, y el segundo
+riesgo es el serio: no es que alguien pierda el acceso, es que alguien hereda el de otro.
+
+Lo que se gana sacándolo no es poco:
+
+- Una columna, su índice único, y la lógica de *claim* del registro: el usuario pre-creado sin
+  `sub` al que el primer ingreso se lo asignaba. Ahora un usuario pre-creado matchea de una.
+- La búsqueda en dos pasos de `resolverIdentidad()` queda en un `findUnique` por email.
+- **Toda la dependencia de `userIDClaim`.** Era la parte más frágil del §5.7: ese campo no se
+  mapea de forma confiable al `UserClaim` del proveedor en la configuración alpha
+  ([#3165](https://github.com/oauth2-proxy/oauth2-proxy/issues/3165)), y de él salía el
+  `X-Auth-Request-User` con el que la app buscaba. Un cambio de default ahí dejaba a todo el
+  mundo afuera. El email sale de `emailClaim`, que sí se respeta, y es el mismo header que la
+  app ya venía usando.
+- `X-Forwarded-User` deja de existir para la app. Sigue vaciándose en el nginx, como todo lo
+  que no se usa.
+
+El «Sin ingresar» de la pantalla de Usuarios miraba `google_sub IS NULL`; ahora mira
+`ultimo_acceso`, que dice exactamente lo mismo con un dato que ya estaba.
+
+La migración `20260904000000_identidad_por_email` borra la columna. Es destructiva y sin vuelta
+atrás, pero el dato no hace falta para nada: si alguna vez se volviera al `sub`, se repuebla
+con que cada usuario ingrese una vez.
 
 ### 6. Alta del primer usuario
 

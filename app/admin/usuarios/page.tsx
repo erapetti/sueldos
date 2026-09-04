@@ -25,8 +25,9 @@ export default async function PaginaUsuarios() {
         nombre: u.nombre,
         esAdmin: u.esAdmin,
         activo: u.activo,
-        // §3.3 — queda NULL hasta el primer ingreso.
-        reclamado: u.googleSub !== null,
+        // §3.3 — con el match por email ya no hay un sub que «reclamar»: lo que distingue a
+        // un usuario pre-creado del que ya entró es si tiene un último acceso.
+        reclamado: u.ultimoAcceso !== null,
         ultimoAcceso: u.ultimoAcceso ? formatearFecha(u.ultimoAcceso) : null,
         empleados: u._count.empleados,
       }))}

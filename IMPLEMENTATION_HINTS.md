@@ -1098,10 +1098,17 @@ necesitás un dato nuevo en el cálculo, se agrega **ahí**, no dentro del motor
 
 ### 2.2 Un solo lugar lee la identidad
 
-`lib/auth/currentUser.ts` es el **único** archivo que lee `x-forwarded-user`,
-`x-forwarded-email` y `x-forwarded-preferred-username` (§3.2). No lo repliques: si otro
-archivo empieza a leer headers de identidad, la superficie de ataque se multiplica y deja de
-ser auditable.
+`lib/auth/currentUser.ts` es el **único** archivo que lee `x-forwarded-email`,
+`x-forwarded-name` y `x-forwarded-picture` (§3.2). No lo repliques: si otro archivo empieza a
+leer headers de identidad, la superficie de ataque se multiplica y deja de ser auditable.
+
+Son tres divergencias del §3, todas deliberadas y todas explicadas en el README:
+
+- `X-Forwarded-Preferred-Username` (§3.1) llega **siempre vacío**, porque Google no emite ese
+  claim. El nombre y la foto salen de `name` y `picture`, que oauth2-proxy extrae con
+  `additionalClaims`. README §5.7.
+- **El match es por email, no por `google_sub`** (§3.3), y esa columna ya no existe. README §5.8.
+- `X-Forwarded-User` (§3.1) no lo lee nadie. Sigue vaciándose en el nginx igual.
 
 ### 2.3 Toda Server Action valida permisos en el servidor
 
@@ -1176,6 +1183,11 @@ que decide.
 | Google muestra una pantalla de consentimiento en **cada** ingreso, y manda un mail «You shared some Google Account data with …» | Sin `--prompt` ni `--approval-prompt`, oauth2-proxy manda `approval_prompt=force` por compatibilidad legacy, y Google lee eso como «volvé a pedir el consentimiento». Cada aceptación es una autorización nueva, y de ahí el mail | `--approval-prompt=auto` en oauth2-proxy. Con la configuración alpha, el parámetro no tiene default: se borra el bloque `loginURLParameters`. README §5 |
 | Al guardar, la pantalla entera se reemplaza por «This page couldn't load» y se pierde todo lo cargado | La Server Action no llegó a ejecutarse: venció la sesión del proxy, el `fetch` interno de Next siguió el redirect al login hasta Google y murió por CORS. Ese rechazo no devuelve un `Resultado`, **tira**, y escalaba hasta el error boundary del framework | `useAccion` atrapa el rechazo y pregunta a `/sesion/estado`, que contesta 401 sin sesión, para distinguir la sesión vencida de un fallo de red. Es el único cuello de botella: los 20 componentes que llaman acciones pasan por ahí. No consulta `/oauth2/auth`, que queda `internal` porque su respuesta lleva el access token de Google en un encabezado (README §5.3) |
 | «Salir» borra la sesión pero el navegador queda en bucle sobre `/oauth2/sign_out` | nginx manda `X-Auth-Request-Redirect: $request_uri` para todo `/oauth2/`, y para sign_out eso vale `/oauth2/sign_out`. De las tres estrategias de redirect de oauth2-proxy, la del encabezado es la única que **no** descarta las rutas del propio proxy, y es la de mayor prioridad | Un `location = /oauth2/sign_out` que vacíe ese encabezado; caen las otras dos estrategias, que sí se protegen. README §5.2 |
+| La barra superior muestra un nombre viejo o inventado —«Administrador inicial», con iniciales «Ai»— aunque el usuario esté bien autenticado | `X-Forwarded-Preferred-Username` llega **siempre vacío**: `preferred_username` es un claim que Google no emite, y oauth2-proxy llena `PreferredUsername` solo desde ese claim. El refresco del §4.1 no pisa con vacío, así que gana lo que la fila ya tenía | Pedir `name` en `additionalClaims` e inyectarlo en su propio header. README §5.7 |
+| Un `injectResponseHeaders` con un claim cualquiera —`name`, `picture`— inyecta un header vacío, sin fallar al arrancar | Falta declararlo en `additionalClaims`, o la versión es anterior a la 7.15.0, donde `GetClaim()` devuelve `[]string{}` para todo lo que no esté en su `switch` | `additionalClaims` en el provider, y oauth2-proxy ≥ 7.15.0. README §5.7 |
+| `additionalClaims` está declarado, la versión es la correcta, y los headers siguen llegando vacíos | El proveedor es `google`, que parsea el ID token por su cuenta en `Redeem()` y descarta todo salvo `sub`, `email` y `email_verified`. Los claims adicionales los extrae `buildSessionFromClaims()`, por donde `google` no pasa | `provider: oidc` con `issuerURL: https://accounts.google.com`, y `scope: openid email profile` explícito. README §5.7 |
+| Un usuario dado de alta correctamente ve la pantalla de acceso no autorizado, y en el tcpdump `X-Forwarded-Email` trae algo que no es un email | El email sale de `emailClaim`. Hay compatibilidad hacia atrás que lo reescribe a partir de `userIDClaim` cuando ese no vale `email`, así que tocar `userIDClaim` rompe el email | `userIDClaim: email` se deja como está. La clave de la app es el email: README §5.8 |
+| Una `<img>` renderizada en el servidor queda con el ícono de imagen rota: el `onError` de React nunca corre | El navegador pide la imagen mientras parsea el HTML, o sea **antes** de que React hidrate y enganche el handler. Si falla ahí, el evento ya pasó | Además del `onError`, un `useEffect` al montar: una imagen `complete` con `naturalWidth === 0` es una que falló. Está en `components/layout/AvatarUsuario.tsx` |
 | Un usuario dado de alta en **Usuarios** no puede entrar: Google lo autentica y aterriza en un 403 «Invalid session: unauthorized» | El despliegue arranca oauth2-proxy con `--authenticated-emails-file` y sin `--email-domain`, así que ese archivo es una segunda lista de acceso, **antes** de la app. La validación pasa en el callback de OAuth, antes de que haya sesión, así que la request nunca llega a Next y no se ve `/sin-acceso` | El email va en los dos lugares. Es una divergencia del §3.3 sin resolver: README §5.6 |
 | nginx no arranca: «`proxy_pass` cannot have URI part in location given by regular expression, or inside named location…» | Dentro de una `location` con nombre, `proxy_pass` no admite parte de URI | El destino se fija con `rewrite ^ /destino last`, que vuelve a buscar `location`; el `proxy_pass` vive en la que matchea. README §5.3 |
 | Una `location` con `auth_request` deja pasar todo, sin consultar la sesión y sin error | `return` es del módulo rewrite y corre en la **fase de rewrite**, anterior a la **fase de access** donde corre `auth_request`: el `return` contesta antes de que la autenticación se evalúe | El cuerpo lo tiene que emitir un handler de la fase de content — `empty_gif`, `alias`, `proxy_pass` —, nunca un `return`. Pasó con la sonda `/sesion/estado`: README §5.3 |

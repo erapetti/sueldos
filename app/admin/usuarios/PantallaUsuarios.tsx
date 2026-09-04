@@ -179,7 +179,7 @@ export function PantallaUsuarios({
         className="mb-0"
         rotulo="Configuración"
         titulo="Usuarios"
-        bajada="El alta se hace con el email de Google. El usuario queda vinculado a su cuenta en el primer ingreso."
+        bajada="El alta se hace con el email de Google, que es con lo que la persona entra. Hasta su primer ingreso queda marcada como «Sin ingresar»."
       />
 
       <section className="space-y-4 rounded-card bg-card shadow-soft border px-[22px] py-5">

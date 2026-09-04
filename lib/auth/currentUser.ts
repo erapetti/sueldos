@@ -2,8 +2,7 @@
  * §3 — identidad del usuario.
  *
  * **Este es el único módulo que lee los headers de identidad** (§3.2 punto 3). Ningún otro
- * archivo debe leer `X-Forwarded-User`, `X-Forwarded-Email` ni
- * `X-Forwarded-Preferred-Username`.
+ * archivo debe leer `X-Forwarded-Email`, `X-Forwarded-Name` ni `X-Forwarded-Picture`.
  *
  * La aplicación no implementa login: corre detrás de oauth2-proxy, que resuelve el flujo
  * OAuth2/OIDC de Google y reenvía la request con esos headers.
@@ -17,6 +16,11 @@ export type UsuarioActual = {
   email: string
   nombre: string | null
   esAdmin: boolean
+  /**
+   * Foto de perfil de Google. No sale de la base: llega en un header en cada request, así que
+   * siempre está fresca y no hay una URL de Google guardada que se venza (README §5.7).
+   */
+  avatar: string | null
 }
 
 /** Motivo por el que un usuario autenticado en Google no puede operar (§3.3). */
@@ -27,9 +31,9 @@ export type ResultadoIdentidad =
   | { estado: 'SIN_ACCESO'; motivo: MotivoSinAcceso; email: string | null }
 
 type IdentidadDelProxy = {
-  sub: string | null
   email: string | null
   nombre: string | null
+  avatar: string | null
 }
 
 /**
@@ -43,7 +47,39 @@ function identidadSimulada(): IdentidadDelProxy | null {
 
   const [email, nombre] = crudo.split('|')
   if (!email) return null
-  return { sub: `dev-${email.trim().toLowerCase()}`, email: email.trim(), nombre: nombre?.trim() ?? null }
+  return { email: email.trim(), nombre: nombre?.trim() ?? null, avatar: null }
+}
+
+/** Un string no vacío, o `null`. */
+function texto(valor: string | null): string | null {
+  if (valor === null) return null
+  const limpio = valor.trim()
+  return limpio === '' ? null : limpio
+}
+
+/**
+ * Foto de perfil, acotada a lo que sirve Google.
+ *
+ * El valor termina en el `src` de una imagen que se renderiza en todas las páginas, así que
+ * una URL arbitraria acá sería un pixel de rastreo. Se exige `https` y un host de
+ * `googleusercontent.com`; cualquier otra cosa se descarta.
+ */
+function avatarValido(crudo: string | null): string | null {
+  const valor = texto(crudo)
+  if (!valor) return null
+
+  let url: URL
+  try {
+    url = new URL(valor)
+  } catch {
+    return null
+  }
+
+  if (url.protocol !== 'https:') return null
+  const host = url.hostname
+  if (host !== 'googleusercontent.com' && !host.endsWith('.googleusercontent.com')) return null
+
+  return url.toString()
 }
 
 async function leerIdentidadDelProxy(): Promise<IdentidadDelProxy> {
@@ -52,9 +88,12 @@ async function leerIdentidadDelProxy(): Promise<IdentidadDelProxy> {
 
   const h = await headers()
   return {
-    sub: h.get('x-forwarded-user'),
     email: h.get('x-forwarded-email'),
-    nombre: h.get('x-forwarded-preferred-username'),
+    // El §3.1 del SPECS nombra `X-Forwarded-Preferred-Username`, pero Google no emite ese
+    // claim y ese header llega siempre vacío. El nombre viene del claim `name`, que
+    // oauth2-proxy extrae con `additionalClaims`. Ver README §5.7.
+    nombre: texto(h.get('x-forwarded-name')),
+    avatar: avatarValido(h.get('x-forwarded-picture')),
   }
 }
 
@@ -70,63 +109,53 @@ async function ejecutarBootstrap(): Promise<void> {
   if (cantidad > 0) return
 
   await prisma.usuario.create({
-    data: { email, esAdmin: true, activo: true, nombre: 'Administrador inicial' },
+    // Sin `nombre`: el primero que llega es el del claim `name`, en el primer ingreso.
+    // Inventar uno acá lo dejaba fijo para siempre, porque el refresco de §4.1 no pisa con
+    // un valor vacío.
+    data: { email, esAdmin: true, activo: true },
   })
 }
 
 /**
  * Resuelve la identidad de la request contra la tabla `usuarios`.
  *
- * §3.3 — el match es por `google_sub`. Si no hay ninguno con ese sub pero sí un usuario
- * pre-creado con ese email y sin sub, se le asigna el sub recibido (*claim* del registro);
- * a partir de ahí el match es siempre por sub. Un usuario que no existe, o que existe pero
- * está inactivo, no se auto-registra: recibe la pantalla de acceso no autorizado.
+ * **El match es por email**, y eso es una divergencia deliberada del §3.3, que lo pide por
+ * `google_sub`. El motivo está en README §5.8: contra cuentas `@gmail.com` los dos peligros
+ * que el `sub` evita —que el email cambie, o que se reasigne a otra persona— no existen, y
+ * sacarlo se lleva puesta una columna, un índice, la lógica de *claim* del registro y la
+ * dependencia de `userIDClaim`.
+ *
+ * Un usuario que no existe, o que existe pero está inactivo, no se auto-registra: recibe la
+ * pantalla de acceso no autorizado.
  */
 async function resolverIdentidad(): Promise<ResultadoIdentidad> {
   const identidad = await leerIdentidadDelProxy()
 
-  if (!identidad.sub && !identidad.email) {
+  const email = identidad.email?.trim().toLowerCase() ?? null
+  if (!email) {
     return { estado: 'SIN_ACCESO', motivo: 'SIN_IDENTIDAD', email: null }
   }
 
-  const emailNormalizado = identidad.email?.trim().toLowerCase() ?? null
-
   await ejecutarBootstrap()
 
-  let usuario = identidad.sub
-    ? await prisma.usuario.findUnique({ where: { googleSub: identidad.sub } })
-    : null
-
-  // Claim: usuario pre-creado por un administrador, sin sub todavía.
-  if (!usuario && emailNormalizado) {
-    const preCreado = await prisma.usuario.findUnique({ where: { email: emailNormalizado } })
-    if (preCreado && preCreado.googleSub === null && identidad.sub) {
-      usuario = await prisma.usuario.update({
-        where: { id: preCreado.id },
-        data: { googleSub: identidad.sub },
-      })
-    } else if (preCreado && preCreado.googleSub === null && !identidad.sub) {
-      usuario = preCreado
-    }
-  }
+  const usuario = await prisma.usuario.findUnique({ where: { email } })
 
   if (!usuario) {
-    return { estado: 'SIN_ACCESO', motivo: 'NO_REGISTRADO', email: emailNormalizado }
+    return { estado: 'SIN_ACCESO', motivo: 'NO_REGISTRADO', email }
   }
   if (!usuario.activo) {
     return { estado: 'SIN_ACCESO', motivo: 'INACTIVO', email: usuario.email }
   }
 
-  // El nombre y el email se refrescan en cada login desde los headers (§4.1).
-  const nombreNuevo = identidad.nombre?.trim() || usuario.nombre
-  const emailNuevo = emailNormalizado ?? usuario.email
-  const hayCambios = nombreNuevo !== usuario.nombre || emailNuevo !== usuario.email
+  // El nombre se refresca en cada ingreso desde el claim de Google (§4.1). El email no: es
+  // la clave con la que se llegó hasta acá.
+  const nombreNuevo = identidad.nombre ?? usuario.nombre
 
   const actualizado = await prisma.usuario.update({
     where: { id: usuario.id },
     data: {
       ultimoAcceso: new Date(),
-      ...(hayCambios ? { nombre: nombreNuevo, email: emailNuevo } : {}),
+      ...(nombreNuevo !== usuario.nombre ? { nombre: nombreNuevo } : {}),
     },
   })
 
@@ -137,6 +166,7 @@ async function resolverIdentidad(): Promise<ResultadoIdentidad> {
       email: actualizado.email,
       nombre: actualizado.nombre,
       esAdmin: actualizado.esAdmin,
+      avatar: identidad.avatar,
     },
   }
 }

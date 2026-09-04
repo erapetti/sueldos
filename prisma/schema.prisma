@@ -85,8 +85,6 @@ enum TipoLicenciaMovimiento {
 
 model Usuario {
   id           String    @id @default(uuid(7)) @db.Char(36)
-  /// `sub` del token de Google. NULL hasta el primer ingreso (§3.3).
-  googleSub    String?   @unique @map("google_sub") @db.VarChar(255)
   email        String    @unique @db.VarChar(320)
   nombre       String?   @db.VarChar(255)
   esAdmin      Boolean   @default(false) @map("es_admin")
