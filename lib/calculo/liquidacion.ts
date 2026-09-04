@@ -220,6 +220,24 @@ function descripcionDeHorasExtras(recargoPct: number): string {
   return recargoPct === 0 ? 'Horas extras' : `Horas extras (recargo ${recargoPct} %)`
 }
 
+/**
+ * La línea de faltas dice **qué días** se faltó: «Faltas: 3/8 17/8 31/8».
+ *
+ * Con las horas solas —la columna `cantidad` ya las suma—, la empleada que discute una falta y
+ * quien le contesta tienen que ir a la planilla del mes a buscar cuáles fueron, y la hoja
+ * impresa no las lleva. Van solo las que **descuentan** (§4.6.1), que son las que arman esta
+ * línea: una falta con aviso que no descuenta no está en el importe y no tiene por qué estar
+ * en la lista.
+ *
+ * Los días salen de `formatearDiaMes`, que es la misma que usa la línea de cuotas para la
+ * fecha del préstamo: una sola forma de escribir un día en las descripciones. El mes va en
+ * cada uno aunque sea siempre el del período; repetirlo es lo que hace que se lean como fechas
+ * y no como una lista de números sueltos.
+ */
+function descripcionDeFaltas(faltas: readonly { fecha: Date }[]): string {
+  return `Faltas: ${faltas.map((f) => formatearDiaMes(f.fecha)).join(' ')}`
+}
+
 export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): ResultadoLiquidacion {
   verificarDatos(entrada)
 
@@ -287,7 +305,7 @@ export function calcularLiquidacionMensual(entrada: EntradaLiquidacion): Resulta
     lineas.push({
       tabla: tablaBase,
       codigo: CODIGOS.FALTAS,
-      descripcion: 'Faltas',
+      descripcion: descripcionDeFaltas(faltasQueDescuentan),
       cantidad: horasFalta,
       valorUnitario: vhc,
       importe: importeFaltas,

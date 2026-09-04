@@ -1507,6 +1507,12 @@ cambios a confirmar en el servidor, en este orden:
   lo dice la tabla en la que cae la línea (§1.7.1), y se fue el «recargo 0 %», que no informa
   nada. Sale de `descripcionDeHorasExtras`, en el motor, que es el único lugar que lo arma;
   ahí está anotado el único caso que el rótulo ya no distingue.
+- **La línea de faltas nombra los días.** Dice «Faltas: 3/8 17/8 31/8» y no solo «Faltas»: la
+  columna «cantidad» ya suma las horas, pero quien discute una falta —o quien le contesta—
+  tenía que ir a la planilla del mes a buscar cuáles fueron, y la hoja impresa no las lleva.
+  Van solo las que **descuentan** (§4.6.1), que son las que arman la línea. Los días salen de
+  `formatearDiaMes`, la misma que usa la línea de cuotas para la fecha del préstamo, así que
+  hay una sola forma de escribir un día en las descripciones.
 - **La columna «cantidad» de la liquidación lleva la unidad de cada línea.** No cuenta lo mismo
   en todas: son horas, un porcentaje o una cantidad de boletos según la línea, y los números
   pelados se leían todos como lo mismo. La decisión vive en un mapa `código → formateador` en

@@ -136,6 +136,23 @@ describe('2. faltas parciales y de día completo', () => {
     expect(r.materiaGravada.toFixed(2)).toBe('62000.00')
   })
 
+  it('la línea nombra los días, y solo los que descuentan', () => {
+    const r = calcularLiquidacionMensual(
+      entradaBase({
+        faltas: [
+          falta('2026-04-08', 3),
+          // §4.6.1 — esta no descuenta, así que no entra en el importe ni en la lista.
+          falta('2026-04-15', 6, 'CON_AVISO', false),
+          falta('2026-04-22', 6),
+        ],
+      }),
+    )
+
+    expect(r.lineas.find((l) => l.codigo === CODIGOS.FALTAS)!.descripcion).toBe(
+      'Faltas: 08/04 22/04',
+    )
+  })
+
   it('una falta en un día sin horas en el régimen no cambia los boletos', () => {
     // Sábado 11/4/2026.
     const r = calcularLiquidacionMensual(entradaBase({ faltas: [falta('2026-04-11', 2)] }))
