@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   acotarPeriodo,
+  admiteLiquidacionNueva,
   anteriorPeriodo,
   consultaDePeriodo,
   etiquetaPeriodo,
@@ -185,6 +186,29 @@ describe('§7.6 desde qué día se puede confirmar la liquidación', () => {
   it('febrero también tiene su día 23', () => {
     expect(sePuedeConfirmar(periodoDe(2026, 2), fecha(2026, 2, 22))).toBe(false)
     expect(sePuedeConfirmar(periodoDe(2026, 2), fecha(2026, 2, 23))).toBe(true)
+  })
+})
+
+/**
+ * La regla la miran dos lados —la pantalla, que apaga «Generar complementaria», y
+ * `confirmarLiquidacionMensual`, que rechaza el pedido—, así que estos casos son el contrato
+ * entre los dos: si alguien la cambia, los dos se mueven juntos o esto se pone en rojo.
+ */
+describe('§7.6.1 no se apilan liquidaciones confirmadas sin pagar', () => {
+  it('el período sin ninguna liquidación vigente admite la primera', () => {
+    expect(admiteLiquidacionNueva(null)).toBe(true)
+  })
+
+  it('con la última pagada se puede generar la complementaria', () => {
+    expect(admiteLiquidacionNueva({ pago: 'PAGADA' })).toBe(true)
+  })
+
+  it('con un solo libro pagado también: ese asiento ya no se puede anular', () => {
+    expect(admiteLiquidacionNueva({ pago: 'PARCIAL' })).toBe(true)
+  })
+
+  it('con la última sin ningún pago, no: primero se cobra o se anula', () => {
+    expect(admiteLiquidacionNueva({ pago: 'SIN_PAGAR' })).toBe(false)
   })
 })
 

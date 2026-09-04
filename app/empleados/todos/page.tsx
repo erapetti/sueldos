@@ -30,6 +30,7 @@ export default async function PantallaTodos() {
     fechaIngresoTexto: formatearFecha(e.fechaIngreso),
     nivel: e.nivel,
     estado: e.estado,
+    periodoDelEstado: e.periodoDelEstado,
     compartidoCon: e.compartidoCon,
   }))
 

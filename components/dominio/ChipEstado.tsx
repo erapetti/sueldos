@@ -38,13 +38,22 @@ const CLASES: Record<EstadoEmpleado, string> = {
 }
 
 /** A dónde se va a resolver cada estado, o `null` si no hay nada que hacer. */
-function destino(estado: EstadoEmpleado, empleadoId: string): string | null {
+function destino(
+  estado: EstadoEmpleado,
+  empleadoId: string,
+  periodo: string | null,
+): string | null {
   const base = `/empleados/${empleadoId}`
   switch (estado) {
-    // Las dos van a la liquidación: una a confirmarla y la otra a ver la que quedó impaga.
+    /*
+      Las dos van a la liquidación: una a confirmarla y la otra a ver la que quedó impaga, y
+      las dos **con el mes puesto**. Sin el `?periodo=`, esa pantalla abre en el mes que tenga
+      en memoria (§1.15) —el que se venía mirando en otra empleada, por ejemplo—, así que el
+      chip decía «Falta pagar» y llevaba a un mes que no debía nada.
+    */
     case 'FALTA_LIQUIDACION':
     case 'FALTA_PAGAR':
-      return `${base}/liquidacion`
+      return `${base}/liquidacion${periodo ? `?periodo=${periodo}` : ''}`
     // La baja se pone y se saca desde la fecha de egreso, en los datos generales.
     case 'BAJA':
       return `${base}?seccion=datos`
@@ -56,12 +65,15 @@ function destino(estado: EstadoEmpleado, empleadoId: string): string | null {
 export function ChipEstado({
   estado,
   empleadoId,
+  periodo,
 }: {
   estado: EstadoEmpleado
   /** Sin él el chip no se puede enlazar y queda informativo. */
   empleadoId?: string
+  /** `AAAA-MM` del mes que el estado reclama, cuando reclama alguno. */
+  periodo?: string | null
 }) {
-  const href = empleadoId ? destino(estado, empleadoId) : null
+  const href = empleadoId ? destino(estado, empleadoId, periodo ?? null) : null
   const clases = cn('font-medium', CLASES[estado])
 
   if (!href) {

@@ -359,18 +359,44 @@ export async function cancelarCuota(cuotaId: string) {
 }
 
 /**
- * §7.5 — liquidaciones confirmadas del empleado, para poder vincular el pago.
+ * §7.5 — liquidaciones confirmadas del empleado **que todavía tienen algo que cobrar**, para
+ * poder vincular el pago.
  *
  * Cada una viaja con lo que paga en cada libro y con los libros que le faltan (§4.14): es lo
  * que le permite al diálogo ofrecer el libro pendiente y precargar su monto.
+ *
+ * Las que ya están cobradas enteras no se ofrecen: vincularles un pago no hace nada, y el
+ * desplegable crecía con cada mes que pasaba hasta ser una lista de meses cerrados con la
+ * pendiente escondida en el medio. Queda la del pago parcial, que sí tiene un libro por
+ * cobrar.
  */
 export async function liquidacionesParaPago(empleadoId: string) {
   return ejecutar('prestamos.liquidacionesParaPago', async (log) => {
     const { usuario, empleado } = await exigirEdicion(empleadoId)
     log({ usuarioId: usuario.id, entidad: 'liquidacion', entidadId: empleado.id })
 
+    /*
+      El `where` es el mismo criterio que `estadoDePago` escrito para la base: hay algo que
+      cobrar si **algún** libro con importe positivo no tiene todavía su movimiento de pago.
+      Está acá para no traer las cobradas —y para que el `take` cuente pendientes y no meses
+      viejos—, pero el que decide es el `filter` de abajo, que usa la regla de verdad. Si
+      alguna vez los dos no coincidieran, sobra una consulta y no falta una liquidación.
+    */
     const liquidaciones = await prisma.liquidacion.findMany({
-      where: { empleadoId: empleado.id, estado: 'CONFIRMADA' },
+      where: {
+        empleadoId: empleado.id,
+        estado: 'CONFIRMADA',
+        OR: [
+          {
+            totalAPagarFormal: { gt: 0 },
+            movimientos: { none: { tipo: 'PAGO', libro: 'FORMAL' } },
+          },
+          {
+            totalAPagarInformal: { gt: 0 },
+            movimientos: { none: { tipo: 'PAGO', libro: 'INFORMAL' } },
+          },
+        ],
+      },
       include: INCLUIR_PAGOS,
       orderBy: [{ periodo: 'desc' }, { secuencia: 'desc' }],
       take: 24,
@@ -382,9 +408,10 @@ export async function liquidacionesParaPago(empleadoId: string) {
 
     return exito({
       aportaBps: aporte?.aportaBps ?? true,
-      liquidaciones: liquidaciones.map((l) => {
-        const pago = pagoDeLiquidacion(l)
-        return {
+      liquidaciones: liquidaciones
+        .map((l) => ({ liquidacion: l, pago: pagoDeLiquidacion(l) }))
+        .filter(({ pago }) => pago.estado !== 'PAGADA')
+        .map(({ liquidacion: l, pago }) => ({
           id: l.id,
           periodo: l.periodo.toISOString().slice(0, 10),
           tipo: l.tipo,
@@ -395,8 +422,7 @@ export async function liquidacionesParaPago(empleadoId: string) {
           libros: pago.libros,
           faltan: pago.faltan,
           pago: pago.estado,
-        }
-      }),
+        })),
     })
   })
 }

@@ -8,12 +8,13 @@
  * el cuerpo: la fórmula está **pendiente de definición** (§13.3), así que por ahora informa
  * qué falta decidir en vez de mostrar números.
  */
-import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
+import { useModoLista } from '@/hooks/useModoLista'
 import { MOTIVO_NO_IMPLEMENTADO } from '@/lib/calculo/aguinaldo'
-import { etiquetaPeriodo } from '@/lib/calculo/periodos'
+import { etiquetaPeriodo, type VistaDeLiquidacion } from '@/lib/calculo/periodos'
+import type { EstadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { parsePeriodo } from '@/lib/format/dates'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
 import { NavegadorDePeriodo } from './NavegadorDePeriodo'
@@ -29,8 +30,14 @@ export function PantallaAguinaldo(props: {
   puedeAvanzar: boolean
   liquidaciones: FilaLiquidacion[]
   totalesPorPeriodo: Record<string, string>
+  /** Lo que dice el chip del navegador. El aguinaldo todavía no se liquida (§13.3). */
+  estado: EstadoVisible
+  /** Con cuál de las dos caras abre la pantalla, cuando la URL lo dice. */
+  vista: VistaDeLiquidacion | null
+  /** Firma de lo que pide la URL: cambia cuando se pide otro período u otra secuencia. */
+  pedido: string
 }) {
-  const [modoLista, setModoLista] = useState(false)
+  const [modoLista, setModoLista] = useModoLista(props.vista, props.pedido)
   const actual = { periodo: parsePeriodo(props.periodo), tipo: 'AGUINALDO' as const }
 
   return (
@@ -48,6 +55,7 @@ export function PantallaAguinaldo(props: {
         <NavegadorDePeriodo
           empleadoId={props.empleadoId}
           actual={actual}
+          estado={props.estado}
           puedeRetroceder={props.puedeRetroceder}
           puedeAvanzar={props.puedeAvanzar}
           modoLista={modoLista}

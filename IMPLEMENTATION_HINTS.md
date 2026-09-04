@@ -437,6 +437,13 @@ El corte es por lo que la tabla **es**, no por su posición: una empleada con `a
 tiene la informal como única tabla, así que su hoja sale con el encabezado de datos y **ninguna
 tabla**. Es a propósito, y es la consecuencia que hay que tener presente antes de «arreglarlo».
 
+**El cierre no se dibuja cuando no explica nada.** En el borrador del período, sin diferencia
+contra lo ya liquidado, el bloque quedaba en «DIFERENCIA A PAGAR $ 0» debajo de un total que ya
+está liquidado: tres renglones para decir que no hay nada que hacer, que es justo lo que ya dice
+el botón apagado. Se ve apenas se confirma un mes, que es cuando el borrador pasa a ser el de
+una complementaria vacía. Mirando una liquidación guardada el cierre va siempre: ahí sí explica
+algo, que es lo que esa liquidación pagó sobre lo que el período ya tenía.
+
 **El cierre de la complementaria pidió dos cosas más**, y las dos son de fondo, no de estilo:
 
 - si el cierre no tiene columna formal, el bloque entero se queda afuera de la hoja: serían
@@ -446,6 +453,25 @@ tabla**. Es a propósito, y es la consecuencia que hay que tener presente antes 
   pueden no coincidir: con el formal en cero y el informal en −$1.050, la hoja decía «A
   DESCONTAR» arriba de un $0. Por eso hay dos versiones del rótulo, una `print:hidden` y otra
   `hidden print:inline`, en vez de una sola.
+
+**Los rótulos del cierre no llevan los signos que dibuja el §7.6.1**, por pedido del dueño del
+proyecto. El SPECS los pone pegados a la descripción —`− Ya liquidado …`, `= DIFERENCIA A
+PAGAR`—; acá el menos va **con la cifra**, en la columna de los importes, que es donde se lee
+alineado con los demás montos y en la misma convención que las líneas (§8.5), y el `=` no está.
+El cero no se niega: `-0` es negativo para decimal.js y saldría un «−$ 0».
+
+**El primer renglón se llama distinto según qué se esté mirando**, y la diferencia no es
+cosmética:
+
+| Pantalla | Rótulo | Qué cifra es |
+|---|---|---|
+| Una liquidación guardada (`?liquidacion=<id>`) | `Total a pagar (liquidación #N)` | El total de las tablas de arriba, que son las líneas de esa liquidación |
+| El período (sin `liquidacion`) | `Total recalculado del período` | El recálculo de **hoy**, que es lo que se compara para proponer la complementaria |
+
+En la pantalla del período las dos cosas pueden no coincidir —las tablas muestran la última
+confirmada y el cierre el recálculo—, y cuando no coinciden aparece además el aviso de que los
+parámetros actuales darían otro resultado. Por eso ahí el rótulo conserva su nombre: llamarlo
+«total a pagar» de alguna liquidación sería mentir justo en el caso que el aviso está señalando.
 
 Lo que **no** se toca al imprimir es el encabezado de datos de la empleada: es lo único que
 identifica la hoja, porque el encabezado de la página es `no-print` (§7.6).
@@ -1026,6 +1052,19 @@ cliente habría que dibujar un mes y redirigir al otro, con el parpadeo de por m
 Los enlaces del menú llevan el mes puesto aunque la cookie alcanzaría: así el botón «atrás» del
 navegador vuelve al mes que se estaba mirando y no al que diga la cookie en ese momento.
 
+**El chip de estado del listado también lleva el mes**, por el mismo motivo dado vuelta: sin
+`?periodo=` mandaba a la pantalla de liquidación y esa abría en el mes que tuviera en memoria
+—el de otra empleada, por ejemplo—, así que el chip decía «Falta pagar» y llevaba a un mes que
+no debía nada. Ahora lleva el mes que el estado reclama: **la liquidación impaga más vieja**, o
+el más viejo de los dos meses que falta liquidar. Sale de `sqlPeriodoDelEstado`, en
+`lib/consultas/empleados.ts`, que comparte con `sqlEstado` los fragmentos de
+`condicionesDeEstado`: si se escribieran dos veces, el chip podría decir un estado y llevar al
+mes de otro.
+
+Que la impaga pueda ser de un mes viejo no es raro ni está prohibido: la regla de §1.15.2 es
+**por período**, así que se puede confirmar agosto con julio todavía sin pagar. Lo que no se
+puede es apilar dos sin pagar del mismo mes.
+
 **Divergencia con el §6.10**, por decisión del dueño del proyecto: el SPECS dice que la
 pantalla abre en el mes en curso, y ahora abre en el **mes anterior** cuando ese mes quedó sin
 liquidar y la empleada ya había ingresado. Lo habitual es entrar a cargar las novedades del mes
@@ -1035,6 +1074,181 @@ sesión—; después manda lo que se venía mirando. «Sin liquidar» es no tene
 `MENSUAL` `CONFIRMADA` de ese mes: las filas de `Liquidacion` se crean únicamente al confirmar,
 así que un mes pendiente no tiene fila y no hay un estado intermedio que mirar.
 El `SPECS.md` no se edita sin permiso del dueño (§2.7).
+
+### 1.15.1 El borrador y las guardadas: la URL dice cuál se está mirando
+
+La pantalla de liquidación tiene dos caras —Detalle y Lista— y un período puede tener varias
+liquidaciones (§7.6.1). Por pedido del dueño del proyecto los dos datos viajan en la URL:
+
+| Parámetro | Qué hace |
+|---|---|
+| `periodo=AAAA-MM` | El mes, como en las planillas (§1.15) |
+| `tipo=aguinaldo` | El aguinaldo del semestre (§1.9); el mensual no viaja |
+| `liquidacion=<id>` | Muestra **esa** liquidación guardada del período, no el cálculo de hoy |
+| `vista=lista` / `vista=detalle` | Con cuál de las dos caras abre la pantalla |
+
+**El cartel del borrador dice solo lo que el chip no dice.** Decía «Este período ya tiene una
+liquidación confirmada. Todavía no está pagada.» al lado de un chip que decía «Sin pagar»: dos
+veces lo mismo con distinta letra y a dos centímetros de distancia. Quedan las tres cosas que el
+chip no tiene forma de decir —cuántas liquidaciones hay cuando hay más de una, qué libro falta
+cobrar cuando el pago es parcial, y que la información cargada cambió después de confirmar—, y
+si no hay ninguna, no hay cartel.
+
+**La Lista va de lo más nuevo a lo más viejo, también dentro del mes.** Los meses bajaban y
+las secuencias subían, así que la lista cambiaba de sentido a mitad de camino y la última
+liquidación de un mes quedaba abajo de todo. El orden lo fija `ORDEN_DE_LIQUIDACIONES`, en
+`lib/consultas/ficha.ts`, y lo comparten las dos consultas que arman estas filas. Ojo con eso:
+el chip del navegador necesita la secuencia más alta del período, y ahora la **busca** en vez
+de tomarla de la punta del array, que es lo que hacía cuando el orden era el otro.
+
+**Cada fila lleva dos fechas, y no son la misma.** «Creada» es el día en que se creó la fila,
+que es el día en que se confirmó; «Fecha», al final, es desde cuándo está en el estado que
+muestra la columna de al lado: cuándo se anuló, cuándo se terminó de cobrar, o cuándo se
+confirmó si todavía no cobró nada. Coinciden hasta que pasa algo, y ahí la segunda se despega:
+una liquidación creada el 04/09 y cobrada el 01/09 —el pago puede tener fecha anterior— muestra
+las dos. Los dos sellos de la fila son instantes y el del pago es una fecha de negocio, así que
+los instantes se pasan al día que fueron en Montevideo antes de mostrarlos: leídos en UTC, los
+de la tardecita muestran el día siguiente (§2.4).
+
+**En Lista, la fila de controles queda solo con el conmutador.** La lista es de **todas** las
+liquidaciones de la empleada y no mira el mes del navegador —eso es a propósito: lo que falta
+pagar puede estar repartido en varios meses (§1.15.2) y la lista es el único lugar donde se ve
+junto—, así que las flechas no tienen qué mover. El chip se va con ellas por lo mismo: dice el
+estado del período que está en pantalla, y en Lista no hay uno solo; cada fila trae el suyo en
+su columna «Estado». Como el conmutador y el botón de imprimir van pegados a la derecha, al
+cambiar de vista no se mueven: lo de la izquierda aparece y desaparece, pero nada se corre de
+lugar.
+
+**La vista sigue siendo estado del componente**, igual que el conmutador de las planillas; el
+parámetro solo fija el valor inicial. Hacía falta porque las filas de la Lista enlazan al
+Detalle, y con la vista solo en el estado ese clic cambiaba el mes y dejaba la Lista puesta: el
+enlace parecía no hacer nada. Lo resuelve `hooks/useModoLista.ts`: cuando cambia lo que pide la
+URL, un `vista` explícito manda, y si la URL no dice nada —las flechas del navegador— se
+conserva la cara elegida. El único caso que queda afuera es volver a apretar la fila de la que
+se vino, porque ahí la URL no cambia y no hay navegación que observar.
+
+**El `liquidacion` de la URL parte la pantalla en dos**, y la diferencia es de fondo:
+
+| | Sin `liquidacion` | Con `liquidacion=<id>` |
+|---|---|---|
+| Qué se dibuja | El **borrador**: el cálculo del período con los datos de hoy | Esa liquidación, tal como quedó guardada |
+| Qué dice el pie | Cuánto habría que pagar **si se confirma**: el recálculo menos lo ya liquidado | Lo que esa liquidación pagó respecto de lo que el período ya tenía liquidado |
+| Botones | Confirmar, o Generar complementaria si el período ya tiene alguna | Anular esa liquidación |
+
+**El modo lectura del §7.6 vive en la pantalla de la liquidación.** El SPECS pide que «una
+liquidación confirmada se muestre en modo lectura con sus valores persistidos» y no dice desde
+dónde se llega: se llega desde la Lista, y ahí está, con sus líneas y sus totales guardados. La
+del período es la otra mitad de la frase: abrir el mes muestra la última si no cambió nada, o
+el borrador de la próxima si cambió, y el aviso de que «los parámetros actuales darían un
+resultado distinto» es justamente lo que avisa cuál de las dos se está viendo.
+
+Antes el período mostraba la última confirmada en modo lectura, y de ahí salían dos problemas:
+las tablas y el pie decían cosas distintas —las tablas lo confirmado y el pie el recálculo de
+hoy, que es con lo que se arma la complementaria— y **el borrador de la complementaria no se
+podía ver en ningún lado**. Ahora el período es siempre el borrador y las tablas cierran en la
+misma cifra con la que arranca el pie. La consecuencia práctica: la hoja impresa de una
+liquidación confirmada sale de su propia pantalla, a la que se llega desde la Lista; la del
+período imprime el borrador.
+
+**Con `liquidacion=<id>` no se recalcula nada.** La pantalla dibuja la fila, sus líneas y su
+snapshot (§4.14), que es justamente lo que garantiza que una liquidación vieja se relea igual
+que el día que se confirmó. Lo lee `lib/liquidacion/guardada.ts`, y por eso ahí no aparece el
+motor de cálculo. Consecuencias:
+
+- El **aviso de que la información cargada cambió** no se muestra: sin recálculo no hay con qué
+  comparar. En el borrador sí, y es lo que explica por qué hace falta la complementaria.
+- De los botones queda solo **Anular esa liquidación**, apagado con el motivo en el tooltip
+  cuando no se puede: hay una liquidación posterior, ya está pagada o ya está anulada. **Generar
+  complementaria** no está: se genera a partir del borrador, así que se pide desde la pantalla
+  del período. Los tres criterios del apagado son los que ya aplicaba
+  `anularLiquidacionConfirmada`, así que el botón habilitado es exactamente el que la acción va
+  a aceptar.
+- Un **id que no corresponde** —de otro mes, de otra empleada, inventado, o cualquiera con
+  `tipo=aguinaldo`, que todavía no se liquida (§13.3)— redirige a `?periodo=…&vista=lista`, que
+  es donde se ve qué liquidaciones hay. La consulta pide los cuatro datos —id, empleada,
+  período y tipo— justamente para eso: el id solo encontraría también la liquidación de otro
+  mes, y la pantalla la dibujaría bajo el navegador de este.
+
+**El enlace lleva el `id` y no el número de secuencia**, porque la secuencia no identifica una
+fila: anular la #1 y volver a confirmar deja **dos filas #1**, la anulada y la vigente (§4.14 —
+el índice único parcial deja convivir a las anuladas), y las dos están en la Lista. Con la
+secuencia en la URL las dos filas enlazaban al mismo lado.
+
+**El chip de estado.** Al lado del navegador va el estado de la liquidación que se está
+mirando: la que pide la URL, o la última vigente del período si no pide ninguna. Son los cinco
+valores de `lib/liquidacion/estadoVisible.ts` —sin confirmar, sin pagar, pago parcial, pagada,
+anulada— con los mismos rótulos que la columna «Estado» de la Lista, porque los dibuja el mismo
+módulo (`components/dominio/EstadoLiquidacion.tsx`). Si la Lista y el chip dijeran cosas
+distintas de la misma liquidación, la que está mal es la aplicación. Lo que cambia entre los
+dos es el dibujo: en la tabla es un `Badge` y al lado del navegador es la píldora de las
+planillas, cuya clase (`CHIP_DE_PERIODO`) sale del mismo archivo que la usa `PlanillaMensual`.
+
+El navegador también quedó con **las medidas del de las planillas** (`PlanillaMensual`): el
+mismo `gap`, el mismo ancho mínimo de la etiqueta y el mismo chip en el mismo lugar. El único
+período que pasa ese ancho es el aguinaldo —«½ Aguinaldo Diciembre 2026» no entra en 10rem— y
+ahí la flecha de la derecha se corre.
+
+### 1.15.2 No se apilan liquidaciones confirmadas sin pagar
+
+**Divergencia con el §7.6.1**, por decisión del dueño del proyecto. El SPECS dice que un
+período con una liquidación confirmada **no pagada** admite dos caminos —«se puede anular y
+volver a confirmar. Alternativamente, generar una complementaria»— y el segundo queda cerrado:
+mientras la última liquidación vigente del período no tenga ningún pago, no se puede confirmar
+otra. La salida es cobrarla o anularla.
+
+El motivo es que la segunda opción no lleva a ningún lado bueno: deja dos asientos abiertos en
+el mismo mes y dos cobros que hacer por algo que todavía nadie tocó. La aplicación ya lo
+pensaba así sin decirlo —el error de la acción recomendaba anular y volver a confirmar—; ahora
+lo hace cumplir.
+
+La regla es `admiteLiquidacionNueva`, en `lib/calculo/periodos.ts`, al lado de la otra
+condición para confirmar, que es la del día 23 (§1.16). Vive ahí porque **la miran dos**: la
+pantalla, que apaga el botón, y `confirmarLiquidacionMensual`, que rechaza el pedido —apagar el
+botón no alcanza (§2.3), y entre que se dibuja la pantalla y se aprieta el botón el período pudo
+cambiar—. Los casos están en `tests/periodos.test.ts` como contrato entre los dos lados.
+
+**El pago parcial cuenta como pagada.** Con un libro cobrado y el otro no, anular está prohibido
+—ese asiento ya no se toca— así que si la complementaria también lo estuviera el período
+quedaría trabado sin salida.
+
+**Se mira la última vigente, no «alguna».** El criterio anterior era «alguna previa tiene algún
+pago», y con la #1 pagada y la #2 sin pagar daba pagada: ofrecía la complementaria y no ofrecía
+anular la #2, que era justo lo que se podía hacer.
+
+Con eso, los botones de la pantalla quedan así.
+
+**Mirando una liquidación guardada (`?liquidacion=<id>`)** el único botón es anular esa:
+
+| Estado de la que se mira | Botón anular |
+|---|---|
+| Es la última vigente y no tiene ningún pago | Habilitado |
+| Hay una liquidación vigente posterior | Apagado — «Hay una liquidación posterior» |
+| Pagada, o con un libro pagado | Apagado — «Ya está pagada» |
+| Anulada | Apagado — «Ya está anulada» |
+
+**Mirando el borrador del período (sin `liquidacion`):**
+
+| Última liquidación vigente | Botones |
+|---|---|
+| No hay: nunca se liquidó, o están todas anuladas | **Confirmar liquidación**, habilitado desde el día 23 (§1.16) |
+| Pagada (o con un libro pagado) y el recálculo da distinto | **Generar complementaria**, habilitado |
+| Pagada (o con un libro pagado) y el recálculo da igual | **Generar complementaria**, apagado — «No hay diferencia con lo ya liquidado» |
+| Sin ningún pago | **Anular la liquidación #N**, habilitado, que es la salida; y **Generar complementaria** apagado — «La liquidación #N todavía no está pagada: pagala o anulala antes de generar otra» |
+
+Dos detalles de esa tabla:
+
+- **«Hay diferencia» se mira libro por libro**, no por el total: el formal puede dar +$100 y el
+  informal −$100, y ahí el total da cero pero cada libro tiene su propio asiento que hacer
+  (§4.9). Es la misma condición que decide el aviso de que la información cargada cambió, así
+  que el cartel y el botón nunca se contradicen.
+- **La complementaria de $ 0 se bloquea solo en la pantalla.** La acción no la rechaza: si se
+  cuela por un clic sobre una pantalla vieja, crea una liquidación sin ningún asiento —el
+  devengado cero no genera ninguno—. Es basura inofensiva; si molesta, el chequeo va al lado
+  del otro.
+
+El botón se llama **«Generar complementaria»** en los dos casos en que aparece. Antes decía
+«Generar liquidación complementaria» cuando estaba solo y «Generar complementaria» cuando
+estaba acompañado: dos nombres para la misma acción según con quién estuviera al lado.
 
 ### 1.16 Confirmar la liquidación del mes recién se habilita el día 23
 

@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, List, CalendarDays, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CHIP_DE_PERIODO } from '@/components/dominio/EstadoLiquidacion'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
@@ -903,7 +904,10 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
           */}
           <Link
             href={`/empleados/${props.empleadoId}/liquidacion?periodo=${props.periodo}`}
-            className="rounded-full border px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className={cn(
+              CHIP_DE_PERIODO,
+              'transition-colors hover:bg-accent hover:text-accent-foreground',
+            )}
           >
             {ESTADO_TEXTO[props.estadoLiquidacion]}
           </Link>

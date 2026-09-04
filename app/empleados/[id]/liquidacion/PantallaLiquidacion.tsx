@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useAccion } from '@/hooks/useAccion'
+import { useModoLista } from '@/hooks/useModoLista'
 import { anularLiquidacionConfirmada, confirmarLiquidacionMensual } from '@/actions/liquidaciones'
 import {
   formatearImporteEntero,
@@ -25,7 +26,12 @@ import {
   parseFechaISO,
   parsePeriodo,
 } from '@/lib/format/dates'
-import { primerDiaConfirmable } from '@/lib/calculo/periodos'
+import {
+  admiteLiquidacionNueva,
+  primerDiaConfirmable,
+  type VistaDeLiquidacion,
+} from '@/lib/calculo/periodos'
+import type { EstadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { CODIGOS } from '@/lib/calculo/tipos'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
@@ -100,11 +106,45 @@ const ETIQUETA_LIBRO: Record<Libro, string> = {
  * tenerlo distinto: la del período y la del libro formal, que es la única que sale impresa.
  */
 function etiquetaDeLaDiferencia(monto: number) {
-  return monto < 0 ? '= DIFERENCIA A DESCONTAR' : '= DIFERENCIA A PAGAR'
+  return monto < 0 ? 'DIFERENCIA A DESCONTAR' : 'DIFERENCIA A PAGAR'
 }
 
 const SALDO_A_FAVOR_DE_LA_EMPRESA =
   'Queda como saldo a favor de la empresa en la cuenta corriente de la empleada hasta que se compense.'
+
+/**
+ * Un botón apagado con el motivo en un tooltip. Los cuatro botones de esta pantalla que pueden
+ * quedar apagados lo usan, así que la mecánica está escrita una vez.
+ *
+ * El `span` envuelve al botón porque un botón `disabled` no dispara eventos de puntero: el
+ * `disabled:pointer-events-none` que ya trae `Button` los deja pasar al envoltorio, que es el
+ * que abre el tooltip. El `tabIndex` lo pone además al alcance del teclado, que no tiene hover.
+ *
+ * En un teléfono el tooltip no aparece —no hay con qué pasar por encima— y ahí el botón queda
+ * apagado sin explicación. Es una decisión tomada, no un olvido.
+ */
+function BotonApagado({
+  motivo,
+  variant,
+  children,
+}: {
+  motivo: React.ReactNode
+  variant?: 'outline'
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0}>
+          <Button variant={variant} disabled>
+            {children}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{motivo}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 type Previa = {
   id: string
@@ -115,6 +155,30 @@ type Previa = {
   /** Los libros que le faltan cobrar. */
   faltan: Libro[]
   confirmadaEn: string | null
+  /** ISO `AAAA-MM-DD` del último pago cobrado, o `null` si no cobró ninguno. */
+  pagadaEn: string | null
+}
+
+/**
+ * §7.6.1 — por qué el período va por una complementaria y no se puede modificar lo que ya
+ * está. Es la primera oración del diálogo.
+ *
+ * El SPECS escribe la del caso completo —«ya fue pagada el {fecha} por ${monto}»— y las otras
+ * dos existen porque esa oración no siempre es cierta: con un solo libro cobrado la
+ * liquidación no «fue pagada», y una diferencia de cero o negativa figura pagada sin que nadie
+ * haya pagado nada, así que no hay fecha que mostrar. Decía la fecha de **confirmación** en
+ * los tres casos, que es otro día.
+ */
+function motivoDeLaComplementaria(periodo: Date, ultima: Previa | null): string {
+  if (!ultima) return ''
+  const mes = formatearPeriodoCapitalizado(periodo)
+  if (ultima.pagadaEn === null) {
+    return `La liquidación de ${mes} ya está confirmada y no se puede modificar.`
+  }
+  const cuando = formatearFecha(parseFechaISO(ultima.pagadaEn))
+  return ultima.pago === 'PAGADA'
+    ? `La liquidación de ${mes} ya fue pagada el ${cuando} por ${formatearImporteEntero(ultima.totalAPagar)}. No se puede modificar.`
+    : `La liquidación de ${mes} ya tiene un pago del ${cuando} y no se puede modificar.`
 }
 
 export function PantallaLiquidacion(props: {
@@ -124,12 +188,11 @@ export function PantallaLiquidacion(props: {
   listadoDeOrigen: ListadoDePersonal
   periodo: string
   puedeEditar: boolean
+  /** El desglose a dibujar: el cálculo de hoy, o el guardado de la liquidación pedida. */
   lineas: LineaVista[]
   valorHoraCalculado: string
   /** Del registro de salario vigente en el período (§5.2). */
   horasSemanales: string | null
-  materiaGravada: string
-  subtotal: string
   totalRecalculado: string
   totalYaLiquidado: string
   totalAPagar: string
@@ -148,7 +211,28 @@ export function PantallaLiquidacion(props: {
   previas: Previa[]
   /** §7.6 — el mes en curso recién se puede confirmar desde el día 23 (§4.2.3). */
   puedeConfirmar: boolean
-  lineasPersistidas: LineaVista[] | null
+  /** Lo que dice el chip del navegador: el estado de la liquidación que se está mirando. */
+  estado: EstadoVisible
+  /**
+   * §7.6.1 — la liquidación guardada que la URL pidió por su id, si pidió alguna. `null` es
+   * el borrador del período: el cálculo con los datos de hoy, con las acciones de confirmarlo
+   * o de generar con él la complementaria.
+   */
+  mostrada: {
+    id: string
+    secuencia: number
+    /** Cuántas la preceden en el período: lo que su cierre ya tenía liquidado. */
+    previas: number
+    confirmadaEn: string | null
+    /** §7.6 — solo la última confirmada y sin pagar se puede anular. */
+    anulable: boolean
+    /** Por qué no, para el tooltip del botón apagado. */
+    motivoNoAnulable: string | null
+  } | null
+  /** Con cuál de las dos caras abre la pantalla, cuando la URL lo dice. */
+  vista: VistaDeLiquidacion | null
+  /** Firma de lo que pide la URL: cambia cuando se pide otro período u otra secuencia. */
+  pedido: string
 }) {
   const router = useRouter()
   const confirmacion = useAccion<{ id: string; secuencia: number }>()
@@ -158,25 +242,46 @@ export function PantallaLiquidacion(props: {
   /**
    * §7.6 — las dos caras de la pantalla. Abre en el detalle del mes en curso, que es a lo que
    * se viene la mayoría de las veces; la lista dice qué meses están cerrados.
-   *
-   * Es estado local y no `?vista=` en la URL, igual que el conmutador de las planillas: así
-   * las tres pantallas con vistas se manejan igual.
    */
-  const [modoLista, setModoLista] = useState(false)
+  const [modoLista, setModoLista] = useModoLista(props.vista, props.pedido)
 
   const periodo = useMemo(() => parsePeriodo(props.periodo), [props.periodo])
 
+  /**
+   * §7.6.1 — la pantalla tiene dos modos y `mostrada` los separa.
+   *
+   * **Sin `liquidacion` en la URL es el borrador**: el cálculo del período con los datos de
+   * hoy, y el pie dice cuánto habría que pagar si se confirma, o sea la diferencia contra lo
+   * ya liquidado. Es a lo que se viene: el mes que falta liquidar, o la complementaria que
+   * hace falta porque los datos cambiaron después de confirmar.
+   *
+   * **Con `liquidacion` es una liquidación guardada**, tal como quedó, y lo único que se
+   * ofrece es anularla. No se recalcula nada.
+   *
+   * Antes el período mostraba la última confirmada en modo lectura, y por eso las tablas y el
+   * pie podían decir cosas distintas —las tablas lo confirmado y el pie el recálculo—, y el
+   * borrador de la complementaria no se podía ver en ningún lado.
+   */
+  const mostrada = props.mostrada
+  /** La última liquidación vigente del período: las anuladas no están en `previas`. */
   const ultima = props.previas.at(-1) ?? null
-  // §7.6.1 — alcanza con que un libro esté pagado: ese asiento ya no se toca.
-  const hayPagada = props.previas.some((p) => p.pago !== 'SIN_PAGAR')
-  const pagadaEntera = props.previas.length > 0 && props.previas.every((p) => p.pago === 'PAGADA')
-  const esComplementaria = props.previas.length > 0
+  /**
+   * §7.6.1 — la regla que evita que se apilen liquidaciones sin pagar: mientras la última no
+   * tenga ningún pago no se puede generar otra, y la salida es cobrarla o anularla. Alcanza
+   * con que **un** libro esté pagado para salir de acá: ese asiento ya no se puede tocar
+   * —anular lo rechaza— y entonces el único camino es la complementaria.
+   *
+   * Mira la última y no «alguna», que es lo que miraba antes: con la #1 pagada y la #2 sin
+   * pagar, «alguna» daba pagada y ofrecía la complementaria en vez de dejar anular la #2.
+   *
+   * La regla es la misma que aplica la acción al confirmar, y por eso sale de un solo lugar.
+   */
+  const ultimaSinPagar = !admiteLiquidacionNueva(ultima)
+  /** Las que están antes de la que se muestra: las que su cierre ya tenía liquidadas. */
+  const cuantasPrevias = mostrada ? mostrada.previas : props.previas.length
+  const esComplementaria = cuantasPrevias > 0
   const diferencia = Number(props.totalAPagar)
 
-  // §7.6 — una liquidación confirmada se muestra en modo lectura con sus valores persistidos.
-  const enModoLectura = ultima !== null
-  const lineasAMostrar =
-    enModoLectura && props.lineasPersistidas ? props.lineasPersistidas : props.lineas
 
   /**
    * §6.2 — la liquidación se lee en dos tablas: la formal, que pasa por el BPS, y la informal,
@@ -188,14 +293,15 @@ export function PantallaLiquidacion(props: {
    * un renglón más arriba de cada tarjeta.
    */
   const tablas = (['FORMAL', 'INFORMAL'] as const)
-    .map((tabla) => ({ tabla, lineas: lineasAMostrar.filter((l) => l.tabla === tabla) }))
+    .map((tabla) => ({ tabla, lineas: props.lineas.filter((l) => l.tabla === tabla) }))
     .filter((t) => t.lineas.length > 0)
 
   const dosTablas = tablas.length > 1
 
   /**
    * El total del período: la suma de los dos totales a pagar. Sale de las líneas y no de
-   * `totalRecalculado` para que en modo lectura sea exactamente lo que muestran las tablas.
+   * `totalRecalculado` para que mirando una liquidación guardada sea exactamente lo que
+   * muestran las tablas de arriba, que son las de esa liquidación y no un cálculo de hoy.
    */
   const totalGeneral = tablas.reduce(
     (acc, t) => acc + Number(t.lineas.find((l) => l.codigo === 'TOTAL')?.importe ?? 0),
@@ -224,8 +330,18 @@ export function PantallaLiquidacion(props: {
   function celdasDelCierre(
     campo: 'recalculado' | 'yaLiquidado' | 'aPagar',
     total: string,
-    negativoEnRojo = false,
+    { negado = false, negativoEnRojo = false } = {},
   ) {
+    /*
+      El renglón de lo ya liquidado es una resta, y el signo va **con la cifra**, en la columna
+      de los importes, no pegado al rótulo: así se lee alineado con los demás montos y en la
+      misma convención que las líneas de la liquidación (§8.5).
+
+      El cero no se niega: `-0` es negativo para decimal.js y saldría un «−$ 0».
+    */
+    const conSigno = (valor: string) =>
+      negado && Number(valor) !== 0 ? -Number(valor) : valor
+
     const celda = (valor: string, clave: string, borde: boolean) => (
       <td
         key={clave}
@@ -237,7 +353,7 @@ export function PantallaLiquidacion(props: {
           clave !== 'FORMAL' && 'print:hidden',
         )}
       >
-        {formatearImporteEntero(valor)}
+        {formatearImporteEntero(conSigno(valor))}
       </td>
     )
     const borde = campo === 'aPagar'
@@ -248,13 +364,56 @@ export function PantallaLiquidacion(props: {
   }
 
   /**
-   * §7.6 — aviso de que los parámetros actuales darían un resultado distinto. Se compara el
-   * recálculo completo del período contra lo ya liquidado: si difieren, hay algo (una
-   * novedad nueva, un cambio de salario, de boleto o de BPS) que la liquidación confirmada
-   * no refleja.
+   * §7.6 — aviso de que la información cargada cambió después de confirmar. Se compara el
+   * recálculo completo del período contra lo ya liquidado: si difieren, hay algo —una novedad
+   * nueva, un cambio de salario, de boleto o de BPS— que las liquidaciones confirmadas no
+   * reflejan, y el borrador que se está mirando es justamente la complementaria que lo aplica.
    */
-  const parametrosCambiaron =
-    enModoLectura && Number(props.totalRecalculado) !== Number(props.totalYaLiquidado)
+  /**
+   * §7.6.1 — si el recálculo de hoy difiere de lo ya liquidado, o sea si hay complementaria
+   * que generar. Se mira **libro por libro** y no por el total: el formal puede dar +$100 y el
+   * informal −$100, y ahí el total da cero pero cada libro tiene su propio asiento que hacer.
+   */
+  const hayDiferencia = (['FORMAL', 'INFORMAL'] as const).some(
+    (libro) => Number(props.porLibro[libro].aPagar) !== 0,
+  )
+
+  /** El aviso de que la información cargada cambió después de confirmar. */
+  const parametrosCambiaron = mostrada === null && esComplementaria && hayDiferencia
+
+  /**
+   * §7.6.1 — el cierre se muestra cuando explica algo.
+   *
+   * Mirando una liquidación guardada siempre explica: es lo que esa liquidación pagó sobre lo
+   * que el período ya tenía liquidado. En el borrador, en cambio, sin diferencia queda un
+   * «DIFERENCIA A PAGAR $ 0» debajo de un total que ya está liquidado: tres renglones para
+   * decir que no hay nada que hacer, que es lo que ya dice el botón apagado. Se ve apenas se
+   * confirma un mes, que es cuando el borrador pasa a ser el de una complementaria que todavía
+   * no tiene nada adentro.
+   */
+  const muestraElCierre = esComplementaria && (mostrada !== null || hayDiferencia)
+
+  /**
+   * §7.6 — el cartel del borrador dice **lo que el chip no dice**.
+   *
+   * El chip del navegador ya cuenta el estado de la última liquidación vigente —«Sin pagar»,
+   * «Pagada», «Pago parcial»—, así que una oración que repita eso es decir dos veces lo mismo
+   * con distinta letra, y encima a dos centímetros de distancia. Queda entonces lo que el chip
+   * no tiene forma de decir: cuántas liquidaciones hay cuando hay más de una, qué libro falta
+   * cobrar cuando el pago es parcial, y que la información cargada cambió después de
+   * confirmar. Sin nada de eso, no hay cartel.
+   */
+  const loQueElChipNoDice = [
+    props.previas.length > 1
+      ? `Este período tiene ${props.previas.length} liquidaciones confirmadas.`
+      : null,
+    props.estado === 'PARCIAL' && ultima
+      ? `Falta el pago ${ultima.faltan.map((l) => ETIQUETA_LIBRO[l]).join(' y el pago ')}.`
+      : null,
+    parametrosCambiaron
+      ? 'La información ingresada cambió y es necesaria una liquidación complementaria.'
+      : null,
+  ].filter((oracion) => oracion !== null)
 
   function confirmar(aceptaComplementaria: boolean) {
     confirmacion.ejecutar(
@@ -274,8 +433,9 @@ export function PantallaLiquidacion(props: {
   }
 
   function anular() {
-    if (!ultima) return
-    anulacion.ejecutar(() => anularLiquidacionConfirmada({ liquidacionId: ultima.id }), {
+    const liquidacionId = mostrada ? mostrada.id : ultima?.id
+    if (!liquidacionId) return
+    anulacion.ejecutar(() => anularLiquidacionConfirmada({ liquidacionId }), {
       onExito: () => {
         setDialogo(null)
         router.refresh()
@@ -308,6 +468,7 @@ export function PantallaLiquidacion(props: {
         <NavegadorDePeriodo
           empleadoId={props.empleadoId}
           actual={{ periodo, tipo: 'MENSUAL' }}
+          estado={props.estado}
           puedeRetroceder={props.puedeRetroceder}
           puedeAvanzar={props.puedeAvanzar}
           modoLista={modoLista}
@@ -338,21 +499,22 @@ export function PantallaLiquidacion(props: {
           </p>
         ))}
 
-        {enModoLectura ? (
+        {mostrada ? (
+          /*
+            La URL pidió una liquidación concreta, así que el cartel dice cuál es y de cuándo,
+            en vez de contar cómo viene el período. El estado —pagada, anulada— lo dice el
+            chip del navegador.
+          */
           <p className="rounded-md border bg-muted px-3 py-2 text-sm">
-            {esComplementaria && props.previas.length > 1
-              ? `Este período tiene ${props.previas.length} liquidaciones confirmadas.`
-              : 'Este período ya tiene una liquidación confirmada.'}{' '}
-            {pagadaEntera
-              ? 'Ya fue pagada.'
-              : hayPagada
-                ? `Está pagada en parte: falta el pago ${(ultima?.faltan ?? [])
-                    .map((l) => ETIQUETA_LIBRO[l])
-                    .join(' y el pago ')}.`
-                : 'Todavía no está pagada.'}
-            {parametrosCambiaron
-              ? ' Los parámetros actuales darían un resultado distinto: para aplicarlo hay que recalcular el período.'
+            Liquidación #{mostrada.secuencia} de {formatearPeriodoCapitalizado(periodo)}
+            {mostrada.confirmadaEn
+              ? `, confirmada el ${formatearFecha(new Date(mostrada.confirmadaEn))}`
               : ''}
+            .
+          </p>
+        ) : loQueElChipNoDice.length > 0 ? (
+          <p className="rounded-md border bg-muted px-3 py-2 text-sm">
+            {loQueElChipNoDice.join(' ')}
           </p>
         ) : null}
 
@@ -499,7 +661,7 @@ export function PantallaLiquidacion(props: {
           del total no se imprimen, el rótulo y el aviso pasan a mirar la cifra del formal, y si
           el cierre no tiene columna formal el bloque entero se queda afuera de la hoja.
         */}
-        {esComplementaria ? (
+        {muestraElCierre ? (
           <div
             className={cn(
               'overflow-x-auto rounded-card bg-card shadow-soft border-2 border-primary/40 px-[22px] py-5',
@@ -529,19 +691,28 @@ export function PantallaLiquidacion(props: {
               </thead>
               <tbody>
                 <tr>
+                  {/*
+                    Mirando una liquidación guardada, esta cifra es el total de las tablas de
+                    arriba —las líneas de esa liquidación—, así que el rótulo la nombra por lo
+                    que es y no por cómo se calculó. En la pantalla del período, en cambio, es
+                    el recálculo de hoy: puede no coincidir con lo que muestran las tablas, que
+                    ahí son las de la última confirmada, y por eso conserva su nombre.
+                  */}
                   <th scope="row" className="text-left font-normal">
-                    Total recalculado del período
+                    {mostrada
+                      ? `Total a pagar (liquidación #${mostrada.secuencia})`
+                      : 'Total recalculado del período'}
                   </th>
                   {celdasDelCierre('recalculado', props.totalRecalculado)}
                 </tr>
                 <tr className="text-muted-foreground">
                   <th scope="row" className="text-left font-normal">
-                    − Ya liquidado{' '}
-                    {props.previas.length === 1
+                    Ya liquidado{' '}
+                    {cuantasPrevias === 1
                       ? '(liquidación #1)'
-                      : `(${props.previas.length} liquidaciones)`}
+                      : `(${cuantasPrevias} liquidaciones)`}
                   </th>
-                  {celdasDelCierre('yaLiquidado', props.totalYaLiquidado)}
+                  {celdasDelCierre('yaLiquidado', props.totalYaLiquidado, { negado: true })}
                 </tr>
                 <tr className="font-semibold">
                   <th scope="row" className="border-t pt-2 text-left">
@@ -555,7 +726,7 @@ export function PantallaLiquidacion(props: {
                       {etiquetaDeLaDiferencia(diferenciaFormal)}
                     </span>
                   </th>
-                  {celdasDelCierre('aPagar', props.totalAPagar, true)}
+                  {celdasDelCierre('aPagar', props.totalAPagar, { negativoEnRojo: true })}
                 </tr>
               </tbody>
             </table>
@@ -577,47 +748,71 @@ export function PantallaLiquidacion(props: {
         {/* Acciones */}
         {props.puedeEditar ? (
           <div className="no-print flex flex-wrap gap-2">
-            {hayPagada ? (
-              <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
-                Generar liquidación complementaria
-              </Button>
-            ) : esComplementaria ? (
+            {mostrada ? (
+              /*
+                Mirando una liquidación guardada lo único que se ofrece es anular **esa**.
+                Generar la complementaria no está acá a propósito: la complementaria se calcula
+                sobre el período entero y se pide desde la pantalla del período, sin secuencia
+                en la URL.
+
+                Cuando no se puede anular el botón queda apagado con el motivo en el tooltip,
+                en vez de desaparecer: el usuario llegó buscando anular y un botón que no está
+                no explica nada.
+              */
+              mostrada.anulable ? (
+                <Button variant="outline" onClick={() => setDialogo('ANULAR')} disabled={enviando}>
+                  Anular la liquidación #{mostrada.secuencia}
+                </Button>
+              ) : (
+                <BotonApagado variant="outline" motivo={mostrada.motivoNoAnulable}>
+                  Anular la liquidación #{mostrada.secuencia}
+                </BotonApagado>
+              )
+            ) : !esComplementaria ? (
+              // El mes todavía no tiene ninguna liquidación vigente: se confirma la primera,
+              // y §7.6 — no antes del día 23 (§4.2.3).
+              props.puedeConfirmar ? (
+                <Button onClick={() => confirmar(false)} disabled={enviando}>
+                  {enviando ? 'Confirmando…' : 'Confirmar liquidación'}
+                </Button>
+              ) : (
+                <BotonApagado
+                  motivo={
+                    <>
+                      La liquidación de {nombreMes(mes(periodo))} se habilita el{' '}
+                      {formatearFecha(primerDiaConfirmable(periodo))}.
+                    </>
+                  }
+                >
+                  Confirmar liquidación
+                </BotonApagado>
+              )
+            ) : ultimaSinPagar ? (
+              /*
+                La regla: con la última sin pagar no se genera otra. Anular es la salida, y por
+                eso los dos botones van juntos acá; el de la complementaria queda apagado
+                diciendo qué falta en vez de desaparecer.
+              */
               <>
                 <Button variant="outline" onClick={() => setDialogo('ANULAR')} disabled={enviando}>
                   Anular la liquidación #{ultima!.secuencia}
                 </Button>
-                <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
+                <BotonApagado
+                  motivo={`La liquidación #${ultima!.secuencia} todavía no está pagada: pagala o anulala antes de generar otra.`}
+                >
                   Generar complementaria
-                </Button>
+                </BotonApagado>
               </>
-            ) : props.puedeConfirmar ? (
-              <Button onClick={() => confirmar(false)} disabled={enviando}>
-                {enviando ? 'Confirmando…' : 'Confirmar liquidación'}
+            ) : hayDiferencia ? (
+              <Button onClick={() => setDialogo('COMPLEMENTARIA')} disabled={enviando}>
+                Generar complementaria
               </Button>
             ) : (
-              /*
-                §7.6 — el mes en curso no se confirma antes del día 23 (§4.2.3), así que el
-                botón está apagado y el tooltip es lo único que dice por qué y desde cuándo.
-
-                Va sobre un `span` y no sobre el botón porque un botón `disabled` no dispara
-                eventos de puntero: el `disabled:pointer-events-none` que ya trae `Button` los
-                deja pasar al envoltorio, que es el que abre el tooltip. El `tabIndex` lo pone
-                además al alcance del teclado, que no tiene hover.
-
-                En un teléfono el tooltip no aparece —no hay con qué pasar por encima— y ahí el
-                botón queda apagado sin explicación. Es una decisión tomada, no un olvido.
-              */
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={0}>
-                    <Button disabled>Confirmar liquidación</Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  La liquidación de {nombreMes(mes(periodo))} se habilita el{' '}
-                  {formatearFecha(primerDiaConfirmable(periodo))}.
-                </TooltipContent>
-              </Tooltip>
+              // Sin diferencia la complementaria sería una liquidación de $ 0, con su asiento
+              // y todo. No se ofrece, y el tooltip dice por qué.
+              <BotonApagado motivo="No hay diferencia con lo ya liquidado.">
+                Generar complementaria
+              </BotonApagado>
             )}
           </div>
         ) : null}
@@ -631,14 +826,13 @@ export function PantallaLiquidacion(props: {
         onCerrar={() => setDialogo(null)}
         titulo="Generar liquidación complementaria"
         descripcion={
+          /*
+            El diálogo solo se abre con la última pagada: la rama de «ya tiene una liquidación
+            confirmada» sin pagar dejó de existir, porque ese caso ahora no ofrece el botón.
+          */
           <>
-            {hayPagada && ultima?.confirmadaEn
-              ? `La liquidación de ${formatearPeriodoCapitalizado(periodo)} ya fue pagada el ${formatearFecha(
-                  new Date(ultima.confirmadaEn),
-                )} por ${formatearImporteEntero(ultima.totalAPagar)}. No se puede modificar. `
-              : `${formatearPeriodoCapitalizado(periodo)} ya tiene una liquidación confirmada. `}
-            Se generará una liquidación complementaria por la diferencia de{' '}
-            {formatearImporteEntero(props.totalAPagar)}.
+            {motivoDeLaComplementaria(periodo, ultima)} Se generará una liquidación
+            complementaria por la diferencia de {formatearImporteEntero(props.totalAPagar)}.
           </>
         }
         etiquetaConfirmar="Generar complementaria"
@@ -650,8 +844,10 @@ export function PantallaLiquidacion(props: {
       <DialogoDeAccion
         abierto={dialogo === 'ANULAR'}
         onCerrar={() => setDialogo(null)}
-        titulo="Anular la liquidación"
-        descripcion="Las cuotas del plan de pagos que había aplicado vuelven a pendientes y el asiento de cuenta corriente se revierte con un contra-asiento. No se borra nada."
+        titulo={
+          mostrada ? `Anular la liquidación #${mostrada.secuencia}` : 'Anular la liquidación'
+        }
+        descripcion="La liquidación actual se marca como anulada. Las cuotas del plan de pagos que había aplicado vuelven a pendientes y el asiento de cuenta corriente se revierte con un contra-asiento. No se borra nada."
         etiquetaConfirmar="Anular"
         onConfirmar={anular}
         enviando={enviando}

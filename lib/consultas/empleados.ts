@@ -26,6 +26,12 @@ export type FilaEmpleado = {
   fechaEgreso: Date | null
   nivel: NivelAcceso
   estado: EstadoEmpleado
+  /**
+   * §4.2.3 — el mes que el estado reclama, como `AAAA-MM`, o `null` si no reclama nada. Va en
+   * el enlace del chip: sin él la pantalla de liquidación abre en el mes que tenga en memoria
+   * (§1.15), que no tiene por qué ser el que hay que resolver.
+   */
+  periodoDelEstado: string | null
   /** Con quiénes está compartido, para §8.7. */
   compartidoCon: string[]
 }
@@ -42,6 +48,7 @@ type FilaCruda = {
   fecha_egreso: Date | null
   nivel: string
   estado: string
+  periodo_estado: string | null
   /** Array JSON: se agrega en SQL para no hacer una consulta por fila. */
   compartido_con: string | string[] | null
 }
@@ -72,18 +79,20 @@ function mapear(fila: FilaCruda): FilaEmpleado {
     fechaEgreso: fila.fecha_egreso,
     nivel: fila.nivel as NivelAcceso,
     estado: fila.estado as EstadoEmpleado,
+    periodoDelEstado: fila.periodo_estado,
     compartidoCon: leerNombres(fila.compartido_con),
   }
 }
 
 /**
- * Estado derivado (§4.2.3), resuelto en SQL.
+ * Las dos condiciones de «falta liquidación» (§4.2.3), que miran M0 y M-1 y solo cuentan si el
+ * empleado tuvo vínculo vigente en ese mes.
  *
- * El orden de la tabla es normativo: `falta_pago` gana sobre `falta_liquidacion`, y esta
- * sobre `Baja`. Los dos períodos que se miran (M0 y M-1) solo cuentan si el empleado tuvo
- * vínculo vigente en ese mes.
+ * Están acá afuera porque las usan dos columnas —el estado y el mes que hay que ir a
+ * resolver— y tienen que decir lo mismo: si se separan, el chip diría «Falta liquidación» y
+ * llevaría al mes equivocado.
  */
-function sqlEstado(m0: string, m1: string, diaDeHoy: number) {
+function condicionesDeEstado(m0: string, m1: string, diaDeHoy: number) {
   const mesIngreso = Prisma.sql`DATE_FORMAT(e.fecha_ingreso, '%Y-%m-01')`
   const mesEgreso = Prisma.sql`DATE_FORMAT(e.fecha_egreso, '%Y-%m-01')`
 
@@ -92,14 +101,45 @@ function sqlEstado(m0: string, m1: string, diaDeHoy: number) {
   const vinculoM1 = Prisma.sql`
     (${m1} >= ${mesIngreso} AND (e.fecha_egreso IS NULL OR ${m1} <= ${mesEgreso}))`
 
+  return {
+    faltaM0: Prisma.sql`
+      (${diaDeHoy} >= ${DIA_UMBRAL_LIQUIDACION} AND ${vinculoM0} AND COALESCE(liq.tiene_m0, 0) = 0)`,
+    faltaM1: Prisma.sql`
+      (${vinculoM1} AND COALESCE(liq.tiene_m1, 0) = 0)`,
+  }
+}
+
+/**
+ * Estado derivado (§4.2.3), resuelto en SQL.
+ *
+ * El orden de la tabla es normativo: `falta_pago` gana sobre `falta_liquidacion`, y esta
+ * sobre `Baja`.
+ */
+function sqlEstado(cond: ReturnType<typeof condicionesDeEstado>) {
   return Prisma.sql`
     CASE
       WHEN liq.hay_impaga = 1 THEN 'FALTA_PAGAR'
-      WHEN (${diaDeHoy} >= ${DIA_UMBRAL_LIQUIDACION} AND ${vinculoM0} AND COALESCE(liq.tiene_m0, 0) = 0)
-        OR (${vinculoM1} AND COALESCE(liq.tiene_m1, 0) = 0)
-        THEN 'FALTA_LIQUIDACION'
+      WHEN ${cond.faltaM0} OR ${cond.faltaM1} THEN 'FALTA_LIQUIDACION'
       WHEN e.fecha_egreso IS NOT NULL THEN 'BAJA'
       ELSE 'ACTIVO'
+    END`
+}
+
+/**
+ * §4.2.3 — el mes que el estado manda a resolver, en el mismo orden que el estado: la
+ * liquidación impaga **más vieja**, o el más viejo de los dos meses que falta liquidar. Es el
+ * que hay que atacar primero en los dos casos.
+ *
+ * Va como texto `AAAA-MM` porque termina en un `?periodo=` de la URL, y las tres ramas se
+ * formatean igual para que la columna no cambie de tipo según la fila.
+ */
+function sqlPeriodoDelEstado(m0: string, m1: string, cond: ReturnType<typeof condicionesDeEstado>) {
+  return Prisma.sql`
+    CASE
+      WHEN liq.hay_impaga = 1 THEN DATE_FORMAT(liq.periodo_impago, '%Y-%m')
+      WHEN ${cond.faltaM1} THEN DATE_FORMAT(${m1}, '%Y-%m')
+      WHEN ${cond.faltaM0} THEN DATE_FORMAT(${m0}, '%Y-%m')
+      ELSE NULL
     END`
 }
 
@@ -124,7 +164,14 @@ function sqlLiquidaciones(m0: string, m1: string) {
           WHEN l.total_a_pagar_informal > 0 AND COALESCE(pagos.pago_informal, 0) = 0 THEN 1
           ELSE 0
         END
-      ) AS hay_impaga
+      ) AS hay_impaga,
+      -- El mes de la impaga más vieja, que es el que hay que ir a cobrar primero.
+      MIN(
+        CASE
+          WHEN l.total_a_pagar_formal > 0 AND COALESCE(pagos.pago_formal, 0) = 0 THEN l.periodo
+          WHEN l.total_a_pagar_informal > 0 AND COALESCE(pagos.pago_informal, 0) = 0 THEN l.periodo
+        END
+      ) AS periodo_impago
     FROM liquidaciones l
     LEFT JOIN (
       SELECT
@@ -157,6 +204,7 @@ export async function listarEmpleadosVisibles(usuarioId: string): Promise<FilaEm
   const referencia = hoy()
   const m0 = aISO(primerDiaDelMes(referencia))
   const m1 = aISO(sumarMeses(primerDiaDelMes(referencia), -1))
+  const condiciones = condicionesDeEstado(m0, m1, dia(referencia))
 
   const filas = await prisma.$queryRaw<FilaCruda[]>`
     SELECT
@@ -170,7 +218,8 @@ export async function listarEmpleadosVisibles(usuarioId: string): Promise<FilaEm
       e.fecha_ingreso,
       e.fecha_egreso,
       CASE WHEN e.dueno_id = ${usuarioId} THEN 'DUENO' ELSE perm.permiso END AS nivel,
-      ${sqlEstado(m0, m1, dia(referencia))} AS estado,
+      ${sqlEstado(condiciones)} AS estado,
+      ${sqlPeriodoDelEstado(m0, m1, condiciones)} AS periodo_estado,
       comp.nombres AS compartido_con
     FROM empleados e
     JOIN usuarios d ON d.id = e.dueno_id
@@ -198,6 +247,7 @@ export async function listarTodosLosEmpleados(
   const referencia = hoy()
   const m0 = aISO(primerDiaDelMes(referencia))
   const m1 = aISO(sumarMeses(primerDiaDelMes(referencia), -1))
+  const condiciones = condicionesDeEstado(m0, m1, dia(referencia))
 
   // Un administrador ve todo; el resto, solo lo propio y lo compartido.
   const filtro = esAdmin
@@ -220,7 +270,8 @@ export async function listarTodosLosEmpleados(
         WHEN perm.permiso IS NOT NULL THEN perm.permiso
         ELSE 'ADMIN'
       END AS nivel,
-      ${sqlEstado(m0, m1, dia(referencia))} AS estado,
+      ${sqlEstado(condiciones)} AS estado,
+      ${sqlPeriodoDelEstado(m0, m1, condiciones)} AS periodo_estado,
       comp.nombres AS compartido_con
     FROM empleados e
     JOIN usuarios d ON d.id = e.dueno_id

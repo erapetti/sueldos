@@ -13,8 +13,8 @@ import type { Libro } from '@/lib/calculo/tipos'
 export type FilaConPagos = {
   totalAPagarFormal: DecimalPrisma
   totalAPagarInformal: DecimalPrisma
-  /** Los movimientos `PAGO` vinculados, con su libro. */
-  movimientos: readonly { libro: Libro }[]
+  /** Los movimientos `PAGO` vinculados, con su libro y su fecha, de la más vieja a la más nueva. */
+  movimientos: readonly { libro: Libro; fecha: Date }[]
 }
 
 export function pagoDeLiquidacion(liquidacion: FilaConPagos): EstadoDePago {
@@ -27,7 +27,24 @@ export function pagoDeLiquidacion(liquidacion: FilaConPagos): EstadoDePago {
   )
 }
 
+/**
+ * Cuándo se terminó de cobrar: la fecha del **último** pago vinculado, o `null` si todavía no
+ * cobró ninguno.
+ *
+ * Puede haber uno por libro (§4.9), así que la fecha que importa es la del último: es el día
+ * en que la liquidación dejó de tener algo pendiente. Y puede no haber ninguno aun estando
+ * «pagada»: una complementaria de cero o negativa no tiene ningún libro que cobrar, así que
+ * `estadoDePago` la da por pagada sin que nadie haya pagado nada.
+ */
+export function ultimoPago(liquidacion: FilaConPagos): Date | null {
+  return liquidacion.movimientos.at(-1)?.fecha ?? null
+}
+
 /** Lo que necesita el `include` de Prisma para que `pagoDeLiquidacion` pueda leer la fila. */
 export const INCLUIR_PAGOS = {
-  movimientos: { where: { tipo: 'PAGO' as const }, select: { libro: true } },
+  movimientos: {
+    where: { tipo: 'PAGO' as const },
+    select: { libro: true, fecha: true },
+    orderBy: { fecha: 'asc' as const },
+  },
 } as const

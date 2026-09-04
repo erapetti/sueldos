@@ -5,6 +5,9 @@
  * precarga el monto con el total a pagar. El vínculo es lo que marca la liquidación como
  * pagada (§4.14).
  *
+ * El desplegable ofrece solo las que **tienen algo que cobrar**: las cobradas enteras las deja
+ * afuera `liquidacionesParaPago`, así que acá no hay un estado «ya pagada» que dibujar.
+ *
  * §4.9 — cada pago pertenece a un libro. Una liquidación con las dos tablas se paga con **dos
  * transferencias**, así que el diálogo se abre una vez por libro: al elegir la liquidación
  * ofrece el libro que todavía falta y precarga el monto de ese libro.
@@ -183,7 +186,6 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
                 <SelectItem key={l.id} value={l.id}>
                   {ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
                   {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
-                  {l.pago === 'PAGADA' ? ' · ya pagada' : ''}
                   {l.pago === 'PARCIAL'
                     ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
                     : ''}

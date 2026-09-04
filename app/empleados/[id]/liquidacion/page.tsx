@@ -2,8 +2,7 @@
  * §7.6 — pantalla de cálculo de sueldo: desglose línea por línea del §6.2, selector de mes y
  * las acciones de confirmar, anular e imprimir.
  */
-import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db/prisma'
+import { notFound, redirect } from 'next/navigation'
 import {
   exigirUsuario,
   accesoAEmpleado,
@@ -12,18 +11,23 @@ import {
   puedeVer,
 } from '@/lib/auth/guards'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
+import { liquidacionGuardada } from '@/lib/liquidacion/guardada'
+import { estadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
 import { aISO, aPeriodoISO } from '@/lib/format/dates'
 import { periodoDePantalla } from '@/lib/consultas/periodoDePantalla'
 import {
   anteriorPeriodo,
+  consultaDePeriodo,
   mesEnRango,
   periodoValido,
   sePuedeConfirmar,
   siguientePeriodo,
   tipoDesdeUrl,
+  vistaDesdeUrl,
   type PeriodoLiquidable,
+  type TipoPeriodo,
 } from '@/lib/calculo/periodos'
 import { PantallaLiquidacion, type LineaVista } from './PantallaLiquidacion'
 import { PantallaAguinaldo } from './PantallaAguinaldo'
@@ -31,15 +35,53 @@ import { AvisoDatosFaltantes } from './AvisoDatosFaltantes'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Lo que dice el chip del navegador cuando la URL no pide una secuencia: el estado de la
+ * última liquidación vigente del período. Un período sin ninguna —o con todas anuladas—
+ * está sin confirmar.
+ */
+function estadoDelPeriodo(
+  liquidaciones: {
+    periodoISO: string
+    tipo: string
+    secuencia: number
+    estado: string
+    pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
+  }[],
+  periodoISO: string,
+  tipo: TipoPeriodo,
+) {
+  const vigentes = liquidaciones.filter(
+    (l) => l.periodoISO === periodoISO && l.tipo === tipo && l.estado !== 'ANULADA',
+  )
+  // La de secuencia más alta, buscada y no tomada de la punta: en qué orden vienen es cosa de
+  // la vista Lista, que ya las dio vuelta una vez.
+  const ultima = vigentes.reduce<(typeof vigentes)[number] | null>(
+    (mayor, l) => (mayor === null || l.secuencia > mayor.secuencia ? l : mayor),
+    null,
+  )
+  return estadoVisible(ultima)
+}
+
 export default async function PaginaLiquidacion({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ periodo?: string; tipo?: string }>
+  searchParams: Promise<{
+    periodo?: string
+    tipo?: string
+    liquidacion?: string
+    vista?: string
+  }>
 }) {
   const { id } = await params
-  const { periodo: periodoTexto, tipo: tipoTexto } = await searchParams
+  const {
+    periodo: periodoTexto,
+    tipo: tipoTexto,
+    liquidacion: liquidacionTexto,
+    vista: vistaTexto,
+  } = await searchParams
 
   const usuario = await exigirUsuario()
   const acceso = await accesoAEmpleado(id, usuario)
@@ -77,6 +119,84 @@ export default async function PaginaLiquidacion({
   const puedeRetroceder = mesEnRango(anteriorPeriodo(actual).periodo, rango)
   const puedeAvanzar = mesEnRango(siguientePeriodo(actual).periodo, rango)
 
+  /**
+   * §7.6 — con qué cara abre la pantalla, y qué le pidió la URL.
+   *
+   * La vista es estado del componente, como en las planillas, así que el parámetro solo fija
+   * el valor inicial; `pedido` es lo que le deja ver al cliente que el pedido cambió, para
+   * que el enlace de la Lista abra el detalle en vez de dejar la Lista puesta.
+   */
+  const vista = vistaDesdeUrl(vistaTexto)
+  const pedido = `${aPeriodoISO(periodo)}|${actual.tipo}|${liquidacionTexto ?? ''}|${vistaTexto ?? ''}`
+
+  const comunes = {
+    empleadoId: id,
+    alias: acceso.empleado.alias,
+    nombreCompleto: acceso.empleado.nombreCompleto,
+    listadoDeOrigen: listadoDeOrigen(acceso.nivel),
+    periodo: aPeriodoISO(periodo),
+    puedeEditar: puedeEditar(acceso.nivel),
+    vista,
+    pedido,
+  }
+
+  const delNavegador = {
+    liquidaciones: liquidacionesDeLaEmpleada,
+    totalesPorPeriodo,
+    puedeRetroceder,
+    puedeAvanzar,
+  }
+
+  /*
+    §7.6.1 — la URL puede pedir **una** liquidación del período por su id, que es a donde
+    llevan las filas de la Lista. Se muestra tal como quedó guardada, sin recalcular nada.
+
+    Solo el mensual se abre así: el aguinaldo todavía no se liquida (§13.3). Un id que no
+    corresponde —el de otro mes, el de otra empleada, uno inventado— vuelve al listado, que es
+    donde se ve qué liquidaciones hay.
+  */
+  if (liquidacionTexto !== undefined) {
+    const guardada =
+      actual.tipo === 'MENSUAL'
+        ? await liquidacionGuardada(id, periodo, 'MENSUAL', liquidacionTexto)
+        : null
+
+    if (!guardada) {
+      redirect(`/empleados/${id}/liquidacion?${consultaDePeriodo(actual)}&vista=lista`)
+    }
+
+    return (
+      <PantallaLiquidacion
+        {...comunes}
+        {...delNavegador}
+        estado={guardada.estado}
+        mostrada={{
+          id: guardada.id,
+          secuencia: guardada.secuencia,
+          previas: guardada.previas,
+          confirmadaEn: guardada.confirmadaEn,
+          anulable: guardada.anulable,
+          motivoNoAnulable: guardada.motivoNoAnulable,
+        }}
+        lineas={guardada.lineas}
+        valorHoraCalculado={guardada.valorHoraCalculado}
+        horasSemanales={guardada.horasSemanales}
+        totalRecalculado={guardada.totalRecalculado}
+        totalYaLiquidado={guardada.totalYaLiquidado}
+        totalAPagar={guardada.totalAPagar}
+        porLibro={guardada.porLibro}
+        avisos={guardada.avisos}
+        cedula={acceso.empleado.cedula}
+        fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
+        // El período entero no entra en juego: lo que se mira es una liquidación sola.
+        previas={[]}
+        puedeConfirmar={false}
+      />
+    )
+  }
+
+  const estado = estadoDelPeriodo(liquidacionesDeLaEmpleada, aISO(periodo), actual.tipo)
+
   // El aguinaldo tiene otro formato y su fórmula está pendiente (§13.3): por ahora la pantalla
   // informa eso, con el mismo encabezado y el mismo navegador que el resto.
   if (actual.tipo === 'AGUINALDO') {
@@ -87,10 +207,10 @@ export default async function PaginaLiquidacion({
         nombreCompleto={acceso.empleado.nombreCompleto}
         listadoDeOrigen={listadoDeOrigen(acceso.nivel)}
         periodo={aPeriodoISO(periodo)}
-        puedeRetroceder={puedeRetroceder}
-        puedeAvanzar={puedeAvanzar}
-        liquidaciones={liquidacionesDeLaEmpleada}
-        totalesPorPeriodo={totalesPorPeriodo}
+        estado={estado}
+        vista={vista}
+        pedido={pedido}
+        {...delNavegador}
       />
     )
   }
@@ -101,15 +221,6 @@ export default async function PaginaLiquidacion({
    * cliente, el primer dibujado no coincidiría con el del servidor.
    */
   const puedeConfirmar = sePuedeConfirmar(periodo)
-
-  const comunes = {
-    empleadoId: id,
-    alias: acceso.empleado.alias,
-    nombreCompleto: acceso.empleado.nombreCompleto,
-    listadoDeOrigen: listadoDeOrigen(acceso.nivel),
-    periodo: aPeriodoISO(periodo),
-    puedeEditar: puedeEditar(acceso.nivel),
-  }
 
   let calculo
   try {
@@ -145,26 +256,20 @@ export default async function PaginaLiquidacion({
       pago: l.pago.estado,
       faltan: l.pago.faltan,
       confirmadaEn: l.confirmadaEn ? l.confirmadaEn.toISOString() : null,
+      pagadaEn: l.pagadaEn ? aISO(l.pagadaEn) : null,
     }))
-
-  // Las líneas persistidas de la última liquidación confirmada, para el modo lectura (§4.14).
-  const ultimaConfirmada =
-    previas.length > 0
-      ? await prisma.liquidacion.findUnique({
-          where: { id: previas[previas.length - 1].id },
-          include: { lineas: { orderBy: { orden: 'asc' } } },
-        })
-      : null
 
   return (
     <PantallaLiquidacion
       {...comunes}
+      {...delNavegador}
+      estado={estado}
+      // Sin secuencia en la URL se mira el período entero, no una liquidación concreta.
+      mostrada={null}
       lineas={lineas}
       valorHoraCalculado={resultado.valorHoraCalculado.toFixed(2)}
       // §5.2 — las del registro de salario vigente en el período, no las de hoy.
       horasSemanales={contexto.entrada.salario?.horasSemanales.toString() ?? null}
-      materiaGravada={resultado.materiaGravada.toFixed(2)}
-      subtotal={resultado.subtotal.toFixed(2)}
       totalRecalculado={resultado.totalRecalculado.toFixed(2)}
       totalYaLiquidado={resultado.totalYaLiquidado.toFixed(2)}
       totalAPagar={resultado.totalAPagar.toFixed(2)}
@@ -181,29 +286,10 @@ export default async function PaginaLiquidacion({
         },
       }}
       avisos={resultado.avisos}
-      liquidaciones={liquidacionesDeLaEmpleada}
-      totalesPorPeriodo={totalesPorPeriodo}
-      puedeRetroceder={puedeRetroceder}
-      puedeAvanzar={puedeAvanzar}
       cedula={acceso.empleado.cedula}
       fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
       previas={previas}
       puedeConfirmar={puedeConfirmar}
-      lineasPersistidas={
-        ultimaConfirmada
-          ? ultimaConfirmada.lineas.map((l) => ({
-              orden: l.orden,
-              tabla: l.tabla,
-              codigo: l.codigo,
-              descripcion: l.descripcion,
-              cantidad: l.cantidad ? l.cantidad.toString() : null,
-              valorUnitario: l.valorUnitario ? l.valorUnitario.toString() : null,
-              importe: l.importe.toString(),
-              signo: l.signo,
-              destacada: l.codigo === 'SUBTOTAL' || l.codigo === 'TOTAL',
-            }))
-          : null
-      }
     />
   )
 }

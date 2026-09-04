@@ -51,6 +51,17 @@ export function consultaDePeriodo({ periodo, tipo }: PeriodoLiquidable): string 
 }
 
 /**
+ * §7.6 — las dos caras de la pantalla de liquidación, cuando la URL pide una. La vista es
+ * estado del componente, como en las planillas; el parámetro solo dice con cuál abrir, y
+ * existe para que el enlace de la Lista lleve al detalle en vez de dejar la Lista puesta.
+ */
+export type VistaDeLiquidacion = 'lista' | 'detalle'
+
+export function vistaDesdeUrl(valor: string | undefined): VistaDeLiquidacion | null {
+  return valor === 'lista' || valor === 'detalle' ? valor : null
+}
+
+/**
  * El siguiente en la secuencia. Después del mensual de junio o diciembre viene su aguinaldo,
  * y después del aguinaldo, el mensual del mes siguiente.
  */
@@ -110,6 +121,26 @@ export function primerDiaConfirmable(periodo: Date): Date {
  */
 export function sePuedeConfirmar(periodo: Date, referencia: Date = hoy()): boolean {
   return referencia.getTime() >= primerDiaConfirmable(periodo).getTime()
+}
+
+/**
+ * §7.6.1 — la otra condición para confirmar, además de la fecha: **no se apilan liquidaciones
+ * confirmadas sin pagar**. Mientras la última vigente del período no tenga ningún pago, la
+ * salida es cobrarla o anularla; una liquidación nueva encima dejaría dos asientos abiertos en
+ * el mismo mes y dos cobros que hacer.
+ *
+ * Alcanza con que **un** libro esté pagado para poder seguir: ese asiento ya no se puede tocar
+ * —anular lo rechaza (§7.6)— y entonces el único camino que queda es la complementaria. Un
+ * período sin ninguna liquidación vigente, o con todas anuladas, no tiene nada que esperar.
+ *
+ * Vive acá y no en cada lado porque la miran dos: la pantalla, que apaga el botón, y la acción,
+ * que rechaza el pedido. Escrita dos veces, quedaría un botón que siempre da error, o un camino
+ * bloqueado sin explicación (`IMPLEMENTATION_HINTS.md` §1.14).
+ */
+export function admiteLiquidacionNueva(
+  ultimaVigente: { pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA' } | null,
+): boolean {
+  return ultimaVigente === null || ultimaVigente.pago !== 'SIN_PAGAR'
 }
 
 /**

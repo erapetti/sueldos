@@ -35,6 +35,8 @@ export type FilaTabla = {
   fechaIngresoTexto: string
   nivel: string
   estado: EstadoEmpleado
+  /** `AAAA-MM` del mes que el estado reclama, para el enlace del chip. */
+  periodoDelEstado: string | null
   compartidoCon: string[]
 }
 
@@ -126,7 +128,7 @@ export function TablaTodos({
       */
       celda: (f) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          <ChipEstado estado={f.estado} empleadoId={f.id} />
+          <ChipEstado estado={f.estado} empleadoId={f.id} periodo={f.periodoDelEstado} />
           {!f.visible ? (
             <Badge variant="outline" className="gap-1">
               <TextoDeChip icono={EyeOff}>Oculto</TextoDeChip>

@@ -15,6 +15,7 @@ import { aColumnaImporte } from '@/lib/db/mapeo'
 import { LIBROS } from '@/lib/calculo/cuentaCorriente'
 import type { Libro, ResultadoLiquidacion } from '@/lib/calculo/tipos'
 import { formatearPeriodo, hoy, parsePeriodo, primerDiaDelMes } from '@/lib/format/dates'
+import { admiteLiquidacionNueva } from '@/lib/calculo/periodos'
 
 /** Snapshot completo del cálculo, para que reimprimir la liquidación dé lo mismo (§4.14). */
 function armarSnapshot(resultado: ResultadoLiquidacion, entrada: unknown) {
@@ -81,20 +82,25 @@ export async function confirmarLiquidacionMensual(entrada: unknown) {
     const { contexto, resultado } = await calcularPeriodo(empleado.id, periodo)
 
     const previasConfirmadas = contexto.liquidacionesPrevias.filter((l) => l.confirmadaEn !== null)
-    // §7.6.1 — alcanza con que **algún** libro de alguna previa esté pagado: ese asiento ya
-    // no se puede tocar, y el camino es la complementaria.
-    const hayPagada = previasConfirmadas.some((l) => l.pago.estado !== 'SIN_PAGAR')
-    const esComplementaria = previasConfirmadas.length > 0
+    // La última **vigente** del período: las anuladas no cuentan, no llegan hasta acá.
+    const ultima = previasConfirmadas.at(-1) ?? null
+    const esComplementaria = ultima !== null
 
-    if (hayPagada && !datos.aceptaComplementaria) {
+    /*
+      §7.6.1 — no se apilan liquidaciones confirmadas sin pagar; el porqué está en
+      `admiteLiquidacionNueva`. La pantalla ya apaga el botón, y acá va igual: la acción no
+      confía en el cliente (§2.3), y entre que se dibuja la pantalla y se aprieta el botón el
+      estado del período pudo cambiar.
+    */
+    if (ultima && !admiteLiquidacionNueva({ pago: ultima.pago.estado })) {
       throw new ErrorNegocio(
-        `La liquidación de ${formatearPeriodo(periodo)} ya fue pagada. No se puede modificar: hay que generar una liquidación complementaria por la diferencia.`,
+        `La liquidación #${ultima.secuencia} de ${formatearPeriodo(periodo)} todavía no está pagada. Pagala o anulala antes de generar otra.`,
       )
     }
 
-    if (esComplementaria && !hayPagada && !datos.aceptaComplementaria) {
+    if (esComplementaria && !datos.aceptaComplementaria) {
       throw new ErrorNegocio(
-        `${formatearPeriodo(periodo)} ya tiene una liquidación confirmada sin pagar. Anulala y volvé a confirmar, o generá una complementaria.`,
+        `La liquidación de ${formatearPeriodo(periodo)} ya fue pagada. No se puede modificar: hay que generar una liquidación complementaria por la diferencia.`,
       )
     }
 

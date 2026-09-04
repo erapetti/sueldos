@@ -15,7 +15,7 @@ import { calcularLiquidacionMensual } from '@/lib/calculo/liquidacion'
 import { diasDeLicenciaEnRango } from '@/lib/calculo/licencias'
 import type { EntradaLiquidacion, ResultadoLiquidacion } from '@/lib/calculo/tipos'
 import type { EstadoDePago } from '@/lib/calculo/cuentaCorriente'
-import { INCLUIR_PAGOS, pagoDeLiquidacion } from './pago'
+import { INCLUIR_PAGOS, pagoDeLiquidacion, ultimoPago } from './pago'
 import { primerDiaDelMes, ultimoDiaDelMes } from '@/lib/format/dates'
 
 export type ContextoLiquidacion = {
@@ -34,6 +34,8 @@ export type ContextoLiquidacion = {
     /** §4.14 — qué libros de esta liquidación ya se pagaron. */
     pago: EstadoDePago
     confirmadaEn: Date | null
+    /** Cuándo se terminó de cobrar, o `null` si no cobró ningún libro. */
+    pagadaEn: Date | null
   }[]
 }
 
@@ -150,6 +152,7 @@ export async function armarContextoLiquidacion(
     totalAPagar: aDecimal(l.totalAPagar),
     pago: pagoDeLiquidacion(l),
     confirmadaEn: l.confirmadaEn,
+    pagadaEn: ultimoPago(l),
   }))
 
   // §7.6.1 — solo cuentan las confirmadas; un borrador todavía no liquidó nada.

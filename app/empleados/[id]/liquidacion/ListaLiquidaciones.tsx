@@ -7,8 +7,9 @@
  * la lista dice qué meses están cerrados y el detalle muestra uno. Desde una fila se salta al
  * detalle de ese período.
  */
-import { Badge } from '@/components/ui/badge'
+import { EstadoLiquidacion } from '@/components/dominio/EstadoLiquidacion'
 import { Tabla, type Columna } from '@/components/dominio/Tabla'
+import { estadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { formatearImporte } from '@/lib/format/money'
 import { ETIQUETA_TIPO_LIQUIDACION } from '@/constants/etiquetas'
 
@@ -22,6 +23,10 @@ export type FilaLiquidacion = {
   totalAPagar: string
   /** §4.14 — el pago se mira libro por libro: puede faltar solo uno de los dos. */
   pago: 'SIN_PAGAR' | 'PARCIAL' | 'PAGADA'
+  /** `dd/mm/aaaa` del día en que se creó, que es el día en que se confirmó. */
+  creadaEn: string
+  /** `dd/mm/aaaa` del día desde el que está en el estado en que está. */
+  fechaDelEstado: string
 }
 
 export function ListaLiquidaciones({
@@ -34,14 +39,35 @@ export function ListaLiquidaciones({
   /** Total del período agrupando secuencias (§7.6.1), por `periodoISO|tipo`. */
   totalesPorPeriodo: Record<string, string>
 }) {
-  const detalleDe = (l: FilaLiquidacion) =>
-    `/empleados/${empleadoId}/liquidacion?periodo=${l.periodoISO.slice(0, 7)}`
+  /**
+   * A dónde lleva cada fila. Van tres cosas en el enlace, y cada una arregla algo distinto:
+   *
+   *  - `vista=detalle`, porque la Lista y el Detalle son la misma pantalla y el conmutador es
+   *    estado del componente: sin decirlo, el clic cambiaba el mes y dejaba la Lista puesta.
+   *  - `liquidacion`, el id de **esta** fila, porque un mes puede tener varias (§7.6.1) y la
+   *    fila es una de ellas y no el mes entero. Va el id y no el número de secuencia porque
+   *    la secuencia no identifica una fila: al anular la #1 y volver a confirmar quedan dos
+   *    filas #1, y las dos están en la Lista.
+   *  - `tipo`, para que el aguinaldo abra su pantalla y no el mensual del mismo mes.
+   *
+   * El salario vacacional (§7.11) no tiene pantalla de detalle ni lugar en la secuencia de
+   * períodos, así que su fila lleva al mensual de ese mes, que es a donde llevaban todas
+   * antes de esto.
+   */
+  const detalleDe = (l: FilaLiquidacion) => {
+    const partes = [`periodo=${l.periodoISO.slice(0, 7)}`]
+    if (l.tipo === 'AGUINALDO') partes.push('tipo=aguinaldo')
+    if (l.tipo === 'MENSUAL') partes.push(`liquidacion=${l.id}`)
+    partes.push('vista=detalle')
+    return `/empleados/${empleadoId}/liquidacion?${partes.join('&')}`
+  }
 
   const columnas: Columna<FilaLiquidacion>[] = [
     // El período es la puerta al detalle de ese mes, y con él toda la fila.
     { clave: 'periodo', etiqueta: 'Período', className: 'capitalize', celda: (l) => l.periodo },
     { clave: 'tipo', etiqueta: 'Tipo', celda: (l) => ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo },
     { clave: 'secuencia', etiqueta: 'Secuencia', numerica: true, celda: (l) => `#${l.secuencia}` },
+    { clave: 'creada', etiqueta: 'Creada', className: 'tabular', celda: (l) => l.creadaEn },
     {
       clave: 'total',
       etiqueta: 'Total',
@@ -58,17 +84,14 @@ export function ListaLiquidaciones({
     {
       clave: 'estado',
       etiqueta: 'Estado',
-      celda: (l) =>
-        l.estado === 'ANULADA' ? (
-          <Badge variant="outline">Anulada</Badge>
-        ) : l.pago === 'PAGADA' ? (
-          <Badge variant="secondary">Pagada</Badge>
-        ) : l.pago === 'PARCIAL' ? (
-          <Badge variant="outline">Pago parcial</Badge>
-        ) : (
-          <Badge variant="outline">Sin pagar</Badge>
-        ),
+      celda: (l) => <EstadoLiquidacion estado={estadoVisible(l)} />,
     },
+    /*
+      La fecha del estado que muestra la columna de al lado: cuándo se anuló, cuándo se
+      terminó de cobrar, o cuándo se confirmó si todavía no cobró nada. Va pegada al estado
+      porque sola no significa nada: es la respuesta a «¿desde cuándo?».
+    */
+    { clave: 'fecha', etiqueta: 'Fecha', className: 'tabular', celda: (l) => l.fechaDelEstado },
   ]
 
   return (
