@@ -38,6 +38,7 @@ import { DialogoPagoBancario } from '@/components/dominio/DialogoPagoBancario'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
 import type { Vinculo } from '@/lib/validacion/vinculo'
+import type { PagoDeLiquidacion } from '@/lib/liquidacion/pagos'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
 import { NavegadorDePeriodo } from './NavegadorDePeriodo'
 
@@ -231,6 +232,11 @@ export function PantallaLiquidacion(props: {
     /** Por qué no, para el tooltip del botón apagado. */
     motivoNoAnulable: string | null
   } | null
+  /**
+   * §7.5 — los pagos del pie: los de **esta** liquidación cuando se mira una guardada, y los
+   * de todo el período en el borrador, donde puede haber más de una cobrada.
+   */
+  pagos: PagoDeLiquidacion[]
   /** Con cuál de las dos caras abre la pantalla, cuando la URL lo dice. */
   vista: VistaDeLiquidacion | null
   /** Firma de lo que pide la URL: cambia cuando se pide otro período u otra secuencia. */
@@ -396,6 +402,12 @@ export function PantallaLiquidacion(props: {
    * no tiene nada adentro.
    */
   const muestraElCierre = esComplementaria && (mostrada !== null || hayDiferencia)
+
+  /**
+   * §7.5 — lo cobrado, para el pie de pagos. Los anulados no suman: por eso van tachados, y un
+   * total que los incluyera diría que se cobró plata que volvió atrás.
+   */
+  const totalPagado = props.pagos.reduce((acc, p) => (p.anulado ? acc : acc + Number(p.monto)), 0)
 
   /**
    * §7.5 — la liquidación que el chip manda a cobrar: la que se está mirando, o la última
@@ -759,6 +771,96 @@ export function PantallaLiquidacion(props: {
                 {SALDO_A_FAVOR_DE_LA_EMPRESA}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {/*
+          §7.5 — con qué se cobró. Va al pie porque es lo último que le pasó a la liquidación.
+
+          En el borrador son los pagos de **todo el período**, que es lo que se está mirando, y
+          por eso ahí aparece la columna de la secuencia: el mes puede tener varias liquidaciones
+          y cada pago es de una. Mirando una guardada, son solo los de ella.
+
+          `no-print` como el resto de lo que no va en el recibo: la hoja muestra lo que se
+          liquidó, y la lista mezclaría los dos libros (§1.7.5).
+        */}
+        {props.pagos.length > 0 ? (
+          <div className="no-print overflow-hidden rounded-card border bg-card shadow-soft px-[22px] py-4">
+            <table className="w-full text-sm">
+              <caption className="mb-2 text-left font-medium">Pagos</caption>
+              <thead>
+                <tr className="text-muted-foreground">
+                  {/*
+                    Mirando una liquidación, todos los pagos son de ella y la columna repetiría
+                    el número que el cartel ya dice. En el borrador el pie es del período
+                    entero, y ahí es lo único que distingue de cuál es cada pago.
+                  */}
+                  {mostrada ? null : (
+                    <th scope="col" className="pr-4 text-right font-normal">
+                      Liquidación
+                    </th>
+                  )}
+                  <th scope="col" className="pr-4 text-left font-normal">
+                    Libro
+                  </th>
+                  <th scope="col" className="pr-4 text-left font-normal">
+                    Fecha
+                  </th>
+                  <th scope="col" className="pr-4 text-right font-normal">
+                    Importe
+                  </th>
+                  <th scope="col" className="text-left font-normal">
+                    Concepto
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.pagos.map((pago) => (
+                  <tr
+                    key={pago.id}
+                    className={cn(pago.anulado && 'text-muted-foreground line-through')}
+                  >
+                    {mostrada ? null : (
+                      <td className="pr-4 text-right tabular whitespace-nowrap">
+                        #{pago.secuencia}
+                      </td>
+                    )}
+                    <td className="pr-4 whitespace-nowrap">{TITULO_LIBRO[pago.libro]}</td>
+                    <td className="pr-4 tabular whitespace-nowrap">
+                      {formatearFecha(parseFechaISO(pago.fecha))}
+                    </td>
+                    <td className="pr-4 text-right tabular whitespace-nowrap">
+                      {formatearImporteEntero(pago.monto)}
+                    </td>
+                    <td>
+                      {pago.concepto}
+                      {pago.anulado ? ' · anulado' : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {/*
+                Con un pago solo el total sería el mismo renglón dos veces, igual que el total
+                general de las tablas, que aparece solo cuando hay dos (§1.7.5).
+              */}
+              {props.pagos.length > 1 ? (
+                <tfoot>
+                  <tr className="font-semibold">
+                    <th
+                      scope="row"
+                      colSpan={mostrada ? 2 : 3}
+                      className="border-t pt-2 pr-4 text-left"
+                    >
+                      Total general
+                    </th>
+                    <td className="border-t pt-2 pr-4 text-right tabular whitespace-nowrap">
+                      {formatearImporteEntero(totalPagado)}
+                    </td>
+                    <td className="border-t pt-2" />
+                  </tr>
+                </tfoot>
+              ) : null}
+            </table>
           </div>
         ) : null}
 

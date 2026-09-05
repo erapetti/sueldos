@@ -1150,6 +1150,27 @@ misma cifra con la que arranca el pie. La consecuencia práctica: la hoja impres
 liquidación confirmada sale de su propia pantalla, a la que se llega desde la Lista; la del
 período imprime el borrador.
 
+**El pie de pagos** —libro, fecha, importe y concepto— va en las dos, pero no muestra lo
+mismo: mirando una liquidación son los pagos **de ella**, y en el borrador los de **todo el
+período**, que puede tener varias cobradas. Por eso ahí aparece además la columna de la
+secuencia, que es lo único que dice de cuál es cada pago; mirando una sola, esa columna
+repetiría el número que el cartel ya dice. Van del más viejo al más nuevo, que es el orden en
+que se fue cobrando.
+
+Cierra con un **Total general** cuando hay más de un pago; con uno solo sería el mismo renglón
+dos veces, igual que el total general de las tablas (§1.7.5). Los anulados no suman: por eso van
+tachados, y un total que los incluyera diría que se cobró plata que volvió atrás.
+
+Sale de `lib/liquidacion/pagos.ts` y no de `INCLUIR_PAGOS`, que es lo que decide el estado y
+comparten seis lugares: acá hacen falta el importe y el concepto, que a esos seis no les
+sirven. Los contra-asientos no son filas —no son pagos, son la anulación de uno—; el pago
+anulado sí queda, tachado.
+
+Ahí se ve un hueco que ya existía: **anular un pago no devuelve la liquidación a «Sin pagar»**.
+`estadoDePago` cuenta cualquier movimiento `PAGO` del libro, y el original anulado sigue siendo
+uno, así que la liquidación queda «Pagada» con su único pago tachado al pie. Arreglarlo es
+tocar `estadoDePago`, que miran seis pantallas, así que queda anotado y no hecho.
+
 **Con `liquidacion=<id>` no se recalcula nada.** La pantalla dibuja la fila, sus líneas y su
 snapshot (§4.14), que es justamente lo que garantiza que una liquidación vieja se relea igual
 que el día que se confirmó. Lo lee `lib/liquidacion/guardada.ts`, y por eso ahí no aparece el

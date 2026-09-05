@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/guards'
 import { calcularPeriodo } from '@/lib/liquidacion/datos'
 import { liquidacionGuardada } from '@/lib/liquidacion/guardada'
+import { pagosDelPeriodo } from '@/lib/liquidacion/pagos'
 import { estadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { listarLiquidaciones, totalPorPeriodo } from '@/lib/consultas/ficha'
 import { ErrorDatosFaltantes } from '@/lib/calculo/errores'
@@ -171,6 +172,9 @@ export default async function PaginaLiquidacion({
       redirect(`/empleados/${id}/liquidacion?${consultaDePeriodo(actual)}&vista=lista`)
     }
 
+    // §7.5 — el pie, acotado a esta liquidación: es de la única de la que habla la pantalla.
+    const pagos = await pagosDelPeriodo(id, periodo, 'MENSUAL', guardada.id)
+
     return (
       <PantallaLiquidacion
         {...comunes}
@@ -184,6 +188,7 @@ export default async function PaginaLiquidacion({
           anulable: guardada.anulable,
           motivoNoAnulable: guardada.motivoNoAnulable,
         }}
+        pagos={pagos}
         lineas={guardada.lineas}
         valorHoraCalculado={guardada.valorHoraCalculado}
         horasSemanales={guardada.horasSemanales}
@@ -292,6 +297,8 @@ export default async function PaginaLiquidacion({
         },
       }}
       avisos={resultado.avisos}
+      // §7.5 — en el borrador van los pagos de **todo** el período: puede tener varias.
+      pagos={await pagosDelPeriodo(id, periodo, actual.tipo)}
       cedula={acceso.empleado.cedula}
       vinculo={vinculo}
       previas={previas}
