@@ -390,6 +390,7 @@ export type PlanillaMensualProps = {
   puedeAvanzar: boolean
   /** Ruta base de la planilla, para navegar entre meses. */
   ruta: string
+  /** Cómo se llama esta planilla: encabeza el popover de carga del día. */
   titulo: string
   /** Ítem del menú de la empleada que queda marcado. */
   claveMenu: 'horas-extras' | 'faltas'
@@ -1215,6 +1216,17 @@ export function PlanillaMensual(props: PlanillaMensualProps) {
                   </PopoverAnchor>
 
                   <PopoverContent align="start" className="w-72">
+                    {/*
+                      El popover flota sobre el calendario y los de las dos planillas se parecen
+                      —una fecha, un campo de horas, un par de opciones—, así que arranca
+                      diciendo de cuál es. Va acá y no en cada `renderPopover` porque es lo
+                      mismo para las dos.
+
+                      Las clases son las de `DialogTitle` (`components/ui/dialog`): los diálogos
+                      y los popovers de la aplicación se abren igual, así que se titulan igual.
+                      El `h2` es el que trae la serif de los títulos (`globals.css`).
+                    */}
+                    <h2 className="mb-3 text-lg leading-none font-semibold">{props.titulo}</h2>
                     {props.renderPopover({
                       fecha,
                       contexto: contexto ?? {
