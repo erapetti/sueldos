@@ -126,6 +126,12 @@ export default async function PaginaLiquidacion({
    * el valor inicial; `pedido` es lo que le deja ver al cliente que el pedido cambió, para
    * que el enlace de la Lista abra el detalle en vez de dejar la Lista puesta.
    */
+  // §7.5 — el diálogo de pago que se abre desde el chip topea la fecha contra el vínculo.
+  const vinculo = {
+    fechaIngreso: aISO(acceso.empleado.fechaIngreso),
+    fechaEgreso: acceso.empleado.fechaEgreso ? aISO(acceso.empleado.fechaEgreso) : null,
+  }
+
   const vista = vistaDesdeUrl(vistaTexto)
   const pedido = `${aPeriodoISO(periodo)}|${actual.tipo}|${liquidacionTexto ?? ''}|${vistaTexto ?? ''}`
 
@@ -187,7 +193,7 @@ export default async function PaginaLiquidacion({
         porLibro={guardada.porLibro}
         avisos={guardada.avisos}
         cedula={acceso.empleado.cedula}
-        fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
+        vinculo={vinculo}
         // El período entero no entra en juego: lo que se mira es una liquidación sola.
         previas={[]}
         puedeConfirmar={false}
@@ -287,7 +293,7 @@ export default async function PaginaLiquidacion({
       }}
       avisos={resultado.avisos}
       cedula={acceso.empleado.cedula}
-      fechaIngreso={aISO(acceso.empleado.fechaIngreso)}
+      vinculo={vinculo}
       previas={previas}
       puedeConfirmar={puedeConfirmar}
     />

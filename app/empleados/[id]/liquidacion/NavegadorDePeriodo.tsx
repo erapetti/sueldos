@@ -39,6 +39,7 @@ export function NavegadorDePeriodo({
   empleadoId,
   actual,
   estado,
+  onCobrar,
   puedeRetroceder,
   puedeAvanzar,
   modoLista,
@@ -49,6 +50,8 @@ export function NavegadorDePeriodo({
   actual: PeriodoLiquidable
   /** El estado de la liquidación que muestra el detalle, o «sin confirmar» si no hay. */
   estado: EstadoVisible
+  /** Qué hacer al apretar el chip; sin esto el chip no se puede apretar. */
+  onCobrar?: () => void
   puedeRetroceder: boolean
   puedeAvanzar: boolean
   modoLista: boolean
@@ -94,7 +97,7 @@ export function NavegadorDePeriodo({
             </Button>
           </div>
 
-          <ChipDeEstado estado={estado} />
+          <ChipDeEstado estado={estado} onClick={onCobrar} titulo="Registrar el pago" />
         </>
       )}
 

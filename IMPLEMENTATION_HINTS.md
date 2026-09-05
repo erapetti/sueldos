@@ -1183,6 +1183,29 @@ distintas de la misma liquidación, la que está mal es la aplicación. Lo que c
 dos es el dibujo: en la tabla es un `Badge` y al lado del navegador es la píldora de las
 planillas, cuya clase (`CHIP_DE_PERIODO`) sale del mismo archivo que la usa `PlanillaMensual`.
 
+**El chip es además el atajo para cobrar.** Cuando dice «Sin pagar» o «Pago parcial» —y quien
+mira puede editar— es un botón que abre el diálogo de pago bancario con **esa** liquidación ya
+vinculada y sin desplegable: el chip habla de una y el diálogo cobra esa, sin volver a
+preguntar cuál. Es la misma idea del chip del listado de empleados (§1.15): decir «Sin pagar» y
+no dar por dónde cobrarlo es media respuesta. Con «Pagada», «Anulada» o «Sin confirmar» vuelve
+a ser un `span`, porque no hay nada que hacer.
+
+**Con una liquidación vinculada, el diálogo deja de preguntar lo que ya sabe** —venga del chip
+o del listado de pagos bancarios—. El libro y el importe salen de ella, así que se dibujan como
+campos `readOnly`: la caja marca dónde termina un campo y empieza el otro, que una línea de
+texto suelta no hace, y se pueden leer y copiar, cosa que un `disabled` no deja. El desplegable
+de libro aparece **solo cuando hay dos por cobrar**; con uno solo es un campo fijo, porque un
+menú de una opción es una manera de equivocarse sin ganar nada. Los libros que se ofrecen son
+los que **todavía tienen algo que cobrar** —importe positivo y sin pago—: ofrecer el que ya se
+cobró es el mismo error de tipeo, con otro disfraz. Sin liquidación vinculada el pago es libre
+y los tres vuelven a ser campos.
+
+Al registrar el pago, `DialogoPagoBancario` hace `router.refresh()`: la URL no cambia, así que
+se vuelve a dibujar **el mismo mes**, y la vista es estado del componente, que el refresh no
+pisa. El chip y el cartel pasan solos a decir lo que corresponda, que con un pago parcial no es
+«Pagada» sino «Pago parcial» más el renglón que dice qué libro falta (§4.9 — una liquidación
+con las dos tablas se cobra en dos transferencias, y el diálogo propone la que falta).
+
 El navegador también quedó con **las medidas del de las planillas** (`PlanillaMensual`): el
 mismo `gap`, el mismo ancho mínimo de la etiqueta y el mismo chip en el mismo lugar. El único
 período que pasa ese ancho es el aguinaldo —«½ Aguinaldo Diciembre 2026» no entra en 10rem— y

@@ -34,8 +34,10 @@ import {
 import type { EstadoVisible } from '@/lib/liquidacion/estadoVisible'
 import { CODIGOS } from '@/lib/calculo/tipos'
 import { DialogoDeAccion } from '@/components/dominio/DialogoDeAccion'
+import { DialogoPagoBancario } from '@/components/dominio/DialogoPagoBancario'
 import { EncabezadoEmpleada } from '@/components/dominio/EncabezadoEmpleada'
 import type { ListadoDePersonal } from '@/constants/listados'
+import type { Vinculo } from '@/lib/validacion/vinculo'
 import { ListaLiquidaciones, type FilaLiquidacion } from './ListaLiquidaciones'
 import { NavegadorDePeriodo } from './NavegadorDePeriodo'
 
@@ -206,8 +208,8 @@ export function PantallaLiquidacion(props: {
   puedeAvanzar: boolean
   totalesPorPeriodo: Record<string, string>
   cedula: string | null
-  /** ISO `AAAA-MM-DD`. */
-  fechaIngreso: string
+  /** §7.5 — el ingreso, que sale en el encabezado, y el egreso, que topea la fecha del pago. */
+  vinculo: Vinculo
   previas: Previa[]
   /** §7.6 — el mes en curso recién se puede confirmar desde el día 23 (§4.2.3). */
   puedeConfirmar: boolean
@@ -239,6 +241,8 @@ export function PantallaLiquidacion(props: {
   const anulacion = useAccion<undefined>()
   const enviando = confirmacion.enviando || anulacion.enviando
   const [dialogo, setDialogo] = useState<'COMPLEMENTARIA' | 'ANULAR' | null>(null)
+  /** §7.5 — el diálogo de pago bancario, abierto desde el chip del navegador. */
+  const [cobrando, setCobrando] = useState(false)
   /**
    * §7.6 — las dos caras de la pantalla. Abre en el detalle del mes en curso, que es a lo que
    * se viene la mayoría de las veces; la lista dice qué meses están cerrados.
@@ -394,6 +398,18 @@ export function PantallaLiquidacion(props: {
   const muestraElCierre = esComplementaria && (mostrada !== null || hayDiferencia)
 
   /**
+   * §7.5 — la liquidación que el chip manda a cobrar: la que se está mirando, o la última
+   * vigente del período si la URL no pidió ninguna. Es la misma de la que habla el chip.
+   *
+   * Solo cuando queda algo por cobrar —sin pagar, o con un libro cobrado y el otro no— y con
+   * permiso de edición: registrar un pago es escribir.
+   */
+  const aCobrar =
+    props.puedeEditar && (props.estado === 'SIN_PAGAR' || props.estado === 'PARCIAL')
+      ? (mostrada?.id ?? ultima?.id ?? null)
+      : null
+
+  /**
    * §7.6 — el cartel del borrador dice **lo que el chip no dice**.
    *
    * El chip del navegador ya cuenta el estado de la última liquidación vigente —«Sin pagar»,
@@ -469,6 +485,7 @@ export function PantallaLiquidacion(props: {
           empleadoId={props.empleadoId}
           actual={{ periodo, tipo: 'MENSUAL' }}
           estado={props.estado}
+          onCobrar={aCobrar ? () => setCobrando(true) : undefined}
           puedeRetroceder={props.puedeRetroceder}
           puedeAvanzar={props.puedeAvanzar}
           modoLista={modoLista}
@@ -539,7 +556,7 @@ export function PantallaLiquidacion(props: {
             ) : null}
 
             <dt className="text-muted-foreground">Ingreso</dt>
-            <dd className="tabular">{formatearFecha(parseFechaISO(props.fechaIngreso))}</dd>
+            <dd className="tabular">{formatearFecha(parseFechaISO(props.vinculo.fechaIngreso))}</dd>
 
             {props.horasSemanales !== null ? (
               <>
@@ -839,6 +856,24 @@ export function PantallaLiquidacion(props: {
         onConfirmar={() => confirmar(true)}
         enviando={enviando}
       />
+
+      {/*
+        §7.5 — el pago del chip. La liquidación va fija: el chip habla de una y el diálogo cobra
+        esa, sin volver a preguntar cuál. Al registrarlo, `DialogoPagoBancario` hace
+        `router.refresh()`, que vuelve a dibujar la pantalla con el mismo mes y la misma vista
+        —la vista es estado del componente y el refresh no lo pisa—, así que el chip y el
+        cartel pasan solos a decir lo que corresponda, que con un pago parcial no es «Pagada».
+      */}
+      {aCobrar ? (
+        <DialogoPagoBancario
+          abierto={cobrando}
+          onCerrar={() => setCobrando(false)}
+          empleadoId={props.empleadoId}
+          alias={props.alias}
+          vinculo={props.vinculo}
+          liquidacionFija={aCobrar}
+        />
+      ) : null}
 
       {/* Anular revierte una liquidación confirmada: el acento va en «Cancelar». */}
       <DialogoDeAccion

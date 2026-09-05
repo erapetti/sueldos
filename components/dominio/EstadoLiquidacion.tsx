@@ -14,6 +14,7 @@
  * la usan igual la Lista, que es de cliente, y la página, que es de servidor.
  */
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import type { EstadoVisible } from '@/lib/liquidacion/estadoVisible'
 
 const ETIQUETA: Record<EstadoVisible, string> = {
@@ -55,7 +56,36 @@ export function EstadoLiquidacion({
   )
 }
 
-/** El estado como chip de la fila de controles. */
-export function ChipDeEstado({ estado }: { estado: EstadoVisible }) {
-  return <span className={CHIP_DE_PERIODO}>{ETIQUETA[estado]}</span>
+/**
+ * El estado como chip de la fila de controles.
+ *
+ * Con `onClick` el chip es un botón: en la liquidación, decir «Sin pagar» y no dar por dónde
+ * cobrarlo es media respuesta, igual que el chip del listado de empleados, que es un link. Sin
+ * `onClick` es un `span` a secas, que es lo que corresponde cuando no hay nada que hacer.
+ */
+export function ChipDeEstado({
+  estado,
+  onClick,
+  titulo,
+}: {
+  estado: EstadoVisible
+  onClick?: () => void
+  /** Qué va a pasar al apretarlo; sin esto el chip no dice que se puede apretar. */
+  titulo?: string
+}) {
+  if (!onClick) return <span className={CHIP_DE_PERIODO}>{ETIQUETA[estado]}</span>
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={titulo}
+      className={cn(
+        CHIP_DE_PERIODO,
+        'transition-colors hover:bg-accent hover:text-accent-foreground',
+      )}
+    >
+      {ETIQUETA[estado]}
+    </button>
+  )
 }

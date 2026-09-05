@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { SelectorFecha } from './SelectorFecha'
-import { CampoMonto, CampoTexto } from './CampoMonto'
+import { CampoFijo, CampoMonto, CampoTexto } from './CampoMonto'
 import { DialogoDeAccion } from './DialogoDeAccion'
 import type { DialogoNovedadProps } from './DialogoPagoAdicional'
 import { useAccion } from '@/hooks/useAccion'
@@ -65,15 +65,45 @@ function montoDelLibro(liquidacion: Liquidacion, libro: Libro): string {
   return libro === 'FORMAL' ? liquidacion.totalAPagarFormal : liquidacion.totalAPagarInformal
 }
 
+/** Cómo se nombra una liquidación en el desplegable y en el renglón de la fija. */
+function etiquetaDeLiquidacion(l: Liquidacion): string {
+  const tipo = ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo
+  const periodo = formatearPeriodoCapitalizado(parseFechaISO(l.periodo))
+  const secuencia = l.secuencia > 1 ? ` (#${l.secuencia})` : ''
+  return `${tipo} ${periodo}${secuencia} — ${formatearImporte(l.totalAPagar)}`
+}
+
+/** El concepto por defecto del pago: el período y, si es del otro libro, que no lleva BPS. */
+function conceptoDe(elegida: Liquidacion, deLibro: Libro): string {
+  const periodo = formatearPeriodoCapitalizado(parseFechaISO(elegida.periodo))
+  const base =
+    elegida.tipo === 'MENSUAL'
+      ? `Sueldo ${periodo}`
+      : `${ETIQUETA_TIPO_LIQUIDACION[elegida.tipo] ?? elegida.tipo} ${periodo}`
+  return deLibro === 'INFORMAL' ? `${base} (sin aportes)` : base
+}
+
+/** El libro que le falta cobrar; si no falta ninguno, el primero que la liquidación paga. */
+function libroSugerido(elegida: Liquidacion, siNoTiene: Libro): Libro {
+  return elegida.faltan[0] ?? elegida.libros[0] ?? siNoTiene
+}
+
 /**
  * El cuerpo se monta solo mientras el diálogo está abierto: así el formulario arranca limpio
  * en cada apertura, sin un efecto que lo resetee.
  */
-export function DialogoPagoBancario(props: DialogoNovedadProps) {
+/**
+ * `liquidacionFija` es el id de la liquidación desde la que se abrió el diálogo —el chip «Sin
+ * pagar» de la pantalla de liquidación—. Con ella el vínculo no se elige: ya está decidido, y
+ * el desplegable se cambia por el renglón que dice cuál es.
+ */
+type PropsPagoBancario = DialogoNovedadProps & { liquidacionFija?: string }
+
+export function DialogoPagoBancario(props: PropsPagoBancario) {
   return props.abierto ? <Cuerpo {...props} /> : null
 }
 
-function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
+function Cuerpo({ onCerrar, empleadoId, alias, vinculo, liquidacionFija }: PropsPagoBancario) {
   const router = useRouter()
   const { ejecutar, enviando, campos } = useAccion<{ id: string }>()
 
@@ -83,33 +113,40 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   const [concepto, setConcepto] = useState(
     () => `Sueldo ${formatearPeriodoCapitalizado(sumarMeses(primerDiaDelMes(hoy()), -1))}`,
   )
-  const [liquidacionId, setLiquidacionId] = useState<string>(SIN_VINCULO)
+  const [liquidacionId, setLiquidacionId] = useState<string>(liquidacionFija ?? SIN_VINCULO)
   const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([])
   const [libro, setLibro] = useState<Libro>('FORMAL')
 
-  // Sincronización con el servidor: el setState va en el callback, no en el cuerpo del efecto.
+  /*
+    Sincronización con el servidor: el setState va en el callback, no en el cuerpo del efecto.
+
+    Con una liquidación fija, la precarga se hace acá y no al elegirla, porque nadie la elige:
+    hay que esperar a que llegue la lista para saber qué libro le falta y cuánto paga.
+  */
   useEffect(() => {
     let vigente = true
     liquidacionesParaPago(empleadoId).then((r) => {
       if (!vigente || !r.ok) return
       setLiquidaciones(r.datos.liquidaciones)
+
+      const fija = liquidacionFija
+        ? r.datos.liquidaciones.find((l) => l.id === liquidacionFija)
+        : undefined
+      if (fija) {
+        const sugerido = libroSugerido(fija, 'FORMAL')
+        setLibro(sugerido)
+        setMonto(montoDelLibro(fija, sugerido))
+        setConcepto(conceptoDe(fija, sugerido))
+        return
+      }
+
       // Sin liquidación vinculada, el libro por defecto es el que le toca a la empleada.
       setLibro(r.datos.aportaBps ? 'FORMAL' : 'INFORMAL')
     })
     return () => {
       vigente = false
     }
-  }, [empleadoId])
-
-  /** El concepto por defecto del pago: el período y, si es del otro libro, que no lleva BPS. */
-  function conceptoDe(elegida: Liquidacion, deLibro: Libro): string {
-    const periodo = formatearPeriodoCapitalizado(parseFechaISO(elegida.periodo))
-    const base =
-      elegida.tipo === 'MENSUAL'
-        ? `Sueldo ${periodo}`
-        : `${ETIQUETA_TIPO_LIQUIDACION[elegida.tipo] ?? elegida.tipo} ${periodo}`
-    return deLibro === 'INFORMAL' ? `${base} (sin aportes)` : base
-  }
+  }, [empleadoId, liquidacionFija])
 
   function elegirLiquidacion(valor: string) {
     setLiquidacionId(valor)
@@ -118,8 +155,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
     const elegida = liquidaciones.find((l) => l.id === valor)
     if (!elegida) return
 
-    // El libro que falta pagar; si no falta ninguno, el primero que la liquidación paga.
-    const sugerido = elegida.faltan[0] ?? elegida.libros[0] ?? libro
+    const sugerido = libroSugerido(elegida, libro)
     setLibro(sugerido)
     setMonto(montoDelLibro(elegida, sugerido))
     setConcepto(conceptoDe(elegida, sugerido))
@@ -137,6 +173,18 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
   }
 
   const vinculada = liquidaciones.find((l) => l.id === liquidacionId) ?? null
+
+  /**
+   * Con una liquidación vinculada, el formulario deja de tener qué preguntar: el libro y el
+   * importe salen de ella. Se ofrecen los libros que **todavía tienen algo que cobrar** —los
+   * de importe positivo, menos los que ya se pagaron—, así que el desplegable aparece solo
+   * cuando hay de verdad dos caminos. Con uno solo es un campo fijo: un menú de una opción es
+   * una manera de equivocarse sin ganar nada.
+   *
+   * Sin liquidación vinculada el pago es libre y siguen los dos libros y el importe a mano.
+   */
+  const librosACobrar = vinculada ? vinculada.faltan : LIBROS
+  const libroDecidido = vinculada !== null && librosACobrar.length <= 1
 
   function guardar() {
     ejecutar(
@@ -170,60 +218,71 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
       enviando={enviando}
     >
       <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="pago-banc-liquidacion">Liquidación vinculada</Label>
-          <Select
-            value={liquidacionId}
-            onValueChange={elegirLiquidacion}
-            disabled={enviando}
-          >
-            <SelectTrigger id="pago-banc-liquidacion">
-              <SelectValue placeholder="Ninguna" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={SIN_VINCULO}>Ninguna</SelectItem>
-              {liquidaciones.map((l) => (
-                <SelectItem key={l.id} value={l.id}>
-                  {ETIQUETA_TIPO_LIQUIDACION[l.tipo] ?? l.tipo} {formatearPeriodoCapitalizado(parseFechaISO(l.periodo))}
-                  {l.secuencia > 1 ? ` (#${l.secuencia})` : ''} — {formatearImporte(l.totalAPagar)}
-                  {l.pago === 'PARCIAL'
-                    ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
-                    : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-sm text-muted-foreground">
-            Vincularla es lo que la marca como pagada.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="pago-banc-libro">Libro</Label>
-          <Select value={libro} onValueChange={elegirLibro} disabled={enviando}>
-            <SelectTrigger id="pago-banc-libro">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LIBROS.map((l) => (
-                <SelectItem key={l} value={l}>
-                  {ETIQUETA_LIBRO[l]}
-                  {vinculada && vinculada.libros.includes(l)
-                    ? ` — ${formatearImporte(montoDelLibro(vinculada, l))}`
-                    : ''}
-                  {vinculada && vinculada.libros.includes(l) && !vinculada.faltan.includes(l)
-                    ? ' · ya pagado'
-                    : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {vinculada && vinculada.libros.length > 1 ? (
+        {liquidacionFija ? (
+          <CampoFijo
+            id="pago-banc-liquidacion"
+            etiqueta="Liquidación vinculada"
+            valor={vinculada ? etiquetaDeLiquidacion(vinculada) : '…'}
+          />
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-banc-liquidacion">Liquidación vinculada</Label>
+            <Select value={liquidacionId} onValueChange={elegirLiquidacion} disabled={enviando}>
+              <SelectTrigger id="pago-banc-liquidacion">
+                <SelectValue placeholder="Ninguna" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_VINCULO}>Ninguna</SelectItem>
+                {liquidaciones.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {etiquetaDeLiquidacion(l)}
+                    {l.pago === 'PARCIAL'
+                      ? ` · falta ${l.faltan.map((f) => ETIQUETA_LIBRO[f]).join(' y ')}`
+                      : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-sm text-muted-foreground">
-              Esta liquidación se paga en dos transferencias, una por libro.
+              Vincularla es lo que la marca como pagada.
             </p>
-          ) : null}
-        </div>
+          </div>
+        )}
+
+        {libroDecidido ? (
+          <CampoFijo
+            id="pago-banc-libro"
+            etiqueta="Libro"
+            valor={ETIQUETA_LIBRO[libro]}
+            ayuda={
+              vinculada && vinculada.libros.length > 1
+                ? 'El otro libro de esta liquidación ya está pagado.'
+                : undefined
+            }
+          />
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-banc-libro">Libro</Label>
+            <Select value={libro} onValueChange={elegirLibro} disabled={enviando}>
+              <SelectTrigger id="pago-banc-libro">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {librosACobrar.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {ETIQUETA_LIBRO[l]}
+                    {vinculada ? ` — ${formatearImporte(montoDelLibro(vinculada, l))}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {vinculada ? (
+              <p className="text-sm text-muted-foreground">
+                Esta liquidación se paga en dos transferencias, una por libro.
+              </p>
+            ) : null}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="pago-banc-fecha">Fecha</Label>
@@ -240,6 +299,11 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
           {campos.fecha ? <p className="text-sm text-destructive">{campos.fecha}</p> : null}
         </div>
 
+        {/*
+          Con una liquidación vinculada el importe es el del libro elegido y no se tipea: es la
+          cifra que la aplicación va a dar por cobrada, así que dejarla escribir solo habilita
+          equivocarse. Sin liquidación el pago es libre y el importe vuelve a ser un campo.
+        */}
         <CampoMonto
           id="pago-banc-monto"
           etiqueta="Monto"
@@ -247,6 +311,7 @@ function Cuerpo({ onCerrar, empleadoId, alias, vinculo }: DialogoNovedadProps) {
           onChange={setMonto}
           error={campos.monto}
           disabled={enviando}
+          soloLectura={vinculada !== null}
         />
 
         <CampoTexto

@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
+/** Cómo se ve un campo que no se puede tipear: la misma caja, sin el anillo del foco. */
+const CLASES_SOLO_LECTURA = 'bg-muted/60 focus-visible:ring-0 focus-visible:border-input'
+
 export type CampoMontoProps = {
   id: string
   etiqueta: string
@@ -18,6 +21,8 @@ export type CampoMontoProps = {
   ayuda?: string
   className?: string
   autoFocus?: boolean
+  /** El importe lo decide el formulario y no se tipea; ver `CampoFijo`. */
+  soloLectura?: boolean
 }
 
 export function CampoMonto({
@@ -30,6 +35,7 @@ export function CampoMonto({
   ayuda,
   className,
   autoFocus,
+  soloLectura,
 }: CampoMontoProps) {
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -46,12 +52,13 @@ export function CampoMonto({
           value={valor}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
+          readOnly={soloLectura}
           inputMode="decimal"
           autoComplete="off"
           autoFocus={autoFocus}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : ayuda ? `${id}-ayuda` : undefined}
-          className="tabular pl-7"
+          className={cn('tabular pl-7', soloLectura && CLASES_SOLO_LECTURA)}
         />
       </div>
       {error ? (
@@ -63,6 +70,34 @@ export function CampoMonto({
           {ayuda}
         </p>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Un dato que el formulario **no deja cambiar**, dibujado como los que sí: con su etiqueta y
+ * su caja. Una línea de texto suelta no marca dónde termina un campo y empieza el otro, y en
+ * un formulario de cuatro renglones eso se nota.
+ *
+ * Va `readOnly` y no `disabled` para que se pueda leer, seleccionar y copiar, y para que siga
+ * estando en el orden de tabulación: es un dato del formulario, no un control apagado.
+ */
+export function CampoFijo({
+  id,
+  etiqueta,
+  valor,
+  ayuda,
+}: {
+  id: string
+  etiqueta: string
+  valor: string
+  ayuda?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{etiqueta}</Label>
+      <Input id={id} value={valor} readOnly className={CLASES_SOLO_LECTURA} />
+      {ayuda ? <p className="text-sm text-muted-foreground">{ayuda}</p> : null}
     </div>
   )
 }
