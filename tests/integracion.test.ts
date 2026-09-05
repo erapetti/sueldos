@@ -567,7 +567,25 @@ describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
       renglones: [{ fecha: '2026-05-06', horas: 4, conBps: true, recargoPct: 100 }],
       borrar: [],
     })
-    await liquidar(empleado.id, '2026-05', true)
+    expect((await liquidar(empleado.id, '2026-05', true)).ok).toBe(true)
+
+    /*
+      §7.6.1 — la segunda se cobra antes de encadenar la tercera: mientras la última del
+      período no tenga ningún pago no se puede confirmar otra (`admiteLiquidacionNueva`). El
+      caso que este test mira —cómo se acumula `total_ya_liquidado` en la tercera— es el mismo,
+      porque cobrar no cambia ningún importe.
+    */
+    const segunda = await prisma.liquidacion.findFirstOrThrow({
+      where: { empleadoId: empleado.id, secuencia: 2 },
+    })
+    await registrarPagoBancario({
+      empleadoId: empleado.id,
+      fecha: '2026-06-06',
+      monto: segunda.totalAPagar.toString(),
+      libro: 'FORMAL',
+      concepto: 'Complementaria mayo',
+      liquidacionId: segunda.id,
+    })
 
     await guardarPagoAdicional({
       empleadoId: empleado.id,
@@ -575,7 +593,7 @@ describe('19 y 21. liquidación complementaria (§7.6.1)', () => {
       monto: '1500',
       concepto: 'Premio',
     })
-    await liquidar(empleado.id, '2026-05', true)
+    expect((await liquidar(empleado.id, '2026-05', true)).ok).toBe(true)
 
     const tercera = await prisma.liquidacion.findFirstOrThrow({
       where: { empleadoId: empleado.id, secuencia: 3 },
