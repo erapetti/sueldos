@@ -177,6 +177,41 @@ haya alrededor. Aun así, si aparece ese aviso conviene borrar el lockfile suelt
 es la marca de un `npm install` corrido por error fuera del proyecto, que además dejó un
 `node_modules` en el home.
 
+### 4.2. Cuando la aplicación no conecta con la base
+
+El síntoma es siempre el mismo, diga lo que diga la causa:
+
+```
+Database error. Code: `45028`. Message: `pool timeout: failed to retrieve a connection from
+pool after 10000ms (pool connections: active=0 idle=0 limit=10)`
+```
+
+Ese mensaje **no distingue** entre la base caída, una clave equivocada, la base inexistente o
+el tope de conexiones lleno: el pool reintenta hasta agotar el plazo y reporta el plazo, no el
+motivo. El motivo viaja en la causa del error, que el log recorta como `[cause]: [Object]`.
+
+Para verlo, copiar el diagnóstico al servidor y correrlo desde el directorio del proyecto —
+necesita el `node_modules` de ahí—:
+
+```bash
+scp scripts/diag-db.mjs servidor:~/sueldos/
+ssh servidor 'cd ~/sueldos && sudo -E node diag-db.mjs'
+```
+
+Toma la `DATABASE_URL` del proceso del servicio, así prueba la cadena exacta que usa la
+aplicación. Si conecta, informa además las conexiones en uso y el tope; si no, imprime la causa
+real: `ER_ACCESS_DENIED_ERROR`, `ECONNREFUSED`, `ER_BAD_DB_ERROR` o la que sea.
+
+Dos causas que ya se dieron, las dos con este mismo mensaje:
+
+- **La clave con `%` en la unidad.** `Environment=` expande `%` como especificador de systemd,
+  así que la clave llega mutilada y da *access denied*. Un `%` literal se escribe `%%`.
+  `systemctl show sueldos -p Environment` muestra el valor ya resuelto —con la clave en claro
+  en pantalla—, y el diagnóstico imprime cuántos caracteres tiene la que realmente usa.
+- **La autenticación `caching_sha2_password` después de reiniciar MySQL.** Está explicada en
+  `IMPLEMENTATION_HINTS.md` y resuelta en `lib/db/urlConexion.ts` para bases en loopback. Si la
+  base pasa a otra máquina, hay que resolverla con TLS o con `cachingRsaPublicKey`.
+
 ### 5. oauth2-proxy
 
 La aplicación **no implementa login** (§3.1): corre detrás de oauth2-proxy contra Google.
